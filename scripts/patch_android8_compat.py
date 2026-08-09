@@ -3,8 +3,13 @@
 
 MediaPipe tasks-vision 1.0.0 imports aligned_alloc@LIBC_P. Android 8.1
 (API 27) does not export that symbol, while memalign has the same two-argument
-ABI and is available on old Android releases. This tool renames the undefined
-dynamic symbol to memalign and clears its API-28 symbol-version requirement.
+ABI and is available on old Android releases.
+
+Do not rewrite bytes in the ELF string table. String-table entries can be
+shared by more than one symbol and changing them in place can corrupt an
+otherwise valid native library. Instead, this tool redirects aligned_alloc's
+dynamic-symbol name offset and version index to the library's existing
+memalign@LIBC import. No executable code or string-table byte is changed.
 """
 
 from __future__ import annotations
@@ -19,7 +24,6 @@ SHT_DYNSYM = 11
 SHT_GNU_VERSYM = 0x6FFFFFFF
 OLD_SYMBOL = b"aligned_alloc"
 NEW_SYMBOL = b"memalign"
-VER_NDX_GLOBAL = 1
 
 
 class ElfError(RuntimeError):
@@ -89,8 +93,7 @@ def patch_elf(path: pathlib.Path, check_only: bool = False) -> int:
     symbol_entry_size = dynsym["entry_size"] or (16 if elf_class == 1 else 24)
     symbol_count = dynsym["size"] // symbol_entry_size
 
-    old_indexes: list[int] = []
-    compatible_indexes: list[int] = []
+    symbols: list[dict[str, int | bytes]] = []
     for symbol_index in range(symbol_count):
         symbol_offset = dynsym["offset"] + symbol_index * symbol_entry_size
         name_index = struct.unpack_from("<I", data, symbol_offset + symbol_name_offset)[0]
@@ -99,32 +102,61 @@ def patch_elf(path: pathlib.Path, check_only: bool = False) -> int:
         name_offset = dynstr["offset"] + name_index
         name = _cstring(data, name_offset)
         version = struct.unpack_from("<H", data, versym["offset"] + symbol_index * 2)[0] & 0x7FFF
-        if name == OLD_SYMBOL:
-            old_indexes.append(symbol_index)
-            if not check_only:
-                replacement = NEW_SYMBOL + b"\0" * (len(OLD_SYMBOL) - len(NEW_SYMBOL))
-                data[name_offset : name_offset + len(OLD_SYMBOL)] = replacement
-                struct.pack_into("<H", data, versym["offset"] + symbol_index * 2, VER_NDX_GLOBAL)
-        elif name == NEW_SYMBOL and version == VER_NDX_GLOBAL:
-            compatible_indexes.append(symbol_index)
+        symbols.append(
+            {
+                "index": symbol_index,
+                "offset": symbol_offset,
+                "name_index": name_index,
+                "name": name,
+                "version": version,
+            }
+        )
+
+    old_symbols = [symbol for symbol in symbols if symbol["name"] == OLD_SYMBOL]
+    memalign_symbols = [symbol for symbol in symbols if symbol["name"] == NEW_SYMBOL]
+
+    # Prefer the normal versioned libc import already used by this exact ELF.
+    # Its name offset and version are known-good for the target Android linker.
+    replacement_symbol = next(
+        (symbol for symbol in memalign_symbols if int(symbol["version"]) > 1),
+        memalign_symbols[0] if memalign_symbols else None,
+    )
 
     if check_only:
-        if old_indexes:
+        if old_symbols:
             raise ElfError(f"{path}: still imports aligned_alloc")
-        if not compatible_indexes:
-            raise ElfError(f"{path}: compatible unversioned memalign import not found")
-        print(f"OK {path}: Android 8 compatibility symbol verified")
+        if len(memalign_symbols) < 2:
+            raise ElfError(f"{path}: redirected memalign import not found")
+        versions = {int(symbol["version"]) for symbol in memalign_symbols}
+        if len(versions) != 1 or 0 in versions or 1 in versions:
+            raise ElfError(f"{path}: memalign imports do not share a versioned libc binding")
+        print(f"OK {path}: Android 8 memalign redirect verified")
         return 0
 
-    if not old_indexes:
-        if compatible_indexes:
+    if not old_symbols:
+        if len(memalign_symbols) >= 2:
             print(f"SKIP {path}: already patched")
             return 0
         raise ElfError(f"{path}: aligned_alloc import not found")
+    if replacement_symbol is None:
+        raise ElfError(f"{path}: existing memalign import not found")
+
+    replacement_name_index = int(replacement_symbol["name_index"])
+    replacement_version = int(replacement_symbol["version"])
+    if replacement_version <= 1:
+        raise ElfError(f"{path}: existing memalign import is not version-bound to libc")
+
+    for symbol in old_symbols:
+        struct.pack_into(
+            "<I", data, int(symbol["offset"]) + symbol_name_offset, replacement_name_index
+        )
+        struct.pack_into(
+            "<H", data, versym["offset"] + int(symbol["index"]) * 2, replacement_version
+        )
 
     path.write_bytes(data)
-    print(f"PATCHED {path}: {len(old_indexes)} symbol(s)")
-    return len(old_indexes)
+    print(f"PATCHED {path}: redirected {len(old_symbols)} symbol(s) to memalign")
+    return len(old_symbols)
 
 
 def main() -> int:

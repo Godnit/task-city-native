@@ -8,6 +8,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.os.SystemClock
+import android.util.Log
 import androidx.camera.core.ImageProxy
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.framework.image.MPImage
@@ -22,6 +23,7 @@ class HandLandmarkerHelper(
     private val listener: Listener
 ) {
     private var handLandmarker: HandLandmarker? = null
+    private var resultCount = 0
 
     fun setup() {
         try {
@@ -42,6 +44,7 @@ class HandLandmarkerHelper(
                 .build()
 
             handLandmarker = HandLandmarker.createFromOptions(context, options)
+            Log.i(TAG, "HAND_TRACKER_READY")
             listener.onReady()
         } catch (error: Throwable) {
             listener.onError("تعذّر تحميل نموذج اليد: ${error.message ?: error.javaClass.simpleName}")
@@ -80,12 +83,19 @@ class HandLandmarkerHelper(
             listener.onError("تعذّر تدوير صورة الكاميرا: ${error.message ?: error.javaClass.simpleName}")
             return
         }
-
         val mpImage = BitmapImageBuilder(rotated).build()
-        detector.detectAsync(mpImage, SystemClock.uptimeMillis())
+        try {
+            detector.detectAsync(mpImage, SystemClock.uptimeMillis())
+        } catch (error: Throwable) {
+            listener.onError("تعذّر تحليل صورة الكاميرا: ${error.message ?: error.javaClass.simpleName}")
+        }
     }
 
     private fun onResult(result: HandLandmarkerResult, input: MPImage) {
+        resultCount++
+        if (resultCount == 1 || resultCount == 10) {
+            Log.i(TAG, "HAND_TRACKER_RESULT_$resultCount")
+        }
         listener.onResults(
             ResultBundle(
                 result = result,
@@ -115,6 +125,7 @@ class HandLandmarkerHelper(
     }
 
     companion object {
+        private const val TAG = "HandGestureCube"
         private const val MODEL_PATH = "hand_landmarker.task"
     }
 }

@@ -6,3 +6,9 @@
 /app/build/
 *.jks
 *.keystore
+__pycache__/
+*.pyc
+*.apk
+*.zip
+artifact/
+artifact-v1.2/
