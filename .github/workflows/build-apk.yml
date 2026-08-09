@@ -1,0 +1,66 @@
+name: Build Hand Gesture Cube APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Add offline MediaPipe hand model
+        run: |
+          npm ci
+          mkdir -p app/src/main/assets/mediapipe
+          cp node_modules/@mediapipe/hands/hands.js app/src/main/assets/mediapipe/
+          cp node_modules/@mediapipe/hands/hands.binarypb app/src/main/assets/mediapipe/
+          cp node_modules/@mediapipe/hands/hand_landmark_lite.tflite app/src/main/assets/mediapipe/
+          cp node_modules/@mediapipe/hands/hands_solution_packed_assets_loader.js app/src/main/assets/mediapipe/
+          cp node_modules/@mediapipe/hands/hands_solution_packed_assets.data app/src/main/assets/mediapipe/
+          cp node_modules/@mediapipe/hands/hands_solution_simd_wasm_bin.* app/src/main/assets/mediapipe/
+          cp node_modules/@mediapipe/hands/hands_solution_wasm_bin.* app/src/main/assets/mediapipe/
+
+      - name: Test gesture logic
+        run: node tests/gesture-core.test.js
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build signed release APK
+        run: gradle --no-daemon assembleRelease
+
+      - name: Verify APK archive
+        run: unzip -t app/build/outputs/apk/release/app-release.apk
+
+      - name: Prepare named APK
+        run: cp app/build/outputs/apk/release/app-release.apk Hand-Gesture-Cube-v1.0.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hand-Gesture-Cube-v1.0
+          path: Hand-Gesture-Cube-v1.0.apk
+          if-no-files-found: error
+          retention-days: 30
