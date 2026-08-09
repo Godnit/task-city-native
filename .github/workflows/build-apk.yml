@@ -1,4 +1,4 @@
-name: Build Hand Gesture Cube APK
+name: Build Hand Gesture Cube Native APK
 
 on:
   push:
@@ -18,26 +18,12 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: npm
-
-      - name: Add offline MediaPipe hand model
+      - name: Add offline native hand model
         run: |
-          npm ci
-          mkdir -p app/src/main/assets/mediapipe
-          cp node_modules/@mediapipe/hands/hands.js app/src/main/assets/mediapipe/
-          cp node_modules/@mediapipe/hands/hands.binarypb app/src/main/assets/mediapipe/
-          cp node_modules/@mediapipe/hands/hand_landmark_lite.tflite app/src/main/assets/mediapipe/
-          cp node_modules/@mediapipe/hands/hands_solution_packed_assets_loader.js app/src/main/assets/mediapipe/
-          cp node_modules/@mediapipe/hands/hands_solution_packed_assets.data app/src/main/assets/mediapipe/
-          cp node_modules/@mediapipe/hands/hands_solution_simd_wasm_bin.* app/src/main/assets/mediapipe/
-          cp node_modules/@mediapipe/hands/hands_solution_wasm_bin.* app/src/main/assets/mediapipe/
-
-      - name: Test gesture logic
-        run: node tests/gesture-core.test.js
+          mkdir -p app/src/main/assets
+          curl -L --fail --retry 3 \
+            -o app/src/main/assets/hand_landmarker.task \
+            https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -56,13 +42,19 @@ jobs:
       - name: Verify APK archive
         run: unzip -t app/build/outputs/apk/release/app-release.apk
 
+      - name: Verify signature and native libraries
+        run: |
+          $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose app/build/outputs/apk/release/app-release.apk
+          unzip -l app/build/outputs/apk/release/app-release.apk | grep 'assets/hand_landmarker.task'
+          unzip -l app/build/outputs/apk/release/app-release.apk | grep 'lib/armeabi-v7a/'
+
       - name: Prepare named APK
-        run: cp app/build/outputs/apk/release/app-release.apk Hand-Gesture-Cube-v1.0.apk
+        run: cp app/build/outputs/apk/release/app-release.apk Hand-Gesture-Cube-v1.1.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hand-Gesture-Cube-v1.0
-          path: Hand-Gesture-Cube-v1.0.apk
+          name: Hand-Gesture-Cube-v1.1
+          path: Hand-Gesture-Cube-v1.1.apk
           if-no-files-found: error
           retention-days: 30

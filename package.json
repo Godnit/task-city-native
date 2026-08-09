@@ -1,8 +1,0 @@
-{
-  "name": "hand-gesture-cube-assets",
-  "private": true,
-  "version": "1.0.0",
-  "dependencies": {
-    "@mediapipe/hands": "0.4.1675469240"
-  }
-}
