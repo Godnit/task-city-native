@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#07111f">
+  <title>تتبع اليد والمكعب</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">HAND TRACKER • v1.0</p>
+        <h1 id="screenTitle">اختبار تتبع اليد</h1>
+      </div>
+      <div id="statusPill" class="status-pill waiting"><span></span><b>جاري التجهيز</b></div>
+    </header>
+
+    <section id="cameraStage" class="camera-stage" aria-label="منطقة الكاميرا">
+      <video id="camera" autoplay muted playsinline></video>
+      <canvas id="landmarkCanvas"></canvas>
+      <div class="scan-line"></div>
+      <div class="corner corner-a"></div><div class="corner corner-b"></div>
+      <div class="corner corner-c"></div><div class="corner corner-d"></div>
+
+      <div id="startHint" class="start-hint">
+        <div class="hand-icon">🖐️</div>
+        <strong>ارفع يدًا واحدة أمام الكاميرا</strong>
+        <span>اجعل كامل الكف والأصابع داخل الإطار</span>
+      </div>
+
+      <div id="cubeWorld" class="cube-world hidden" aria-label="المكعب المتحرك">
+        <div id="cube" class="cube">
+          <div class="face front">✦</div><div class="face back"></div>
+          <div class="face right"></div><div class="face left"></div>
+          <div class="face top"></div><div class="face bottom"></div>
+        </div>
+      </div>
+
+      <div id="gestureBadge" class="gesture-badge hidden"><span id="gestureEmoji">🖐️</span><b id="gestureName">كف مفتوح</b></div>
+      <div class="fps"><span id="fpsValue">0</span> FPS</div>
+    </section>
+
+    <section id="testPanel" class="bottom-panel">
+      <div class="panel-heading">
+        <div><p>نتيجة الفحص</p><h2 id="testResult">بانتظار ظهور اليد…</h2></div>
+        <div id="progressRing" class="progress-ring" style="--p:0"><span>0%</span></div>
+      </div>
+      <div class="finger-grid" aria-label="حالة الأصابع">
+        <div class="finger" data-finger="thumb"><span>👍</span><b>الإبهام</b><small>—</small></div>
+        <div class="finger" data-finger="index"><span>☝️</span><b>السبابة</b><small>—</small></div>
+        <div class="finger" data-finger="middle"><span>✌️</span><b>الوسطى</b><small>—</small></div>
+        <div class="finger" data-finger="ring"><span>💍</span><b>البنصر</b><small>—</small></div>
+        <div class="finger" data-finger="pinky"><span>🤙</span><b>الخنصر</b><small>—</small></div>
+      </div>
+      <button id="cubeModeButton" class="primary-button" disabled>
+        <span>ابدأ التحكم بالمكعب</span><b>←</b>
+      </button>
+    </section>
+
+    <section id="controlPanel" class="bottom-panel hidden">
+      <div class="control-readout">
+        <div><small>الحركة</small><b id="moveReadout">المنتصف</b></div>
+        <div><small>الحجم</small><b id="scaleReadout">100%</b></div>
+        <div><small>الإيماءة</small><b id="controlGesture">—</b></div>
+      </div>
+      <div class="tip"><span>👌</span><p><b>قرّب الإبهام والسبابة أو أبعدهما</b><br>لتصغير المكعب وتكبيره</p></div>
+      <div class="button-row">
+        <button id="backToTest" class="secondary-button">اختبار اليد</button>
+        <button id="calibrateButton" class="primary-button compact">معايرة المنتصف</button>
+      </div>
+    </section>
+
+    <section id="errorPanel" class="error-panel hidden">
+      <span>⚠️</span><div><b id="errorTitle">تعذّر تشغيل الكاميرا</b><p id="errorMessage"></p></div>
+      <button id="retryButton">إعادة المحاولة</button>
+    </section>
+  </main>
+
+  <script src="mediapipe/hands.js"></script>
+  <script src="gesture-core.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
