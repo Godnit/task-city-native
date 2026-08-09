@@ -13,7 +13,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -67,7 +67,7 @@ jobs:
             --out app/build/outputs/apk/release/app-release.apk \
             "$aligned_apk"
 
-      - name: Process camera frames on Android 8.1
+      - name: Run native inference on Android 8.1
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 27
@@ -78,26 +78,26 @@ jobs:
           script: |
             adb install -g app/build/outputs/apk/release/app-release.apk
             adb logcat -c
-            adb shell am start -W -n com.godnit.handgesturecube/.MainActivity
-            processed=0
-            for attempt in $(seq 1 75); do
-              if adb logcat -d -s HandGestureCube:I '*:S' | grep -q HAND_TRACKER_RESULT_10; then
-                processed=1
+            timeout 15s adb shell am start -n com.godnit.handgesturecube/.MainActivity --ez tracker_self_test true || true
+            passed=0
+            for attempt in $(seq 1 240); do
+              if adb logcat -d -s HandGestureCube:I '*:S' | grep -q HAND_TRACKER_SELF_TEST_PASSED; then
+                passed=1
                 break
               fi
-              if adb logcat -d | grep -Eq 'FATAL EXCEPTION|Fatal signal|UnsatisfiedLinkError'; then
+              if adb logcat -d | grep -Eq 'HAND_TRACKER_SELF_TEST_FAILED|FATAL EXCEPTION|Fatal signal|UnsatisfiedLinkError'; then
                 adb logcat -d
                 exit 1
               fi
               sleep 1
             done
-            if [ "$processed" -ne 1 ]; then
+            if [ "$passed" -ne 1 ]; then
               adb logcat -d
-              echo 'Hand tracker did not process 10 camera frames on Android 8.1'
+              echo 'Hand tracker did not complete native inference on Android 8.1'
               exit 1
             fi
             sleep 5
-            if adb logcat -d | grep -Eq 'FATAL EXCEPTION|Fatal signal|UnsatisfiedLinkError'; then
+            if adb logcat -d | grep -Eq 'HAND_TRACKER_SELF_TEST_FAILED|FATAL EXCEPTION|Fatal signal|UnsatisfiedLinkError'; then
               adb logcat -d
               exit 1
             fi

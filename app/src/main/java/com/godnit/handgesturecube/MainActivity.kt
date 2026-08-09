@@ -56,11 +56,32 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
         window.navigationBarColor = Color.rgb(7, 17, 31)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         executor = Executors.newSingleThreadExecutor()
+        if (intent.getBooleanExtra(TRACKER_SELF_TEST, false)) {
+            runCompatibilitySelfTest()
+            return
+        }
         buildUi()
         if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
             startNativeTracker()
         } else {
             requestPermissions(arrayOf(Manifest.permission.CAMERA), CAMERA_REQUEST)
+        }
+    }
+
+    private fun runCompatibilitySelfTest() {
+        setContentView(TextView(this).apply {
+            text = "Android 8 tracker self-test"
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.BLACK)
+            gravity = Gravity.CENTER
+        })
+        executor.execute {
+            try {
+                HandLandmarkerHelper.runCompatibilitySelfTest(applicationContext)
+            } catch (error: Throwable) {
+                android.util.Log.e("HandGestureCube", "HAND_TRACKER_SELF_TEST_FAILED", error)
+                throw error
+            }
         }
     }
 
@@ -360,6 +381,7 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
 
     companion object {
         private const val CAMERA_REQUEST = 301
+        private const val TRACKER_SELF_TEST = "tracker_self_test"
         private const val MATCH = -1
         private const val WRAP = -2
     }

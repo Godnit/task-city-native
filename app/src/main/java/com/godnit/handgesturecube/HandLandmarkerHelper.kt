@@ -127,5 +127,29 @@ class HandLandmarkerHelper(
     companion object {
         private const val TAG = "HandGestureCube"
         private const val MODEL_PATH = "hand_landmarker.task"
+
+        fun runCompatibilitySelfTest(context: Context) {
+            val baseOptions = BaseOptions.builder()
+                .setDelegate(Delegate.CPU)
+                .setModelAssetPath(MODEL_PATH)
+                .build()
+            val options = HandLandmarker.HandLandmarkerOptions.builder()
+                .setBaseOptions(baseOptions)
+                .setRunningMode(RunningMode.IMAGE)
+                .setNumHands(1)
+                .build()
+            val detector = HandLandmarker.createFromOptions(context, options)
+            try {
+                repeat(3) { index ->
+                    val bitmap = Bitmap.createBitmap(192, 192, Bitmap.Config.ARGB_8888)
+                    val input = BitmapImageBuilder(bitmap).build()
+                    detector.detect(input)
+                    Log.i(TAG, "HAND_TRACKER_SELF_TEST_${index + 1}")
+                }
+                Log.i(TAG, "HAND_TRACKER_SELF_TEST_PASSED")
+            } finally {
+                detector.close()
+            }
+        }
     }
 }
