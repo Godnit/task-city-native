@@ -39,22 +39,46 @@ jobs:
       - name: Build signed release APK
         run: gradle --no-daemon assembleRelease
 
+      - name: Patch MediaPipe for Android 8.1
+        run: |
+          patch_root="$RUNNER_TEMP/hand-gesture-apk-patch"
+          unsigned_apk="$RUNNER_TEMP/hand-gesture-v1.2-unsigned.apk"
+          aligned_apk="$RUNNER_TEMP/hand-gesture-v1.2-aligned.apk"
+          mkdir -p "$patch_root"
+          unzip -q app/build/outputs/apk/release/app-release.apk -x 'META-INF/*' -d "$patch_root"
+          python3 scripts/patch_android8_compat.py "$patch_root"/lib/*/libmediapipe_tasks_jni.so
+          (cd "$patch_root" && zip -q -r "$unsigned_apk" .)
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -p -f 4 "$unsigned_apk" "$aligned_apk"
+          debug_keystore="$(find /home/runner/.android -maxdepth 1 -name debug.keystore -print -quit)"
+          test -n "$debug_keystore"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign \
+            --ks "$debug_keystore" \
+            --ks-key-alias androiddebugkey \
+            --ks-pass pass:android \
+            --key-pass pass:android \
+            --out app/build/outputs/apk/release/app-release.apk \
+            "$aligned_apk"
+
       - name: Verify APK archive
         run: unzip -t app/build/outputs/apk/release/app-release.apk
 
-      - name: Verify signature and native libraries
+      - name: Verify signature and Android 8 compatibility
         run: |
           $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose app/build/outputs/apk/release/app-release.apk
           unzip -l app/build/outputs/apk/release/app-release.apk | grep 'assets/hand_landmarker.task'
           unzip -l app/build/outputs/apk/release/app-release.apk | grep 'lib/armeabi-v7a/'
+          verify_root="$RUNNER_TEMP/hand-gesture-apk-verify"
+          mkdir -p "$verify_root"
+          unzip -q app/build/outputs/apk/release/app-release.apk 'lib/*/libmediapipe_tasks_jni.so' -d "$verify_root"
+          python3 scripts/patch_android8_compat.py --check "$verify_root"/lib/*/libmediapipe_tasks_jni.so
 
       - name: Prepare named APK
-        run: cp app/build/outputs/apk/release/app-release.apk Hand-Gesture-Cube-v1.1.apk
+        run: cp app/build/outputs/apk/release/app-release.apk Hand-Gesture-Cube-v1.2.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hand-Gesture-Cube-v1.1
-          path: Hand-Gesture-Cube-v1.1.apk
+          name: Hand-Gesture-Cube-v1.2
+          path: Hand-Gesture-Cube-v1.2.apk
           if-no-files-found: error
           retention-days: 30
