@@ -1,4 +1,4 @@
-name: Build Task City Bright Native APK
+name: Build Task City Fixed View Native APK
 
 on:
   push:
@@ -16,7 +16,7 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Reconstruct curated Mega Pack neighborhood
+      - name: Reconstruct fixed-view suburban city
         run: |
           set -euxo pipefail
           rm -rf app/src/main/assets/city
@@ -24,23 +24,26 @@ jobs:
           cat assets_payload/templates6.xz.b64.part* | base64 -d | xz -d > /tmp/taskcity/templates.obj
           test -s /tmp/taskcity/templates.obj
           grep -q '^g TEMPLATE_HOUSE_06$' /tmp/taskcity/templates.obj
-          grep -q '^g TEMPLATE_SCENERY_TREE_00$' /tmp/taskcity/templates.obj
-          python3 scripts/build_city_asset.py /tmp/taskcity/templates.obj app/src/main/assets/city/scene.obj
+          python3 scripts/build_city_asset_v4.py /tmp/taskcity/templates.obj app/src/main/assets/city/scene.obj
           cp assets_payload/city.mtl app/src/main/assets/city/scene.mtl
           cp assets_payload/license.txt app/src/main/assets/city/LICENSE.txt
           test -s app/src/main/assets/city/scene.obj
-          grep -q '^g HOUSE_12_' app/src/main/assets/city/scene.obj
+          grep -q '^g HOUSE_20_' app/src/main/assets/city/scene.obj
           grep -q '^g HOUSE_01_ROOF$' app/src/main/assets/city/scene.obj
           grep -q '^g HOUSE_01_WALL$' app/src/main/assets/city/scene.obj
           ! grep -q '^g SCENERY_LOT_' app/src/main/assets/city/scene.obj
-          grep -q '^g SCENERY_TREE_00_LEAF$' app/src/main/assets/city/scene.obj
-          grep -q '^g SCENERY_TREE_00_TRUNK$' app/src/main/assets/city/scene.obj
-          echo "House owners: $(grep '^g HOUSE_' app/src/main/assets/city/scene.obj | sed -E 's/^g (HOUSE_[0-9][0-9]).*/\1/' | sort -u | wc -l)"
-          echo "Tree parts: $(grep -c '^g SCENERY_TREE_' app/src/main/assets/city/scene.obj)"
+          OWNERS=$(grep '^g HOUSE_' app/src/main/assets/city/scene.obj | sed -E 's/^g (HOUSE_[0-9][0-9]).*/\1/' | sort -u | wc -l)
+          echo "House owners: $OWNERS"
+          test "$OWNERS" -eq 20
+          grep -q '^g SCENERY_TREE_00_LEAF_A$' app/src/main/assets/city/scene.obj
+          grep -q '^g SCENERY_MAIN_SOUTH_' app/src/main/assets/city/scene.obj
           du -sh app/src/main/assets/city
 
-      - name: Apply bright renderer, lighting, and stable pinch zoom
+      - name: Apply daylight renderer
         run: python3 scripts/patch_task_city_v2.py
+
+      - name: Lock fixed camera and horizontal pan only
+        run: python3 scripts/patch_task_city_v4.py
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -65,16 +68,13 @@ jobs:
           $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose "$APK"
           SIZE=$(stat -c '%s' "$APK")
           echo "APK_BYTES=$SIZE"
-          if [ "$SIZE" -gt 12582912 ]; then
-            echo "APK unexpectedly larger than 12 MiB"
-            exit 1
-          fi
+          test "$SIZE" -lt 12582912
           $ANDROID_HOME/build-tools/35.0.0/aapt dump badging "$APK" | tee badging.txt
           grep -q "sdkVersion:'26'" badging.txt
           unzip -l "$APK" | grep 'assets/city/scene.obj'
           unzip -l "$APK" | grep 'assets/city/scene.mtl'
 
-      - name: Run launch test on Android 8.1 and capture full-city preview
+      - name: Run Android 8.1 launch test and capture preview
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 27
@@ -90,22 +90,22 @@ jobs:
             adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' | grep 'com.godnit.taskcity'
             ! adb logcat -d | grep -E 'FATAL EXCEPTION|AndroidRuntime.*com.godnit.taskcity'
             mkdir -p build-output
-            adb exec-out screencap -p > build-output/TaskCity-Bright-Preview.png
-            test -s build-output/TaskCity-Bright-Preview.png
+            adb exec-out screencap -p > build-output/TaskCity-FixedView-Preview.png
+            test -s build-output/TaskCity-FixedView-Preview.png
 
       - name: Prepare named APK
         run: |
-          cp app/build/outputs/apk/release/app-release.apk TaskCity-Bright-Android8.apk
-          sha256sum TaskCity-Bright-Android8.apk > SHA256SUMS.txt
-          stat -c 'Final APK bytes: %s' TaskCity-Bright-Android8.apk
+          cp app/build/outputs/apk/release/app-release.apk TaskCity-FixedView-Android8.apk
+          sha256sum TaskCity-FixedView-Android8.apk > SHA256SUMS.txt
+          stat -c 'Final APK bytes: %s' TaskCity-FixedView-Android8.apk
 
-      - name: Upload APK and Android 8.1 preview
+      - name: Upload APK and preview
         uses: actions/upload-artifact@v4
         with:
-          name: TaskCity-Bright-Android8
+          name: TaskCity-FixedView-Android8
           path: |
-            TaskCity-Bright-Android8.apk
+            TaskCity-FixedView-Android8.apk
             SHA256SUMS.txt
-            build-output/TaskCity-Bright-Preview.png
+            build-output/TaskCity-FixedView-Preview.png
           if-no-files-found: error
           retention-days: 30
