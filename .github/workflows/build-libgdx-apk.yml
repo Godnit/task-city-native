@@ -1,0 +1,95 @@
+name: Build Task City libGDX APK
+
+on:
+  push:
+    branches: [task-city-libgdx]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Prepare libGDX task city source
+        run: |
+          set -euxo pipefail
+          rm -rf app/src/main/assets/city app/src/main/assets/web
+          python3 scripts/patch_libgdx_city.py
+          grep -q 'class MainActivity : AndroidApplication' app/src/main/java/com/godnit/taskcity/MainActivity.kt
+          grep -q 'TaskCityGame' app/src/main/java/com/godnit/taskcity/MainActivity.kt
+          grep -q 'TASKCITY_LIBGDX_READY' app/src/main/java/com/godnit/taskcity/TaskCityGame.kt
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build signed release APK
+        run: gradle --no-daemon assembleRelease
+
+      - name: Verify compact Android 8.1 APK
+        run: |
+          set -euxo pipefail
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          unzip -t "$APK"
+          $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose "$APK"
+          SIZE=$(stat -c '%s' "$APK")
+          echo "APK_BYTES=$SIZE"
+          test "$SIZE" -lt 20971520
+          $ANDROID_HOME/build-tools/35.0.0/aapt dump badging "$APK" | tee badging.txt
+          grep -q "sdkVersion:'26'" badging.txt
+          unzip -l "$APK" | grep 'lib/x86/libgdx.so'
+          unzip -l "$APK" | grep 'lib/armeabi-v7a/libgdx.so'
+          unzip -l "$APK" | grep 'lib/arm64-v8a/libgdx.so'
+
+      - name: Run libGDX city on Android 8.1 and capture preview
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 27
+          arch: x86
+          profile: Nexus 5X
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          script: |
+            adb install -r app/build/outputs/apk/release/app-release.apk
+            adb logcat -c
+            adb shell am start -W -n com.godnit.taskcity/.MainActivity --ez preview_all true | tee launch.txt
+            sleep 10
+            adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' | grep 'com.godnit.taskcity'
+            adb logcat -d | grep 'TASKCITY_LIBGDX_READY' | tee libgdx-status.txt
+            ! adb logcat -d | grep -E 'FATAL EXCEPTION|AndroidRuntime.*com.godnit.taskcity'
+            mkdir -p build-output
+            adb exec-out screencap -p > build-output/TaskCity-libGDX-Preview.png
+            test -s build-output/TaskCity-libGDX-Preview.png
+            cp libgdx-status.txt build-output/libgdx-status.txt
+
+      - name: Prepare named APK
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk TaskCity-libGDX-Android8.apk
+          sha256sum TaskCity-libGDX-Android8.apk > SHA256SUMS.txt
+          stat -c 'Final APK bytes: %s' TaskCity-libGDX-Android8.apk
+
+      - name: Upload APK and preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: TaskCity-libGDX-Android8
+          path: |
+            TaskCity-libGDX-Android8.apk
+            SHA256SUMS.txt
+            build-output/TaskCity-libGDX-Preview.png
+            build-output/libgdx-status.txt
+          if-no-files-found: error
+          retention-days: 30
