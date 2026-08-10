@@ -24,18 +24,19 @@ jobs:
           curl -fL --retry 4 --retry-delay 2 \
             https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js \
             -o app/src/main/assets/web/three.min.js
+          python3 scripts/patch_three_html_debug.py
           test -s app/src/main/assets/web/three.min.js
           test -s app/src/main/assets/web/index.html
           grep -q 'THREE.WebGLRenderer' app/src/main/assets/web/index.html
           grep -q 'DirectionalLight' app/src/main/assets/web/index.html
-          grep -q 'shadowMap.enabled=true' app/src/main/assets/web/index.html
+          grep -q 'dataset.ready' app/src/main/assets/web/index.html
           wc -c app/src/main/assets/web/three.min.js app/src/main/assets/web/index.html
 
       - name: Switch city view to Three.js WebView
         run: |
           python3 scripts/patch_threejs_city.py
           grep -q 'private class CityWebView' app/src/main/java/com/godnit/taskcity/MainActivity.kt
-          grep -q 'window.setCity' app/src/main/java/com/godnit/taskcity/MainActivity.kt
+          grep -q 'TaskCityWeb' app/src/main/java/com/godnit/taskcity/MainActivity.kt
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -81,10 +82,12 @@ jobs:
             adb shell am start -W -n com.godnit.taskcity/.MainActivity --ez preview_all true | tee launch.txt
             sleep 10
             adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' | grep 'com.godnit.taskcity'
+            adb logcat -d | grep 'TaskCityWeb' | tee three-status.txt || true
             ! adb logcat -d | grep -E 'FATAL EXCEPTION|AndroidRuntime.*com.godnit.taskcity'
             mkdir -p build-output
             adb exec-out screencap -p > build-output/TaskCity-ThreeJS-Preview.png
             test -s build-output/TaskCity-ThreeJS-Preview.png
+            cp three-status.txt build-output/three-status.txt || true
 
       - name: Prepare named APK
         run: |
@@ -100,5 +103,6 @@ jobs:
             TaskCity-ThreeJS-Android8.apk
             SHA256SUMS.txt
             build-output/TaskCity-ThreeJS-Preview.png
+            build-output/three-status.txt
           if-no-files-found: error
           retention-days: 30
