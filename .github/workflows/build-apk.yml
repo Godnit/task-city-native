@@ -54,16 +54,6 @@ jobs:
             fi
           done < <(find "$inspect_root" -type f -name '*.so' -print0)
 
-      - name: Run native inference on Android 8.1
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 27
-          arch: x86
-          profile: Nexus 5X
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-front emulated
-          disable-animations: true
-          script: bash scripts/android8_self_test.sh
-
       - name: Verify APK archive
         run: unzip -t app/build/outputs/apk/release/app-release.apk
 
@@ -115,3 +105,13 @@ jobs:
           path: Hand-Gesture-Cube-v1.8.1-Direct-Realtime.apk
           if-no-files-found: error
           retention-days: 30
+
+      - name: Run native inference on Android 8.1
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 27
+          arch: x86
+          profile: Nexus 5X
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-front emulated
+          disable-animations: true
+          script: bash scripts/android8_self_test.sh
