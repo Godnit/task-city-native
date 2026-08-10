@@ -86,7 +86,6 @@ jobs:
           emulator-boot-timeout: 480
           disable-animations: true
           script: |
-            set -euxo pipefail
             adb install -r app/build/outputs/apk/release/app-release.apk
             adb logcat -c
             adb shell am start -n com.godnit.taskcity/.MainActivity --ez preview_all true
@@ -94,7 +93,7 @@ jobs:
             mkdir -p build-output
             adb logcat -d > build-output/logcat.txt
             grep 'TASKCITY_LIBGDX_READY' build-output/logcat.txt | tee build-output/libgdx-status.txt
-            ! grep -E 'FATAL EXCEPTION|Process: com.godnit.taskcity|AndroidRuntime.*com.godnit.taskcity' build-output/logcat.txt
+            if grep -E 'FATAL EXCEPTION|Process: com.godnit.taskcity|AndroidRuntime.*com.godnit.taskcity' build-output/logcat.txt; then exit 1; fi
             test -n "$(adb shell pidof com.godnit.taskcity | tr -d '\r')"
             adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' | grep 'com.godnit.taskcity'
             adb exec-out screencap -p > build-output/TaskCity-libGDX-Safe-Preview.png
