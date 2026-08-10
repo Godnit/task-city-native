@@ -1,0 +1,77 @@
+name: Build Network Academy Install Fix
+
+on:
+  push:
+    branches: [network-academy-install-fix]
+    paths:
+      - 'network-fix/**'
+      - '.github/workflows/network-academy-install-fix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android build tools
+        run: sdkmanager "build-tools;35.0.0"
+
+      - name: Assemble APK
+        run: |
+          cat network-fix/chunk_*.b64 > /tmp/app.b64
+          test "$(wc -c < /tmp/app.b64)" -eq 97800
+          base64 -d /tmp/app.b64 > /tmp/app-unsigned.apk
+          unzip -t /tmp/app-unsigned.apk
+          test "$(stat -c%s /tmp/app-unsigned.apk)" -eq 73350
+
+      - name: Align APK
+        run: |
+          ZIPALIGN="$ANDROID_HOME/build-tools/35.0.0/zipalign"
+          "$ZIPALIGN" -f -p 4 /tmp/app-unsigned.apk /tmp/app-aligned.apk
+          "$ZIPALIGN" -c -v 4 /tmp/app-aligned.apk
+
+      - name: Create signing key
+        run: |
+          keytool -genkeypair -v \
+            -keystore /tmp/network-fix.keystore \
+            -storepass android \
+            -keypass android \
+            -alias networkfix \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Network Academy Fix,O=Godnit,C=US"
+
+      - name: Sign and verify APK
+        run: |
+          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          ZIPALIGN="$ANDROID_HOME/build-tools/35.0.0/zipalign"
+          "$APKSIGNER" sign \
+            --ks /tmp/network-fix.keystore \
+            --ks-pass pass:android \
+            --key-pass pass:android \
+            --v1-signing-enabled true \
+            --v2-signing-enabled true \
+            --v3-signing-enabled true \
+            --out Network_Academy_Beginner_v4_InstallFix.apk \
+            /tmp/app-aligned.apk
+          "$APKSIGNER" verify --verbose --print-certs Network_Academy_Beginner_v4_InstallFix.apk
+          "$ZIPALIGN" -c -v 4 Network_Academy_Beginner_v4_InstallFix.apk
+          file Network_Academy_Beginner_v4_InstallFix.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Network-Academy-v4-InstallFix
+          path: Network_Academy_Beginner_v4_InstallFix.apk
+          if-no-files-found: error
+          retention-days: 7
