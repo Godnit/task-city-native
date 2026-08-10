@@ -18,6 +18,16 @@ s = s.replace(anchor, extra, 1)
 
 s = s.replace('class MainActivity : Activity() {', 'class MainActivity : AndroidApplication() {', 1)
 s = s.replace('private lateinit var glView: CityGLView', 'private lateinit var cityGame: TaskCityGame', 1)
+
+# Android 8.x is sensitive to modern nestmate-style private-field access from
+# anonymous Runnable classes. Keep the timer field directly accessible as an
+# ordinary JVM field in addition to compiling the app to Java 8 bytecode.
+s = s.replace(
+    '    private val handler = Handler(Looper.getMainLooper())',
+    '    @JvmField val handler = Handler(Looper.getMainLooper())',
+    1
+)
+
 s = s.replace('        if (::glView.isInitialized) glView.onResume()\n', '', 1)
 s = s.replace('        if (::glView.isInitialized) glView.onPause()\n', '', 1)
 
@@ -29,10 +39,6 @@ old_oncreate = '''        window.statusBarColor = Color.rgb(7, 17, 31)
 new_oncreate = '''        window.statusBarColor = Color.rgb(7, 17, 31)
         window.navigationBarColor = Color.BLACK
 
-        // Important: initialize libGDX as the Activity content first.  The previous
-        // build used initializeForView() and then replaced the content view, which
-        // can fail during Android startup on some devices.  Keep the game surface
-        // as the real content view and place the task controls transparently above it.
         cityGame = TaskCityGame()
         val gameConfig = AndroidApplicationConfiguration().apply {
             useAccelerometer = false
@@ -58,8 +64,7 @@ s = s.replace(old_oncreate, new_oncreate, 1)
 s = s.replace('setBackgroundColor(Color.rgb(7, 17, 31))\n            layoutDirection = View.LAYOUT_DIRECTION_RTL',
               'setBackgroundColor(Color.TRANSPARENT)\n            layoutDirection = View.LAYOUT_DIRECTION_RTL', 1)
 
-# Remove the old native OpenGL/libGDX view insertion from buildUi(). The libGDX
-# surface is already installed by initialize() above.
+# Remove the old native view insertion; initialize() owns the libGDX surface.
 old_view = '''        glView = CityGLView(this)
         root.addView(glView, FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
