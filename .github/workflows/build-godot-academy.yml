@@ -14,6 +14,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Prepare selected app icon
         run: |
+          wc -c godot-academy/icon_parts_v5/part*.txt
           cat \
             godot-academy/icon_parts_v5/part01.txt \
             godot-academy/icon_parts_v5/part02.txt \
@@ -23,7 +24,9 @@ jobs:
             godot-academy/icon_parts_v5/part06.txt \
             godot-academy/icon_parts_v5/part07a.txt \
             godot-academy/icon_parts_v5/part07b.txt > /tmp/godot_icon.b64
-          test "$(wc -c < /tmp/godot_icon.b64)" -eq 12356
+          wc -c /tmp/godot_icon.b64
+          sha256sum /tmp/godot_icon.b64
+          echo "5611bd74ec73f5ef966259b20c995dd1f1f2768f1889a32fd373ffd911255210  /tmp/godot_icon.b64" | sha256sum -c -
           base64 -d /tmp/godot_icon.b64 > godot-academy/app/src/main/res/drawable/ic_launcher_v5.jpg
           echo "0082d45c39384e0f31e9fe501d7a0519e10d0221f8fb0e970f66b8541e90bd2c  godot-academy/app/src/main/res/drawable/ic_launcher_v5.jpg" | sha256sum -c -
           test "$(wc -c < godot-academy/app/src/main/res/drawable/ic_launcher_v5.jpg)" -eq 9266
