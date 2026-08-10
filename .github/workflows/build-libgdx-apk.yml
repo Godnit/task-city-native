@@ -21,9 +21,11 @@ jobs:
           set -euxo pipefail
           rm -rf app/src/main/assets/city app/src/main/assets/web
           python3 scripts/patch_libgdx_city.py
+          python3 scripts/patch_libgdx_visual_v2.py
           grep -q 'class MainActivity : AndroidApplication' app/src/main/java/com/godnit/taskcity/MainActivity.kt
           grep -q 'TaskCityGame' app/src/main/java/com/godnit/taskcity/MainActivity.kt
           grep -q 'TASKCITY_LIBGDX_READY' app/src/main/java/com/godnit/taskcity/TaskCityGame.kt
+          grep -q 'Clearly visible warm sun' app/src/main/java/com/godnit/taskcity/TaskCityGame.kt
 
       - name: Set up Java
         uses: actions/setup-java@v4
