@@ -11,8 +11,8 @@ android {
         applicationId 'com.godnit.taskcity'
         minSdk 26
         targetSdk 35
-        versionCode 2
-        versionName '1.1-libgdx'
+        versionCode 3
+        versionName '1.2-libgdx-safe'
     }
 
     buildTypes {
@@ -33,7 +33,7 @@ android {
     }
 }
 
-def gdxVersion = '1.13.1'
+def gdxVersion = '1.14.2'
 
 configurations {
     natives
