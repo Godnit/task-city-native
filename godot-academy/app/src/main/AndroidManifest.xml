@@ -2,7 +2,7 @@
     <application
         android:allowBackup="true"
         android:label="أكاديمية Godot"
-        android:icon="@drawable/ic_launcher"
+        android:icon="@drawable/ic_launcher_v5"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:supportsRtl="true">
         <activity
