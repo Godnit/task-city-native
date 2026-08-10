@@ -1,19 +1,26 @@
-newmtl palette
-Kd 1 1 1
-map_Kd textures/palette_baseColor.jpeg
+newmtl house_wall
+Kd 0.94 0.88 0.73
 
-newmtl palette_windows
-Kd 1 1 1
-map_Kd textures/palette_windows_baseColor.jpeg
+newmtl house_roof
+Kd 0.84 0.28 0.16
+
+newmtl house_detail
+Kd 0.25 0.43 0.52
+
+newmtl tree_trunk
+Kd 0.42 0.25 0.12
+
+newmtl tree_leaf
+Kd 0.25 0.67 0.25
+
+newmtl shrub
+Kd 0.31 0.73 0.29
 
 newmtl grass
-Kd 0.36 0.68 0.31
-
-newmtl lotgrass
-Kd 0.46 0.76 0.37
+Kd 0.34 0.73 0.31
 
 newmtl road
 Kd 0.20 0.23 0.27
 
 newmtl sidewalk
-Kd 0.72 0.70 0.65
+Kd 0.79 0.77 0.69
