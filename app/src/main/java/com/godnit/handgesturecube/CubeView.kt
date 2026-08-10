@@ -5,46 +5,13 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
-import android.os.SystemClock
 import android.view.View
-import kotlin.math.abs
-import kotlin.math.exp
 import kotlin.math.min
 
 class CubeView(context: Context) : View(context) {
     private var cubeX = 0.5f
     private var cubeY = 0.5f
-    private var targetX = 0.5f
-    private var targetY = 0.5f
     private var grabbed = false
-    private var animationRunning = false
-    private var lastAnimationMs = 0L
-
-    private val animationStep = object : Runnable {
-        override fun run() {
-            if (!isAttachedToWindow) {
-                animationRunning = false
-                return
-            }
-            val now = SystemClock.uptimeMillis()
-            val dtSeconds = if (lastAnimationMs == 0L) 1f / 60f else
-                ((now - lastAnimationMs).coerceIn(1L, 34L)) / 1000f
-            lastAnimationMs = now
-
-            val alpha = 1f - exp(-CUBE_RESPONSE * dtSeconds)
-            cubeX += (targetX - cubeX) * alpha
-            cubeY += (targetY - cubeY) * alpha
-            invalidate()
-
-            val moving = abs(targetX - cubeX) > 0.0003f || abs(targetY - cubeY) > 0.0003f
-            if (moving) {
-                postOnAnimation(this)
-            } else {
-                animationRunning = false
-                lastAnimationMs = 0L
-            }
-        }
-    }
 
     private val front = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(35, 174, 255) }
     private val top = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(74, 235, 193) }
@@ -56,29 +23,22 @@ class CubeView(context: Context) : View(context) {
     }
 
     /**
-     * The cube receives hand coordinates only while the thumb and index finger
-     * are pinched. Releasing them freezes the target at its current position.
+     * Follow the newest detected pinch position immediately. Previous versions
+     * eased toward a target position, which added visible delay and made the
+     * cube suddenly catch up after the user's hand had already stopped.
      */
     fun setGrab(grab: Boolean, x: Float, y: Float) {
         grabbed = grab
         if (grab) {
-            targetX = x.coerceIn(0.10f, 0.86f)
-            targetY = y.coerceIn(0.12f, 0.90f)
-        } else {
-            // Freeze immediately where it was when the fingers opened.
-            targetX = cubeX
-            targetY = cubeY
+            cubeX = x.coerceIn(0.10f, 0.86f)
+            cubeY = y.coerceIn(0.12f, 0.90f)
+            postInvalidateOnAnimation()
         }
-        startAnimation()
     }
 
-    fun release() = setGrab(false, cubeX, cubeY)
-
-    private fun startAnimation() {
-        if (animationRunning) return
-        animationRunning = true
-        lastAnimationMs = 0L
-        postOnAnimation(animationStep)
+    fun release() {
+        grabbed = false
+        postInvalidateOnAnimation()
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -103,19 +63,13 @@ class CubeView(context: Context) : View(context) {
         val frontPath = Path().apply {
             moveTo(left, upper); lineTo(right, upper); lineTo(right, lower); lineTo(left, lower); close()
         }
-        canvas.drawPath(topPath, top); canvas.drawPath(sidePath, side); canvas.drawPath(frontPath, front)
-        canvas.drawPath(topPath, edge); canvas.drawPath(sidePath, edge); canvas.drawPath(frontPath, edge)
-    }
-
-    override fun onDetachedFromWindow() {
-        removeCallbacks(animationStep)
-        animationRunning = false
-        super.onDetachedFromWindow()
+        canvas.drawPath(topPath, top)
+        canvas.drawPath(sidePath, side)
+        canvas.drawPath(frontPath, front)
+        canvas.drawPath(topPath, edge)
+        canvas.drawPath(sidePath, edge)
+        canvas.drawPath(frontPath, edge)
     }
 
     private fun dp(value: Float) = value * resources.displayMetrics.density
-
-    companion object {
-        private const val CUBE_RESPONSE = 22f
-    }
 }
