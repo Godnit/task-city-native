@@ -11,7 +11,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 20
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -51,17 +51,34 @@ jobs:
           test "$SIZE" -lt 20971520
           $ANDROID_HOME/build-tools/35.0.0/aapt dump badging "$APK" | tee badging.txt
           grep -q "sdkVersion:'26'" badging.txt
-          unzip -l "$APK" | grep 'lib/x86/libgdx.so'
+          unzip -l "$APK" | grep 'lib/x86_64/libgdx.so'
           unzip -l "$APK" | grep 'lib/armeabi-v7a/libgdx.so'
           unzip -l "$APK" | grep 'lib/arm64-v8a/libgdx.so'
+
+      - name: Prepare named APK
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk TaskCity-libGDX-Android8.apk
+          sha256sum TaskCity-libGDX-Android8.apk > SHA256SUMS.txt
+          stat -c 'Final APK bytes: %s' TaskCity-libGDX-Android8.apk
+
+      - name: Upload verified APK immediately
+        uses: actions/upload-artifact@v4
+        with:
+          name: TaskCity-libGDX-Android8-APK
+          path: |
+            TaskCity-libGDX-Android8.apk
+            SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Run libGDX city on Android 8.1 and capture preview
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 27
-          arch: x86
+          arch: x86_64
           profile: Nexus 5X
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          emulator-boot-timeout: 480
           disable-animations: true
           script: |
             adb install -r app/build/outputs/apk/release/app-release.apk
@@ -76,19 +93,11 @@ jobs:
             test -s build-output/TaskCity-libGDX-Preview.png
             cp libgdx-status.txt build-output/libgdx-status.txt
 
-      - name: Prepare named APK
-        run: |
-          cp app/build/outputs/apk/release/app-release.apk TaskCity-libGDX-Android8.apk
-          sha256sum TaskCity-libGDX-Android8.apk > SHA256SUMS.txt
-          stat -c 'Final APK bytes: %s' TaskCity-libGDX-Android8.apk
-
-      - name: Upload APK and preview
+      - name: Upload runtime preview
         uses: actions/upload-artifact@v4
         with:
-          name: TaskCity-libGDX-Android8
+          name: TaskCity-libGDX-Android8-Preview
           path: |
-            TaskCity-libGDX-Android8.apk
-            SHA256SUMS.txt
             build-output/TaskCity-libGDX-Preview.png
             build-output/libgdx-status.txt
           if-no-files-found: error
