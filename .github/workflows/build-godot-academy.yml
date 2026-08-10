@@ -12,6 +12,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Validate JavaScript
+        run: |
+          node --check godot-academy/app/src/main/assets/app.js
+          node --check godot-academy/app/src/main/assets/data.js
+          node --check godot-academy/app/src/main/assets/godot-ui-v2.js
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
