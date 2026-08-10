@@ -20,6 +20,19 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
+      - name: Validate simulation JavaScript
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          html = Path('learner/src/main/assets/index.html').read_text(encoding='utf-8')
+          scripts = re.findall(r'<script>(.*?)</script>', html, flags=re.S)
+          if not scripts:
+              raise SystemExit('No inline JavaScript found')
+          Path('/tmp/learning-creature.js').write_text(scripts[-1], encoding='utf-8')
+          PY
+          node --check /tmp/learning-creature.js
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -36,6 +49,12 @@ jobs:
 
       - name: Verify APK archive
         run: unzip -t learner/build/outputs/apk/debug/learner-debug.apk
+
+      - name: Verify embedded simulation
+        run: |
+          unzip -p learner/build/outputs/apk/debug/learner-debug.apk assets/index.html | grep -q 'الكائن المتطوّر'
+          unzip -p learner/build/outputs/apk/debug/learner-debug.apk assets/index.html | grep -q 'إضاءة محمولة'
+          unzip -p learner/build/outputs/apk/debug/learner-debug.apk assets/index.html | grep -q 'عربة بسيطة'
 
       - name: Prepare APK
         run: cp learner/build/outputs/apk/debug/learner-debug.apk Learning-Creature-v0.2.apk
