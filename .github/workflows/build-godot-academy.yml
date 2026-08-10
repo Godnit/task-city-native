@@ -16,7 +16,13 @@ jobs:
         run: |
           base64 -d godot-academy/icon_v5.b64 > godot-academy/app/src/main/res/drawable/ic_launcher_v5.jpg
           cp godot-academy/app/src/main/res/drawable/ic_launcher_v5.jpg godot-academy/app/src/main/assets/godot_academy_icon_v5.jpg
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            mkdir -p "godot-academy/app/src/main/res/mipmap-${density}"
+            cp godot-academy/app/src/main/res/drawable/ic_launcher_v5.jpg "godot-academy/app/src/main/res/mipmap-${density}/ic_launcher.jpg"
+            cp godot-academy/app/src/main/res/drawable/ic_launcher_v5.jpg "godot-academy/app/src/main/res/mipmap-${density}/ic_launcher_round.jpg"
+          done
           test -s godot-academy/app/src/main/res/drawable/ic_launcher_v5.jpg
+          test -s godot-academy/app/src/main/res/mipmap-xxxhdpi/ic_launcher.jpg
           test -s godot-academy/app/src/main/assets/godot_academy_icon_v5.jpg
       - name: Validate JavaScript and complete curriculum
         run: |
@@ -52,9 +58,12 @@ jobs:
           grep -q 'Button وLabel يجب أن يكونا داخل Main(Control)' godot-academy/app/src/main/assets/godot-polish-v5.js
           grep -q 'رجوع للدرس' godot-academy/app/src/main/assets/godot-polish-v5.js
           grep -q 'godot_academy_icon_v5.jpg' godot-academy/app/src/main/assets/godot-polish-v5.js
-          grep -q '@drawable/ic_launcher_v5' godot-academy/app/src/main/AndroidManifest.xml
-          grep -q "versionCode 5" godot-academy/app/build.gradle
-          grep -q "versionName '5.0'" godot-academy/app/build.gradle
+          grep -q '@mipmap/ic_launcher' godot-academy/app/src/main/AndroidManifest.xml
+          grep -q '@mipmap/ic_launcher_round' godot-academy/app/src/main/AndroidManifest.xml
+          test -f godot-academy/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          test -f godot-academy/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+          grep -q "versionCode 6" godot-academy/app/build.gradle
+          grep -q "versionName '5.1'" godot-academy/app/build.gradle
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -68,7 +77,7 @@ jobs:
       - name: Build debug APK
         working-directory: godot-academy
         run: gradle --no-daemon assembleDebug
-      - name: Verify APK contents
+      - name: Verify APK contents and launcher icon
         run: |
           APK=godot-academy/app/build/outputs/apk/debug/app-debug.apk
           unzip -l "$APK" | grep -q 'assets/godot-curriculum-v4.js'
@@ -79,9 +88,13 @@ jobs:
           unzip -l "$APK" | grep -q 'assets/godot_academy_icon_v5.jpg'
           unzip -l "$APK" | grep -q 'assets/data.js'
           unzip -l "$APK" | grep -q 'classes.dex'
+          "${ANDROID_HOME}/build-tools/35.0.0/aapt" dump badging "$APK" | tee /tmp/badging.txt
+          grep -q "application: label='أكاديمية Godot'" /tmp/badging.txt
+          grep -q "application-icon-" /tmp/badging.txt
+          grep -Eq "mipmap|ic_launcher" /tmp/badging.txt
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: GodotAcademy-Professional-v5
+          name: GodotAcademy-Professional-v5.1-IconFix
           path: godot-academy/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
