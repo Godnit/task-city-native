@@ -47,6 +47,7 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
     private var totalResultFrames = 0
     private var lastResultAt = 0L
     private var smoothFps = 0f
+    private var trackerDelegate = "…"
     private var cubeMode = false
     private var cubeGrabbed = false
     private var missedHandFrames = 0
@@ -225,8 +226,9 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
     }
 
     override fun onReady(delegateName: String) {
+        trackerDelegate = delegateName
         runOnUiThread {
-            statusText.text = "النموذج جاهز • تسريع $delegateName"
+            statusText.text = "النموذج الخفيف جاهز • $delegateName"
             resultText.text = "المتتبع يعمل — ارفع يدك الآن"
             bindCamera()
         }
@@ -269,7 +271,7 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
                 smoothFps = if (smoothFps == 0f) instant else smoothFps * 0.86f + instant * 0.14f
             }
             lastResultAt = now
-            fpsText.text = "FPS ${smoothFps.toInt()}  •  ${bundle.inferenceMs} ms"
+            fpsText.text = "LITE $trackerDelegate  •  FPS ${smoothFps.toInt()}  •  ${bundle.inferenceMs} ms"
 
             val landmarks = bundle.result.landmarks().firstOrNull()
             if (landmarks == null) {
@@ -294,7 +296,7 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
             handFrames++
             overlayView.setResults(bundle.result, bundle.inputWidth, bundle.inputHeight)
             hintText.visibility = View.GONE
-            statusText.text = "تم اكتشاف اليد ✓"
+            statusText.text = "تم اكتشاف اليد ✓ • LITE $trackerDelegate"
             statusText.setTextColor(Color.rgb(55, 232, 178))
             val hand = analyze(landmarks)
             gestureText.text = "${hand.emoji}  ${hand.name}"
