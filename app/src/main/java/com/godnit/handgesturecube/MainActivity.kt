@@ -48,6 +48,8 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
     private var lastResultAt = 0L
     private var smoothFps = 0f
     private var cubeMode = false
+    private var cubeGrabbed = false
+    private var missedHandFrames = 0
     private val uiHandler = Handler(Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -184,12 +186,18 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
             background = rounded(Color.rgb(43, 77, 105), 20f, Color.TRANSPARENT)
             setOnClickListener {
                 cubeMode = !cubeMode
+                cubeGrabbed = false
+                cubeView.release()
                 cubeView.visibility = if (cubeMode) View.VISIBLE else View.GONE
                 overlayView.visibility = if (cubeMode) View.GONE else View.VISIBLE
                 hintText.visibility = View.GONE
                 text = if (cubeMode) "العودة إلى اختبار اليد" else "ابدأ التحكم بالمكعب"
                 title.text = if (cubeMode) "تحكم بالمكعب بيدك" else "اختبار تتبع اليد"
-                resultText.text = if (cubeMode) "حرّك يدك، وقرّب الإبهام والسبابة أو أبعدهما" else "الخطوط تتبع يدك بنجاح"
+                resultText.text = if (cubeMode) {
+                    "المكعب ثابت • ضم الإبهام والسبابة 👌 للإمساك به"
+                } else {
+                    "الخطوط تتبع يدك بنجاح"
+                }
             }
         }
         panel.addView(resultText, LinearLayout.LayoutParams(MATCH, WRAP))
@@ -262,14 +270,22 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
             if (landmarks == null) {
                 overlayView.clear()
                 handFrames = (handFrames - 1).coerceAtLeast(0)
-                statusText.text = "المتتبع يعمل • لم يجد يدًا"
-                if (!cubeMode) {
-                    resultText.text = "لم تظهر اليد — أبعدها قليلًا واجعل الكف كاملًا"
-                    hintText.visibility = View.VISIBLE
+                missedHandFrames++
+                if (missedHandFrames >= 3) {
+                    statusText.text = "المتتبع يعمل • لم يجد يدًا"
+                    if (!cubeMode) {
+                        resultText.text = "لم تظهر اليد — أبعدها قليلًا واجعل الكف كاملًا"
+                        hintText.visibility = View.VISIBLE
+                    } else if (cubeGrabbed) {
+                        cubeGrabbed = false
+                        cubeView.release()
+                        resultText.text = "توقّف المكعب • أظهر يدك ثم أمسكه مجددًا 👌"
+                    }
                 }
                 return@runOnUiThread
             }
 
+            missedHandFrames = 0
             handFrames++
             overlayView.setResults(bundle.result, bundle.inputWidth, bundle.inputHeight)
             hintText.visibility = View.GONE
@@ -287,12 +303,22 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
                 actionButton.background = rounded(Color.rgb(37, 174, 141), 20f, Color.TRANSPARENT)
             }
             if (cubeMode) {
-                val centerX = listOf(0, 5, 9, 13, 17).map { landmarks[it].x() }.average().toFloat()
-                val centerY = listOf(0, 5, 9, 13, 17).map { landmarks[it].y() }.average().toFloat()
                 val palm = distance(landmarks[5], landmarks[17]).coerceAtLeast(0.001f)
                 val pinch = distance(landmarks[4], landmarks[8]) / palm
-                val scale = 0.58f + ((pinch - 0.18f) / 1.25f).coerceIn(0f, 1f) * 1.05f
-                cubeView.update(centerX, centerY, scale)
+                // Two different thresholds stop the cube rapidly alternating
+                // between held/released when fingertips hover near the limit.
+                if (!cubeGrabbed && pinch < GRAB_THRESHOLD) cubeGrabbed = true
+                if (cubeGrabbed && pinch > RELEASE_THRESHOLD) cubeGrabbed = false
+
+                val pinchX = (landmarks[4].x() + landmarks[8].x()) * 0.5f
+                val pinchY = (landmarks[4].y() + landmarks[8].y()) * 0.5f
+                cubeView.setGrab(cubeGrabbed, pinchX, pinchY)
+                if (cubeGrabbed) {
+                    gestureText.text = "👌  تم الإمساك بالمكعب"
+                    resultText.text = "حرّك يدك • افتح الإبهام والسبابة لترك المكعب"
+                } else {
+                    resultText.text = "المكعب ثابت • ضم الإبهام والسبابة 👌 للإمساك به"
+                }
             }
         }
     }
@@ -382,6 +408,8 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
     companion object {
         private const val CAMERA_REQUEST = 301
         private const val TRACKER_SELF_TEST = "tracker_self_test"
+        private const val GRAB_THRESHOLD = 0.40f
+        private const val RELEASE_THRESHOLD = 0.55f
         private const val MATCH = -1
         private const val WRAP = -2
     }
