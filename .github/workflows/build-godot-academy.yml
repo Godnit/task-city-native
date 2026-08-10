@@ -12,18 +12,38 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate JavaScript and UI wiring
+      - name: Validate JavaScript and complete curriculum
         run: |
           node --check godot-academy/app/src/main/assets/app.js
           node --check godot-academy/app/src/main/assets/data.js
           node --check godot-academy/app/src/main/assets/godot-ui-v2.js
           node --check godot-academy/app/src/main/assets/godot-fixes-v3.js
-          grep -q 'godot-fixes-v3.css' godot-academy/app/src/main/assets/index.html
-          grep -q 'godot-fixes-v3.js' godot-academy/app/src/main/assets/index.html
-          grep -q 'function setAcademyFilterV3' godot-academy/app/src/main/assets/godot-fixes-v3.js
-          grep -q "\['all','الكل'\]" godot-academy/app/src/main/assets/godot-fixes-v3.js
-          grep -q 'data-tab="script"' godot-academy/app/src/main/assets/godot-fixes-v3.js
-          grep -q 'toggleAcademySearchV3' godot-academy/app/src/main/assets/godot-fixes-v3.js
+          node --check godot-academy/app/src/main/assets/godot-curriculum-v4.js
+          node --check godot-academy/app/src/main/assets/godot-complete-v4.js
+          node --check godot-academy/app/src/main/assets/godot-labs-v4-hotfix.js
+          node <<'NODE'
+          const fs=require('fs'),vm=require('vm');
+          const ctx={window:{},console};ctx.window=ctx;
+          vm.createContext(ctx);
+          vm.runInContext(fs.readFileSync('godot-academy/app/src/main/assets/data.js','utf8'),ctx);
+          ctx.DATA=ctx.GODOT_DATA;
+          vm.runInContext(fs.readFileSync('godot-academy/app/src/main/assets/godot-curriculum-v4.js','utf8'),ctx);
+          if(ctx.DATA.stages.length!==8) throw new Error('Expected 8 stages');
+          if(ctx.DATA.lessons.length!==96) throw new Error('Expected 96 lessons, got '+ctx.DATA.lessons.length);
+          for(let s=1;s<=8;s++){
+            const n=ctx.DATA.lessons.filter(l=>l.stageId===s).length;
+            if(n!==12) throw new Error('Stage '+s+' has '+n+' lessons');
+          }
+          for(let s=2;s<=8;s++) if(!ctx.GODOT_EXAMS_V4[s]||ctx.GODOT_EXAMS_V4[s].length!==5) throw new Error('Exam bank missing for stage '+s);
+          for(let s=2;s<=8;s++) if(!ctx.GODOT_PROJECTS_V4[s]) throw new Error('Project missing for stage '+s);
+          console.log('Curriculum OK: 8 stages, 96 lessons, 8 labs, 8 exams');
+          NODE
+          grep -q 'godot-complete-v4.css' godot-academy/app/src/main/assets/index.html
+          grep -q 'godot-curriculum-v4.js' godot-academy/app/src/main/assets/index.html
+          grep -q 'godot-complete-v4.js' godot-academy/app/src/main/assets/index.html
+          grep -q 'godot-labs-v4-hotfix.js' godot-academy/app/src/main/assets/index.html
+          grep -q "versionCode 4" godot-academy/app/build.gradle
+          grep -q "versionName '4.0'" godot-academy/app/build.gradle
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -39,13 +59,16 @@ jobs:
         run: gradle --no-daemon assembleDebug
       - name: Verify APK contents
         run: |
-          unzip -l godot-academy/app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/godot-fixes-v3.js'
-          unzip -l godot-academy/app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/godot-fixes-v3.css'
-          unzip -l godot-academy/app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/app.js'
-          unzip -l godot-academy/app/build/outputs/apk/debug/app-debug.apk | grep -q 'classes.dex'
+          APK=godot-academy/app/build/outputs/apk/debug/app-debug.apk
+          unzip -l "$APK" | grep -q 'assets/godot-curriculum-v4.js'
+          unzip -l "$APK" | grep -q 'assets/godot-complete-v4.js'
+          unzip -l "$APK" | grep -q 'assets/godot-labs-v4-hotfix.js'
+          unzip -l "$APK" | grep -q 'assets/godot-complete-v4.css'
+          unzip -l "$APK" | grep -q 'assets/data.js'
+          unzip -l "$APK" | grep -q 'classes.dex'
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: GodotAcademy-APK
+          name: GodotAcademy-Final-v4
           path: godot-academy/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
