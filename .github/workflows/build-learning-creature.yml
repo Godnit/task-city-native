@@ -50,19 +50,20 @@ jobs:
       - name: Verify APK archive
         run: unzip -t learner/build/outputs/apk/debug/learner-debug.apk
 
-      - name: Verify embedded simulation
+      - name: Verify embedded stage 2 simulation
         run: |
-          unzip -p learner/build/outputs/apk/debug/learner-debug.apk assets/index.html | grep -q 'الكائن المتطوّر'
-          unzip -p learner/build/outputs/apk/debug/learner-debug.apk assets/index.html | grep -q 'إضاءة محمولة'
-          unzip -p learner/build/outputs/apk/debug/learner-debug.apk assets/index.html | grep -q 'عربة بسيطة'
+          unzip -p learner/build/outputs/apk/debug/learner-debug.apk assets/index.html | grep -q 'المرحلة الثانية'
+          unzip -p learner/build/outputs/apk/debug/learner-debug.apk assets/index.html | grep -q 'هادئ جدًا 0.35×'
+          unzip -p learner/build/outputs/apk/debug/learner-debug.apk assets/index.html | grep -q 'الصندوق ثقيل'
+          unzip -p learner/build/outputs/apk/debug/learner-debug.apk assets/index.html | grep -q 'رف الأدوات'
 
       - name: Prepare APK
-        run: cp learner/build/outputs/apk/debug/learner-debug.apk Learning-Creature-v0.2.apk
+        run: cp learner/build/outputs/apk/debug/learner-debug.apk Learning-Creature-v0.3.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Learning-Creature-v0.2
-          path: Learning-Creature-v0.2.apk
+          name: Learning-Creature-v0.3
+          path: Learning-Creature-v0.3.apk
           if-no-files-found: error
           retention-days: 30
