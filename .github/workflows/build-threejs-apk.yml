@@ -1,0 +1,104 @@
+name: Build Task City ThreeJS APK
+
+on:
+  push:
+    branches: [task-city-threejs-v2]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Prepare embedded Three.js renderer
+        run: |
+          set -euxo pipefail
+          mkdir -p app/src/main/assets/web
+          rm -rf app/src/main/assets/city
+          curl -fL --retry 4 --retry-delay 2 \
+            https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js \
+            -o app/src/main/assets/web/three.min.js
+          test -s app/src/main/assets/web/three.min.js
+          test -s app/src/main/assets/web/index.html
+          grep -q 'THREE.WebGLRenderer' app/src/main/assets/web/index.html
+          grep -q 'DirectionalLight' app/src/main/assets/web/index.html
+          grep -q 'shadowMap.enabled=true' app/src/main/assets/web/index.html
+          wc -c app/src/main/assets/web/three.min.js app/src/main/assets/web/index.html
+
+      - name: Switch city view to Three.js WebView
+        run: |
+          python3 scripts/patch_threejs_city.py
+          grep -q 'private class CityWebView' app/src/main/java/com/godnit/taskcity/MainActivity.kt
+          grep -q 'window.setCity' app/src/main/java/com/godnit/taskcity/MainActivity.kt
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build signed release APK
+        run: gradle --no-daemon assembleRelease
+
+      - name: Verify compact Android 8.1 APK
+        run: |
+          set -euxo pipefail
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          unzip -t "$APK"
+          $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose "$APK"
+          SIZE=$(stat -c '%s' "$APK")
+          echo "APK_BYTES=$SIZE"
+          test "$SIZE" -lt 8388608
+          $ANDROID_HOME/build-tools/35.0.0/aapt dump badging "$APK" | tee badging.txt
+          grep -q "sdkVersion:'26'" badging.txt
+          unzip -l "$APK" | grep 'assets/web/index.html'
+          unzip -l "$APK" | grep 'assets/web/three.min.js'
+          ! unzip -l "$APK" | grep -q 'assets/city/scene.obj'
+
+      - name: Run on Android 8.1 and capture city preview
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 27
+          arch: x86
+          profile: Nexus 5X
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          script: |
+            adb install -r app/build/outputs/apk/release/app-release.apk
+            adb logcat -c
+            adb shell am start -W -n com.godnit.taskcity/.MainActivity --ez preview_all true | tee launch.txt
+            sleep 10
+            adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' | grep 'com.godnit.taskcity'
+            ! adb logcat -d | grep -E 'FATAL EXCEPTION|AndroidRuntime.*com.godnit.taskcity'
+            mkdir -p build-output
+            adb exec-out screencap -p > build-output/TaskCity-ThreeJS-Preview.png
+            test -s build-output/TaskCity-ThreeJS-Preview.png
+
+      - name: Prepare named APK
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk TaskCity-ThreeJS-Android8.apk
+          sha256sum TaskCity-ThreeJS-Android8.apk > SHA256SUMS.txt
+          stat -c 'Final APK bytes: %s' TaskCity-ThreeJS-Android8.apk
+
+      - name: Upload APK and preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: TaskCity-ThreeJS-Android8
+          path: |
+            TaskCity-ThreeJS-Android8.apk
+            SHA256SUMS.txt
+            build-output/TaskCity-ThreeJS-Preview.png
+          if-no-files-found: error
+          retention-days: 30
