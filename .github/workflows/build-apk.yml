@@ -1,5 +1,5 @@
 name: Build Hand Gesture Cube Native APK
-# v1.8.1 direct realtime validation
+# v1.9 corrected direction + lower-copy realtime validation
 
 on:
   push:
@@ -66,9 +66,9 @@ jobs:
 
       - name: Create lightweight 32-bit delivery APK
         run: |
-          light_work="$RUNNER_TEMP/hand-gesture-v1.8.1-light-work.apk"
-          light_aligned="$RUNNER_TEMP/hand-gesture-v1.8.1-light-aligned.apk"
-          release_keystore="$RUNNER_TEMP/hand-gesture-v1.8.1.keystore"
+          light_work="$RUNNER_TEMP/hand-gesture-v1.9-light-work.apk"
+          light_aligned="$RUNNER_TEMP/hand-gesture-v1.9-light-aligned.apk"
+          release_keystore="$RUNNER_TEMP/hand-gesture-v1.9.keystore"
           cp app/build/outputs/apk/release/app-release.apk "$light_work"
           zip -q -d "$light_work" 'lib/x86/*'
           "$ANDROID_HOME/build-tools/35.0.0/zipalign" -p -f 4 "$light_work" "$light_aligned"
@@ -96,13 +96,13 @@ jobs:
           fi
 
       - name: Prepare named APK
-        run: cp app/build/outputs/apk/release/app-release.apk Hand-Gesture-Cube-v1.8.1-Direct-Realtime.apk
+        run: cp app/build/outputs/apk/release/app-release.apk Hand-Gesture-Cube-v1.9-Corrected-Fast.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hand-Gesture-Cube-v1.8.1-Direct-Realtime
-          path: Hand-Gesture-Cube-v1.8.1-Direct-Realtime.apk
+          name: Hand-Gesture-Cube-v1.9-Corrected-Fast
+          path: Hand-Gesture-Cube-v1.9-Corrected-Fast.apk
           if-no-files-found: error
           retention-days: 30
 
