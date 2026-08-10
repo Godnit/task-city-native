@@ -52,9 +52,12 @@ class HandLandmarkerHelper(
             .setBaseOptions(baseOptions)
             .setRunningMode(RunningMode.LIVE_STREAM)
             .setNumHands(1)
-            .setMinHandDetectionConfidence(0.42f)
-            .setMinHandPresenceConfidence(0.42f)
-            .setMinTrackingConfidence(0.42f)
+            .setMinHandDetectionConfidence(0.40f)
+            // Keep the fast landmark tracker alive through brief pose/lighting
+            // changes. Re-running the palm detector is much more expensive on
+            // older 32-bit phones and was a major source of visible stalls.
+            .setMinHandPresenceConfidence(0.32f)
+            .setMinTrackingConfidence(0.25f)
             .setResultListener(::onResult)
             .setErrorListener {
                 frameInFlight.set(false)
