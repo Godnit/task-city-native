@@ -11,6 +11,7 @@ s = s.replace('row.addView(text, LinearLayout.LayoutParams(0, dp(64), 1f))', 'ro
 anchor = 'import android.widget.Toast\n'
 imports = '''import android.widget.Toast
 import android.annotation.SuppressLint
+import android.util.Log
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.webkit.WebSettings
@@ -48,6 +49,7 @@ private class CityWebView(context: Context) : WebView(context) {
 
     init {
         setBackgroundColor(Color.rgb(121, 211, 250))
+        setLayerType(View.LAYER_TYPE_HARDWARE, null)
         isHorizontalScrollBarEnabled = false
         isVerticalScrollBarEnabled = false
         overScrollMode = View.OVER_SCROLL_NEVER
@@ -62,6 +64,9 @@ private class CityWebView(context: Context) : WebView(context) {
             override fun onPageFinished(view: WebView?, url: String?) {
                 loaded = true
                 pushState()
+                evaluateJavascript("(document.body.dataset.ready||'not-ready')+'|'+(document.body.dataset.error||'no-error')") { value ->
+                    Log.i("TaskCityWeb", "THREE_STATUS=$value")
+                }
             }
         }
         loadUrl("file:///android_asset/web/index.html")
