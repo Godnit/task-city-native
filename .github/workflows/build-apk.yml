@@ -49,6 +49,17 @@ jobs:
           grep -E '^(o|g) ' scene.obj | head -40 || true
           du -sh "$GITHUB_WORKSPACE/app/src/main/assets/city"
 
+      - name: Apply tiny source compile fix
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/com/godnit/taskcity/MainActivity.kt')
+          s = p.read_text()
+          s = s.replace('val text = TextView(this).apply {', 'val taskText = TextView(this).apply {', 1)
+          s = s.replace('row.addView(text, LinearLayout.LayoutParams(0, dp(64), 1f))', 'row.addView(taskText, LinearLayout.LayoutParams(0, dp(64), 1f))')
+          p.write_text(s)
+          PY
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -79,7 +90,6 @@ jobs:
           fi
           $ANDROID_HOME/build-tools/35.0.0/aapt dump badging "$APK" | tee badging.txt
           grep -q "sdkVersion:'26'" badging.txt
-          grep -q "application-label-ar:'مدينة المهام'\|application-label:'مدينة المهام'" badging.txt || true
 
       - name: Run real launch test on Android 8.1
         uses: reactivecircus/android-emulator-runner@v2
