@@ -1,6 +1,8 @@
 name: Build Task City Mega Pack Native APK
 
 on:
+  push:
+    branches: [task-city-opengl-native]
   workflow_dispatch:
 
 permissions:
@@ -18,18 +20,24 @@ jobs:
         run: |
           set -euxo pipefail
           rm -rf app/src/main/assets/city
-          mkdir -p app/src/main/assets/city/textures
-          cat assets_payload/city.obj.gz.b64.part* | base64 -d | gunzip > app/src/main/assets/city/scene.obj
+          mkdir -p app/src/main/assets/city/textures /tmp/taskcity
+          cat assets_payload/templates6.xz.b64.part* | base64 -d | xz -d > /tmp/taskcity/templates.obj
+          test -s /tmp/taskcity/templates.obj
+          grep -q '^g TEMPLATE_HOUSE_06$' /tmp/taskcity/templates.obj
+          grep -q '^g TEMPLATE_SCENERY_TREE_00$' /tmp/taskcity/templates.obj
+          python3 scripts/build_city_asset.py /tmp/taskcity/templates.obj app/src/main/assets/city/scene.obj
           cat assets_payload/palette_baseColor.jpeg.b64 | base64 -d > app/src/main/assets/city/textures/palette_baseColor.jpeg
           cat assets_payload/palette_windows_baseColor.jpeg.b64 | base64 -d > app/src/main/assets/city/textures/palette_windows_baseColor.jpeg
           cp assets_payload/city.mtl app/src/main/assets/city/scene.mtl
           cp assets_payload/license.txt app/src/main/assets/city/LICENSE.txt
           test -s app/src/main/assets/city/scene.obj
           grep -q '^g HOUSE_12$' app/src/main/assets/city/scene.obj
+          test "$(grep -c '^g HOUSE_' app/src/main/assets/city/scene.obj)" -eq 12
           echo "House groups: $(grep -c '^g HOUSE_' app/src/main/assets/city/scene.obj)"
+          echo "Tree groups: $(grep -c '^g SCENERY_TREE_' app/src/main/assets/city/scene.obj)"
           du -sh app/src/main/assets/city
 
-      - name: Apply Task City v2 renderer and gesture patch
+      - name: Apply Task City v2 renderer and stable pinch zoom patch
         run: python3 scripts/patch_task_city_v2.py
 
       - name: Set up Java
@@ -48,6 +56,7 @@ jobs:
 
       - name: Verify compact Android 8.1-compatible APK
         run: |
+          set -euxo pipefail
           APK=app/build/outputs/apk/release/app-release.apk
           test -s "$APK"
           unzip -t "$APK"
@@ -61,6 +70,7 @@ jobs:
           $ANDROID_HOME/build-tools/35.0.0/aapt dump badging "$APK" | tee badging.txt
           grep -q "sdkVersion:'26'" badging.txt
           unzip -l "$APK" | grep 'assets/city/scene.obj'
+          unzip -l "$APK" | grep 'assets/city/textures/palette_baseColor.jpeg'
 
       - name: Run launch test on Android 8.1 and capture full-city preview
         uses: reactivecircus/android-emulator-runner@v2
