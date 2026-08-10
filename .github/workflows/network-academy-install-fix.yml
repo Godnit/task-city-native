@@ -25,7 +25,7 @@ jobs:
       - name: Install Android build tools
         run: sdkmanager "build-tools;35.0.0"
 
-      - name: Assemble APK
+      - name: Reconstruct base APK
         run: |
           cat \
             network-fix/chunk_00.b64 \
@@ -38,16 +38,44 @@ jobs:
             network-fix/chunk_06.b64 \
             network-fix/chunk_07.b64 \
             network-fix/chunk_08.b64 > /tmp/app.b64
-          echo "Base64 bytes: $(wc -c < /tmp/app.b64)"
           test "$(wc -c < /tmp/app.b64)" -eq 97800
-          base64 -d /tmp/app.b64 > /tmp/app-unsigned.apk
-          unzip -t /tmp/app-unsigned.apk
-          test "$(stat -c%s /tmp/app-unsigned.apk)" -eq 73350
+          base64 -d /tmp/app.b64 > /tmp/app-base.apk
+          unzip -t /tmp/app-base.apk
+          test "$(stat -c%s /tmp/app-base.apk)" -eq 73350
+
+      - name: Fix launcher activity while keeping independent package
+        run: |
+          python3 - <<'PY'
+          import zipfile, os, shutil
+          src='/tmp/app-base.apk'
+          dst='/tmp/app-launchfix.apk'
+          old='com.godnit.networkacadfix.MainActivity'.encode('utf-16le')
+          new='com.godnit.networkacademy.MainActivity'.encode('utf-16le')
+          assert len(old) == len(new)
+          with zipfile.ZipFile(src, 'r') as zin, zipfile.ZipFile(dst, 'w') as zout:
+              for info in zin.infolist():
+                  data=zin.read(info.filename)
+                  if info.filename == 'AndroidManifest.xml':
+                      assert data.count(old) == 1, data.count(old)
+                      data=data.replace(old,new)
+                      assert data.count(new) == 1
+                  zout.writestr(info, data)
+          with zipfile.ZipFile(dst, 'r') as z:
+              m=z.read('AndroidManifest.xml')
+              assert m.count('com.godnit.networkacadfix'.encode('utf-16le')) == 1
+              assert m.count('com.godnit.networkacademy.MainActivity'.encode('utf-16le')) == 1
+              assert m.count('com.godnit.networkacadfix.MainActivity'.encode('utf-16le')) == 0
+              dex=z.read('classes2.dex')
+              assert b'Lcom/godnit/networkacademy/MainActivity;' in dex
+          print('Launcher/package linkage verified')
+          print('Patched APK bytes:', os.path.getsize(dst))
+          PY
+          unzip -t /tmp/app-launchfix.apk
 
       - name: Align APK
         run: |
           ZIPALIGN="$ANDROID_HOME/build-tools/35.0.0/zipalign"
-          "$ZIPALIGN" -f -p 4 /tmp/app-unsigned.apk /tmp/app-aligned.apk
+          "$ZIPALIGN" -f -p 4 /tmp/app-launchfix.apk /tmp/app-aligned.apk
           "$ZIPALIGN" -c -v 4 /tmp/app-aligned.apk
 
       - name: Create signing key
@@ -73,16 +101,18 @@ jobs:
             --v1-signing-enabled true \
             --v2-signing-enabled true \
             --v3-signing-enabled true \
-            --out Network_Academy_Beginner_v4_InstallFix.apk \
+            --out Network_Academy_Beginner_v4_InstallFix2.apk \
             /tmp/app-aligned.apk
-          "$APKSIGNER" verify --verbose --print-certs Network_Academy_Beginner_v4_InstallFix.apk
-          "$ZIPALIGN" -c -v 4 Network_Academy_Beginner_v4_InstallFix.apk
-          file Network_Academy_Beginner_v4_InstallFix.apk
+          "$APKSIGNER" verify --verbose --print-certs Network_Academy_Beginner_v4_InstallFix2.apk
+          "$ZIPALIGN" -c -v 4 Network_Academy_Beginner_v4_InstallFix2.apk
+          unzip -t Network_Academy_Beginner_v4_InstallFix2.apk
+          file Network_Academy_Beginner_v4_InstallFix2.apk
+          sha256sum Network_Academy_Beginner_v4_InstallFix2.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Network-Academy-v4-InstallFix
-          path: Network_Academy_Beginner_v4_InstallFix.apk
+          name: Network-Academy-v4-InstallFix2
+          path: Network_Academy_Beginner_v4_InstallFix2.apk
           if-no-files-found: error
           retention-days: 7
