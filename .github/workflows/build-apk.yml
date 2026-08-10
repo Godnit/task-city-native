@@ -1,4 +1,5 @@
 name: Build Hand Gesture Cube Native APK
+# v1.8 Lite realtime validation
 
 on:
   push:
