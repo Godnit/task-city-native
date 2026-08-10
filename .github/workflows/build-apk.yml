@@ -1,10 +1,8 @@
-name: Build Hand Gesture Cube Native APK
+name: Build Restored V1.3 Fast Hand Tracker APK
 
 on:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    branches: [agent/hand-cube-v13-restored-fast]
   workflow_dispatch:
 
 permissions:
@@ -13,17 +11,19 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Add offline native hand model
+      - name: Add official offline hand task
         run: |
           mkdir -p app/src/main/assets
           curl -L --fail --retry 3 \
             -o app/src/main/assets/hand_landmarker.task \
             https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task
+          test -s app/src/main/assets/hand_landmarker.task
+          unzip -t app/src/main/assets/hand_landmarker.task
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -39,17 +39,37 @@ jobs:
       - name: Build signed release APK
         run: gradle --no-daemon assembleRelease
 
-      - name: Patch MediaPipe for Android 8.1
+      - name: Keep full APK for x86 emulator
+        run: cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/v13-full.apk"
+
+      - name: Reject Android 9-only native imports
         run: |
-          patch_root="$RUNNER_TEMP/hand-gesture-apk-patch"
-          unsigned_apk="$RUNNER_TEMP/hand-gesture-v1.2-unsigned.apk"
-          aligned_apk="$RUNNER_TEMP/hand-gesture-v1.2-aligned.apk"
-          release_keystore="$RUNNER_TEMP/hand-gesture-v1.2.keystore"
-          mkdir -p "$patch_root"
-          unzip -q app/build/outputs/apk/release/app-release.apk -x 'META-INF/*' -d "$patch_root"
-          python3 scripts/patch_android8_compat.py "$patch_root"/lib/*/libmediapipe_tasks_jni.so
-          (cd "$patch_root" && zip -q -r "$unsigned_apk" .)
-          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -p -f 4 "$unsigned_apk" "$aligned_apk"
+          inspect_root="$RUNNER_TEMP/v13-native-inspect"
+          mkdir -p "$inspect_root"
+          unzip -q app/build/outputs/apk/release/app-release.apk 'lib/*/*.so' -d "$inspect_root"
+          while IFS= read -r -d '' so_file; do
+            if readelf -Ws "$so_file" | grep -Eq 'UND.*aligned_alloc(@|$)'; then
+              echo "Android 9-only aligned_alloc import found in $so_file"
+              exit 1
+            fi
+          done < <(find "$inspect_root" -type f -name '*.so' -print0)
+
+      - name: Verify full APK
+        run: |
+          unzip -t app/build/outputs/apk/release/app-release.apk
+          $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose app/build/outputs/apk/release/app-release.apk
+          unzip -l app/build/outputs/apk/release/app-release.apk | grep 'assets/hand_landmarker.task'
+          unzip -l app/build/outputs/apk/release/app-release.apk | grep 'lib/armeabi-v7a/'
+          unzip -l app/build/outputs/apk/release/app-release.apk | grep 'lib/x86/'
+
+      - name: Create lightweight 32-bit delivery APK
+        run: |
+          light_work="$RUNNER_TEMP/v13-fast-light-work.apk"
+          light_aligned="$RUNNER_TEMP/v13-fast-light-aligned.apk"
+          release_keystore="$RUNNER_TEMP/v13-fast.keystore"
+          cp app/build/outputs/apk/release/app-release.apk "$light_work"
+          zip -q -d "$light_work" 'lib/x86/*'
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -p -f 4 "$light_work" "$light_aligned"
           keytool -genkeypair -noprompt \
             -keystore "$release_keystore" \
             -storepass android \
@@ -65,28 +85,52 @@ jobs:
             --ks-pass pass:android \
             --key-pass pass:android \
             --out app/build/outputs/apk/release/app-release.apk \
-            "$aligned_apk"
-
-      - name: Verify APK archive
-        run: unzip -t app/build/outputs/apk/release/app-release.apk
-
-      - name: Verify signature and Android 8 compatibility
-        run: |
-          $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose app/build/outputs/apk/release/app-release.apk
-          unzip -l app/build/outputs/apk/release/app-release.apk | grep 'assets/hand_landmarker.task'
-          unzip -l app/build/outputs/apk/release/app-release.apk | grep 'lib/armeabi-v7a/'
-          verify_root="$RUNNER_TEMP/hand-gesture-apk-verify"
-          mkdir -p "$verify_root"
-          unzip -q app/build/outputs/apk/release/app-release.apk 'lib/*/libmediapipe_tasks_jni.so' -d "$verify_root"
-          python3 scripts/patch_android8_compat.py --check "$verify_root"/lib/*/libmediapipe_tasks_jni.so
+            "$light_aligned"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose app/build/outputs/apk/release/app-release.apk
+          unzip -t app/build/outputs/apk/release/app-release.apk
+          if unzip -l app/build/outputs/apk/release/app-release.apk | grep -q 'lib/x86/'; then
+            echo 'x86 files remained in delivery APK'
+            exit 1
+          fi
 
       - name: Prepare named APK
-        run: cp app/build/outputs/apk/release/app-release.apk Hand-Gesture-Cube-v1.2.apk
+        run: cp app/build/outputs/apk/release/app-release.apk Hand-Gesture-Cube-v1.3-Restored-Fast.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hand-Gesture-Cube-v1.2
-          path: Hand-Gesture-Cube-v1.2.apk
+          name: Hand-Gesture-Cube-v1.3-Restored-Fast
+          path: Hand-Gesture-Cube-v1.3-Restored-Fast.apk
           if-no-files-found: error
           retention-days: 30
+
+      - name: Process real camera frames on Android 8.1
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 27
+          arch: x86
+          profile: Nexus 5X
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-front emulated
+          disable-animations: true
+          script: |
+            adb install -g "$RUNNER_TEMP/v13-full.apk"
+            adb logcat -c
+            adb shell am start -W -n com.godnit.handgesturecube/.MainActivity
+            processed=0
+            for attempt in $(seq 1 90); do
+              if adb logcat -d -s HandGestureCube:I '*:S' | grep -q HAND_TRACKER_RESULT_10; then
+                processed=1
+                break
+              fi
+              if adb logcat -d | grep -Eq 'FATAL EXCEPTION|Fatal signal|UnsatisfiedLinkError'; then
+                adb logcat -d
+                exit 1
+              fi
+              sleep 1
+            done
+            if [ "$processed" -ne 1 ]; then
+              adb logcat -d
+              echo 'Restored v1.3 tracker did not process 10 frames on Android 8.1'
+              exit 1
+            fi
+            adb shell pidof com.godnit.handgesturecube
