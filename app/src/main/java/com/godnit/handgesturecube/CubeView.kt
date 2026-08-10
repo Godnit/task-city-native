@@ -22,10 +22,12 @@ class CubeView(context: Context) : View(context) {
     }
 
     fun update(x: Float, y: Float, scale: Float) {
-        handX += (x.coerceIn(0.08f, 0.92f) - handX) * 0.24f
-        handY += (y.coerceIn(0.10f, 0.90f) - handY) * 0.24f
-        cubeScale += (scale.coerceIn(0.55f, 1.65f) - cubeScale) * 0.20f
-        invalidate()
+        // No easing here: the old 0.20-0.24 interpolation created an extra
+        // visible catch-up delay on top of ML inference latency.
+        handX = x.coerceIn(0.08f, 0.92f)
+        handY = y.coerceIn(0.10f, 0.90f)
+        cubeScale = scale.coerceIn(0.55f, 1.65f)
+        postInvalidateOnAnimation()
     }
 
     override fun onDraw(canvas: Canvas) {
