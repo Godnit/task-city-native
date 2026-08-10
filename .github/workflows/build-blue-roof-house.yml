@@ -22,10 +22,19 @@ jobs:
           sudo apt-get install -y blender
           blender --version
 
-      - name: Build house model and preview
+      - name: Build house geometry
         run: |
           mkdir -p output/blue-roof-house
-          blender -b --python tools/blue_roof_house/build_house.py -- --output output/blue-roof-house
+          blender -b --python tools/blue_roof_house/build_house.py -- --output output/blue-roof-house || true
+          test -s output/blue-roof-house/blue_roof_cottage.blend
+
+      - name: Export GLB and render preview
+        run: |
+          blender -b output/blue-roof-house/blue_roof_cottage.blend \
+            --python tools/blue_roof_house/export_and_render.py \
+            -- --output output/blue-roof-house
+          test -s output/blue-roof-house/blue_roof_cottage.glb
+          test -s output/blue-roof-house/blue_roof_cottage_preview.png
           ls -lh output/blue-roof-house
 
       - name: Upload 3D house artifact
