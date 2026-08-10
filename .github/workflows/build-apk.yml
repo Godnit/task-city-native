@@ -100,17 +100,12 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
           script: |
-            set -eux
-            APK=app/build/outputs/apk/release/app-release.apk
-            adb install -r "$APK"
+            adb install -r app/build/outputs/apk/release/app-release.apk
             adb logcat -c
             adb shell am start -W com.godnit.taskcity/.MainActivity | tee launch.txt
             sleep 7
             adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' | grep 'com.godnit.taskcity'
-            if adb logcat -d | grep -E 'FATAL EXCEPTION|AndroidRuntime.*com.godnit.taskcity'; then
-              echo 'Task City crashed on Android 8.1'
-              exit 1
-            fi
+            ! adb logcat -d | grep -E 'FATAL EXCEPTION|AndroidRuntime.*com.godnit.taskcity'
             mkdir -p build-output
             adb exec-out screencap -p > build-output/TaskCity-Native-Android8-Preview.png
             test -s build-output/TaskCity-Native-Android8-Preview.png
