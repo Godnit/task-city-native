@@ -10,6 +10,7 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.camera.core.ImageProxy
 import com.google.mediapipe.framework.image.BitmapImageBuilder
+import com.google.mediapipe.framework.image.ByteBufferImageBuilder
 import com.google.mediapipe.framework.image.MPImage
 import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.core.Delegate
@@ -25,12 +26,17 @@ class HandLandmarkerHelper(
 ) {
     private var handLandmarker: HandLandmarker? = null
     private var reusableBitmap: Bitmap? = null
-    private var resultCount = 0
     private val frameInFlight = AtomicBoolean(false)
+    private var resultCount = 0
     private var activeDelegate = "CPU"
+
     private var pendingWidth = 1
     private var pendingHeight = 1
+    private var pendingRotation = 0
     private var pendingMirrorX = false
+    private var pendingZeroCopy = false
+    private var pendingProxy: ImageProxy? = null
+    private var pendingMpImage: MPImage? = null
 
     fun setup() {
         try {
@@ -56,15 +62,14 @@ class HandLandmarkerHelper(
             .setBaseOptions(baseOptions)
             .setRunningMode(RunningMode.LIVE_STREAM)
             .setNumHands(1)
-            .setMinHandDetectionConfidence(0.40f)
-            // In LIVE_STREAM MediaPipe keeps tracking the hand between palm
-            // detections. Lower thresholds keep that fast path alive longer so
-            // the expensive palm detector is not re-triggered unnecessarily.
-            .setMinHandPresenceConfidence(0.28f)
-            .setMinTrackingConfidence(0.20f)
+            .setMinHandDetectionConfidence(0.38f)
+            // Keep MediaPipe on its cheaper tracking path for as long as the
+            // hand is still visible instead of repeatedly running palm detect.
+            .setMinHandPresenceConfidence(0.24f)
+            .setMinTrackingConfidence(0.16f)
             .setResultListener(::onResult)
             .setErrorListener {
-                frameInFlight.set(false)
+                releaseInFlight()
                 listener.onError(it.message ?: "خطأ غير معروف في متتبع اليد")
             }
             .build()
@@ -78,8 +83,7 @@ class HandLandmarkerHelper(
             return
         }
 
-        // Never queue old frames. If inference is busy, discard this frame
-        // before doing any bitmap allocation/copy work.
+        // Never form a queue of old camera frames. The newest frame wins.
         if (!frameInFlight.compareAndSet(false, true)) {
             imageProxy.close()
             return
@@ -87,37 +91,67 @@ class HandLandmarkerHelper(
 
         val width = imageProxy.width
         val height = imageProxy.height
-        val rotation = imageProxy.imageInfo.rotationDegrees
+        val rotation = imageProxy.imageInfo.rotationDegrees.normalizeRotation()
+        pendingWidth = if (rotation % 180 == 0) width else height
+        pendingHeight = if (rotation % 180 == 0) height else width
+        pendingRotation = rotation
+        pendingMirrorX = frontCamera
+        pendingZeroCopy = false
+
+        val processing = ImageProcessingOptions.builder()
+            .setRotationDegrees(rotation)
+            .build()
+
+        // CameraX RGBA output is normally one tightly packed direct buffer.
+        // Wrap that buffer directly in MPImage so we skip createBitmap() and a
+        // complete width*height*4 memory copy on every tracking result.
+        val plane = imageProxy.planes.firstOrNull()
+        val expectedBytes = width * height * 4
+        if (plane != null && plane.pixelStride == 4 && plane.rowStride == width * 4) {
+            try {
+                val source = plane.buffer.duplicate()
+                source.rewind()
+                if (source.remaining() >= expectedBytes) {
+                    source.limit(expectedBytes)
+                    val packed = source.slice()
+                    val mpImage = ByteBufferImageBuilder(
+                        packed,
+                        width,
+                        height,
+                        MPImage.IMAGE_FORMAT_RGBA
+                    ).build()
+                    pendingProxy = imageProxy
+                    pendingMpImage = mpImage
+                    pendingZeroCopy = true
+                    detector.detectAsync(mpImage, processing, SystemClock.uptimeMillis())
+                    return
+                }
+            } catch (fastPathError: Throwable) {
+                Log.w(TAG, "Zero-copy camera path unavailable; using bitmap fallback", fastPathError)
+            }
+        }
+
+        // Safe fallback for devices whose RGBA row stride contains padding.
         val bitmap = obtainBitmap(width, height)
         try {
             val buffer = imageProxy.planes[0].buffer
             buffer.rewind()
             bitmap.copyPixelsFromBuffer(buffer)
         } catch (error: Throwable) {
-            frameInFlight.set(false)
-            listener.onError("تعذّرت قراءة صورة الكاميرا: ${error.message ?: error.javaClass.simpleName}")
             imageProxy.close()
+            releaseInFlight()
+            listener.onError("تعذّرت قراءة صورة الكاميرا: ${error.message ?: error.javaClass.simpleName}")
             return
         }
         imageProxy.close()
 
-        // Do not allocate a second rotated/mirrored bitmap. MediaPipe can apply
-        // the camera rotation internally, and front-camera mirroring is applied
-        // only to the output coordinates. This removes a full-frame transform
-        // and a large temporary allocation from every inference.
-        pendingWidth = if (rotation % 180 == 0) width else height
-        pendingHeight = if (rotation % 180 == 0) height else width
-        pendingMirrorX = frontCamera
-
         val mpImage = BitmapImageBuilder(bitmap).build()
-        val processing = ImageProcessingOptions.builder()
-            .setRotationDegrees(rotation)
-            .build()
-        val timestamp = SystemClock.uptimeMillis()
+        pendingProxy = null
+        pendingMpImage = mpImage
         try {
-            detector.detectAsync(mpImage, processing, timestamp)
+            detector.detectAsync(mpImage, processing, SystemClock.uptimeMillis())
         } catch (error: Throwable) {
-            frameInFlight.set(false)
+            releaseInFlight()
             listener.onError("تعذّر تحليل صورة الكاميرا: ${error.message ?: error.javaClass.simpleName}")
         }
     }
@@ -136,22 +170,40 @@ class HandLandmarkerHelper(
         if (resultCount == 1 || resultCount == 10) {
             Log.i(TAG, "HAND_TRACKER_RESULT_$resultCount")
         }
-        val bundle = ResultBundle(
-            result = result,
-            inputWidth = pendingWidth,
-            inputHeight = pendingHeight,
-            inferenceMs = SystemClock.uptimeMillis() - result.timestampMs(),
-            mirrorX = pendingMirrorX
-        )
-        listener.onResults(bundle)
-        // The backing bitmap may be reused only after MediaPipe has returned
-        // this result. Releasing the gate here prevents inference from reading
-        // pixels while CameraX overwrites the same bitmap.
+        try {
+            listener.onResults(
+                ResultBundle(
+                    result = result,
+                    inputWidth = pendingWidth,
+                    inputHeight = pendingHeight,
+                    inferenceMs = SystemClock.uptimeMillis() - result.timestampMs(),
+                    rotationDegrees = pendingRotation,
+                    mirrorX = pendingMirrorX,
+                    zeroCopy = pendingZeroCopy
+                )
+            )
+        } finally {
+            releaseInFlight()
+        }
+    }
+
+    @Synchronized
+    private fun releaseInFlight() {
+        try {
+            pendingMpImage?.close()
+        } catch (_: Throwable) {
+        }
+        pendingMpImage = null
+        try {
+            pendingProxy?.close()
+        } catch (_: Throwable) {
+        }
+        pendingProxy = null
         frameInFlight.set(false)
     }
 
     fun close() {
-        frameInFlight.set(false)
+        releaseInFlight()
         handLandmarker?.close()
         handLandmarker = null
         reusableBitmap?.recycle()
@@ -163,7 +215,9 @@ class HandLandmarkerHelper(
         val inputWidth: Int,
         val inputHeight: Int,
         val inferenceMs: Long,
-        val mirrorX: Boolean
+        val rotationDegrees: Int,
+        val mirrorX: Boolean,
+        val zeroCopy: Boolean
     )
 
     interface Listener {
@@ -175,6 +229,17 @@ class HandLandmarkerHelper(
     companion object {
         private const val TAG = "HandGestureCube"
         private const val MODEL_PATH = "hand_landmarker.task"
+
+        private fun Int.normalizeRotation(): Int {
+            val normalized = ((this % 360) + 360) % 360
+            return when {
+                normalized < 45 -> 0
+                normalized < 135 -> 90
+                normalized < 225 -> 180
+                normalized < 315 -> 270
+                else -> 0
+            }
+        }
 
         fun runCompatibilitySelfTest(context: Context) {
             val baseOptions = BaseOptions.builder()
@@ -192,6 +257,7 @@ class HandLandmarkerHelper(
                     val bitmap = Bitmap.createBitmap(192, 192, Bitmap.Config.ARGB_8888)
                     val input = BitmapImageBuilder(bitmap).build()
                     detector.detect(input)
+                    input.close()
                     bitmap.recycle()
                     Log.i(TAG, "HAND_TRACKER_SELF_TEST_${index + 1}")
                 }
