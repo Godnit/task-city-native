@@ -136,10 +136,12 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
             setShadowLayer(10f, 0f, 2f, Color.BLACK)
         }
         fpsText = TextView(this).apply {
-            text = "المتتبع: 0 FPS"
+            text = "FPS 0  •  -- ms"
             textSize = 12f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
+            textDirection = View.TEXT_DIRECTION_LTR
+            layoutDirection = View.LAYOUT_DIRECTION_LTR
             background = rounded(Color.argb(170, 5, 18, 32), 14f, Color.TRANSPARENT)
             setPadding(dp(9), dp(5), dp(9), dp(5))
         }
@@ -222,9 +224,9 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
         }, 8000)
     }
 
-    override fun onReady() {
+    override fun onReady(delegateName: String) {
         runOnUiThread {
-            statusText.text = "النموذج جاهز • تشغيل الكاميرا"
+            statusText.text = "النموذج جاهز • تسريع $delegateName"
             resultText.text = "المتتبع يعمل — ارفع يدك الآن"
             bindCamera()
         }
@@ -241,7 +243,10 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
                     it.setSurfaceProvider(previewView.surfaceProvider)
                 }
                 val analysis = ImageAnalysis.Builder()
-                    .setTargetResolution(Size(480, 640))
+                    // The bundled palm/landmark models consume 192x192 and
+                    // 224x224 inputs. 240x320 preserves enough source detail
+                    // while avoiding four times the camera preprocessing work.
+                    .setTargetResolution(Size(240, 320))
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                     .build()
@@ -264,7 +269,7 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
                 smoothFps = if (smoothFps == 0f) instant else smoothFps * 0.86f + instant * 0.14f
             }
             lastResultAt = now
-            fpsText.text = "المتتبع: ${smoothFps.toInt()} FPS • ${bundle.inferenceMs} ms"
+            fpsText.text = "FPS ${smoothFps.toInt()}  •  ${bundle.inferenceMs} ms"
 
             val landmarks = bundle.result.landmarks().firstOrNull()
             if (landmarks == null) {
