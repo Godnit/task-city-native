@@ -12,11 +12,101 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Diagnose icon chunks
+
+      - name: Prepare exact selected launcher icon
         run: |
-          wc -c godot-academy/icon_parts_v5/part01a.txt godot-academy/icon_parts_v5/part01b.txt godot-academy/icon_parts_v5/part01c.txt godot-academy/icon_parts_v5/part01d.txt godot-academy/icon_parts_v5/part01e.txt godot-academy/icon_parts_v5/part02.txt godot-academy/icon_parts_v5/part03.txt godot-academy/icon_parts_v5/part04.txt godot-academy/icon_parts_v5/part05.txt godot-academy/icon_parts_v5/part06.txt godot-academy/icon_parts_v5/part07a.txt godot-academy/icon_parts_v5/part07b.txt
-          sha256sum godot-academy/icon_parts_v5/part01a.txt godot-academy/icon_parts_v5/part01b.txt godot-academy/icon_parts_v5/part01c.txt godot-academy/icon_parts_v5/part01d.txt godot-academy/icon_parts_v5/part01e.txt godot-academy/icon_parts_v5/part02.txt godot-academy/icon_parts_v5/part03.txt godot-academy/icon_parts_v5/part04.txt godot-academy/icon_parts_v5/part05.txt godot-academy/icon_parts_v5/part06.txt godot-academy/icon_parts_v5/part07a.txt godot-academy/icon_parts_v5/part07b.txt
-          cat godot-academy/icon_parts_v5/part01a.txt godot-academy/icon_parts_v5/part01b.txt godot-academy/icon_parts_v5/part01c.txt godot-academy/icon_parts_v5/part01d.txt godot-academy/icon_parts_v5/part01e.txt godot-academy/icon_parts_v5/part02.txt godot-academy/icon_parts_v5/part03.txt godot-academy/icon_parts_v5/part04.txt godot-academy/icon_parts_v5/part05.txt godot-academy/icon_parts_v5/part06.txt godot-academy/icon_parts_v5/part07a.txt godot-academy/icon_parts_v5/part07b.txt > /tmp/all.b64
-          echo TOTAL
-          wc -c /tmp/all.b64
-          sha256sum /tmp/all.b64
+          cat \
+            godot-academy/icon_parts_v5/part01a1.txt \
+            godot-academy/icon_parts_v5/part01a2.txt \
+            godot-academy/icon_parts_v5/part01b.txt \
+            godot-academy/icon_parts_v5/part01c.txt \
+            godot-academy/icon_parts_v5/part01d.txt \
+            godot-academy/icon_parts_v5/part01e.txt \
+            godot-academy/icon_parts_v5/part02.txt \
+            godot-academy/icon_parts_v5/part03.txt \
+            godot-academy/icon_parts_v5/part04.txt \
+            godot-academy/icon_parts_v5/part05.txt \
+            godot-academy/icon_parts_v5/part06.txt \
+            godot-academy/icon_parts_v5/part07a.txt \
+            godot-academy/icon_parts_v5/part07b.txt > /tmp/godot_icon.b64
+          test "$(wc -c < /tmp/godot_icon.b64)" -eq 12356
+          echo "5611bd74ec73f5ef966259b20c995dd1f1f2768f1889a32fd373ffd911255210  /tmp/godot_icon.b64" | sha256sum -c -
+          base64 -d /tmp/godot_icon.b64 > godot-academy/app/src/main/res/drawable/ic_launcher_v5.jpg
+          test "$(wc -c < godot-academy/app/src/main/res/drawable/ic_launcher_v5.jpg)" -eq 9266
+          echo "0082d45c39384e0f31e9fe501d7a0519e10d0221f8fb0e970f66b8541e90bd2c  godot-academy/app/src/main/res/drawable/ic_launcher_v5.jpg" | sha256sum -c -
+          cp godot-academy/app/src/main/res/drawable/ic_launcher_v5.jpg godot-academy/app/src/main/assets/godot_academy_icon_v5.jpg
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            mkdir -p "godot-academy/app/src/main/res/mipmap-${density}"
+            cp godot-academy/app/src/main/res/drawable/ic_launcher_v5.jpg "godot-academy/app/src/main/res/mipmap-${density}/ic_launcher.jpg"
+            cp godot-academy/app/src/main/res/drawable/ic_launcher_v5.jpg "godot-academy/app/src/main/res/mipmap-${density}/ic_launcher_round.jpg"
+          done
+
+      - name: Validate app
+        run: |
+          node --check godot-academy/app/src/main/assets/app.js
+          node --check godot-academy/app/src/main/assets/data.js
+          node --check godot-academy/app/src/main/assets/godot-ui-v2.js
+          node --check godot-academy/app/src/main/assets/godot-fixes-v3.js
+          node --check godot-academy/app/src/main/assets/godot-curriculum-v4.js
+          node --check godot-academy/app/src/main/assets/godot-core-v4b.js
+          node --check godot-academy/app/src/main/assets/godot-labs-v4-hotfix.js
+          node --check godot-academy/app/src/main/assets/godot-polish-v5.js
+          node <<'NODE'
+          const fs=require('fs'),vm=require('vm');
+          const ctx={window:{},console}; ctx.window=ctx;
+          vm.createContext(ctx);
+          vm.runInContext(fs.readFileSync('godot-academy/app/src/main/assets/data.js','utf8'),ctx);
+          ctx.DATA=ctx.GODOT_DATA;
+          vm.runInContext(fs.readFileSync('godot-academy/app/src/main/assets/godot-curriculum-v4.js','utf8'),ctx);
+          if(ctx.DATA.stages.length!==8) throw new Error('Expected 8 stages');
+          if(ctx.DATA.lessons.length!==97) throw new Error('Expected 97 lessons');
+          for(let s=1;s<=8;s++) if(ctx.DATA.lessons.filter(l=>l.stageId===s).length<12) throw new Error('Missing lessons stage '+s);
+          for(let s=2;s<=8;s++) if(!ctx.GODOT_EXAMS_V4[s]||ctx.GODOT_EXAMS_V4[s].length!==5) throw new Error('Missing exam stage '+s);
+          for(let s=2;s<=8;s++) if(!ctx.GODOT_PROJECTS_V4[s]) throw new Error('Missing project stage '+s);
+          console.log('Curriculum OK');
+          NODE
+          grep -q 'godot-polish-v5.css' godot-academy/app/src/main/assets/index.html
+          grep -q 'godot-polish-v5.js' godot-academy/app/src/main/assets/index.html
+          grep -q '@mipmap/ic_launcher' godot-academy/app/src/main/AndroidManifest.xml
+          grep -q '@mipmap/ic_launcher_round' godot-academy/app/src/main/AndroidManifest.xml
+          test -f godot-academy/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          test -f godot-academy/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+          grep -q "versionCode 6" godot-academy/app/build.gradle
+          grep -q "versionName '5.1'" godot-academy/app/build.gradle
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: yes | sdkmanager --licenses >/dev/null && sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build debug APK
+        working-directory: godot-academy
+        run: gradle --no-daemon assembleDebug
+
+      - name: Verify exact launcher icon inside APK
+        run: |
+          APK=godot-academy/app/build/outputs/apk/debug/app-debug.apk
+          unzip -l "$APK" | grep -q 'classes.dex'
+          unzip -l "$APK" | grep -q 'assets/godot-polish-v5.js'
+          unzip -l "$APK" | grep -q 'assets/godot_academy_icon_v5.jpg'
+          ICON_PATH=$(unzip -Z1 "$APK" | grep -E '^res/mipmap-xxxhdpi[^/]*/ic_launcher\.jpg$' | head -1)
+          test -n "$ICON_PATH"
+          unzip -p "$APK" "$ICON_PATH" > /tmp/apk_icon.jpg
+          test "$(wc -c < /tmp/apk_icon.jpg)" -eq 9266
+          echo "0082d45c39384e0f31e9fe501d7a0519e10d0221f8fb0e970f66b8541e90bd2c  /tmp/apk_icon.jpg" | sha256sum -c -
+          "${ANDROID_HOME}/build-tools/35.0.0/aapt" dump badging "$APK" | tee /tmp/badging.txt
+          grep -q "application: label='أكاديمية Godot'" /tmp/badging.txt
+          grep -q 'application-icon-' /tmp/badging.txt
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: GodotAcademy-Professional-v5.1-IconFix
+          path: godot-academy/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
