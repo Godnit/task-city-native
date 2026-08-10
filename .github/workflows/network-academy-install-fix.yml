@@ -1,4 +1,4 @@
-name: Build Network Academy Install Fix
+name: Build Network Academy v5 Theme Fix
 
 on:
   push:
@@ -41,78 +41,91 @@ jobs:
           test "$(wc -c < /tmp/app.b64)" -eq 97800
           base64 -d /tmp/app.b64 > /tmp/app-base.apk
           unzip -t /tmp/app-base.apk
-          test "$(stat -c%s /tmp/app-base.apk)" -eq 73350
 
-      - name: Fix launcher activity while keeping independent package
+      - name: Inject v5 UI fixes and launcher linkage
         run: |
           python3 - <<'PY'
-          import zipfile, os, shutil
-          src='/tmp/app-base.apk'
-          dst='/tmp/app-launchfix.apk'
-          old='com.godnit.networkacadfix.MainActivity'.encode('utf-16le')
-          new='com.godnit.networkacademy.MainActivity'.encode('utf-16le')
-          assert len(old) == len(new)
-          with zipfile.ZipFile(src, 'r') as zin, zipfile.ZipFile(dst, 'w') as zout:
+          import zipfile, os
+          src='/tmp/app-base.apk'; dst='/tmp/app-v5.apk'
+          old_activity='com.godnit.networkacadfix.MainActivity'.encode('utf-16le')
+          real_activity='com.godnit.networkacademy.MainActivity'.encode('utf-16le')
+          old_pkg='com.godnit.networkacadfix'.encode('utf-16le')
+          new_pkg='com.godnit.networkacadfi5'.encode('utf-16le')
+          assert len(old_activity)==len(real_activity)
+          assert len(old_pkg)==len(new_pkg)
+          css=open('network-fix/v5-fix.css','rb').read()
+          js=open('network-fix/v5-fix.js','rb').read()
+          with zipfile.ZipFile(src,'r') as zin, zipfile.ZipFile(dst,'w') as zout:
               for info in zin.infolist():
+                  if info.filename.startswith('META-INF/'):
+                      continue
                   data=zin.read(info.filename)
-                  if info.filename == 'AndroidManifest.xml':
-                      assert data.count(old) == 1, data.count(old)
-                      data=data.replace(old,new)
-                      assert data.count(new) == 1
-                  zout.writestr(info, data)
-          with zipfile.ZipFile(dst, 'r') as z:
+                  if info.filename=='AndroidManifest.xml':
+                      assert data.count(old_activity)==1
+                      data=data.replace(old_activity,real_activity)
+                      assert data.count(old_pkg)==1
+                      data=data.replace(old_pkg,new_pkg)
+                  elif info.filename=='assets/index.html':
+                      text=data.decode('utf-8')
+                      text=text.replace('</head>','  <link rel="stylesheet" href="v5-fix.css" />\n</head>')
+                      text=text.replace('</body>','  <script src="v5-fix.js"></script>\n</body>')
+                      data=text.encode('utf-8')
+                  zout.writestr(info,data)
+              zout.writestr('assets/v5-fix.css',css,compress_type=zipfile.ZIP_DEFLATED)
+              zout.writestr('assets/v5-fix.js',js,compress_type=zipfile.ZIP_DEFLATED)
+          with zipfile.ZipFile(dst,'r') as z:
               m=z.read('AndroidManifest.xml')
-              assert m.count('com.godnit.networkacadfix'.encode('utf-16le')) == 1
-              assert m.count('com.godnit.networkacademy.MainActivity'.encode('utf-16le')) == 1
-              assert m.count('com.godnit.networkacadfix.MainActivity'.encode('utf-16le')) == 0
-              dex=z.read('classes2.dex')
-              assert b'Lcom/godnit/networkacademy/MainActivity;' in dex
-          print('Launcher/package linkage verified')
-          print('Patched APK bytes:', os.path.getsize(dst))
+              assert m.count(new_pkg)==1
+              assert m.count(real_activity)==1
+              assert b'v5-fix.css' in z.read('assets/index.html')
+              assert b'v5-fix.js' in z.read('assets/index.html')
+              assert 'assets/v5-fix.css' in z.namelist() and 'assets/v5-fix.js' in z.namelist()
+              assert b'Lcom/godnit/networkacademy/MainActivity;' in z.read('classes2.dex')
+          print('v5 package, launcher, CSS and JS verified:',os.path.getsize(dst))
           PY
-          unzip -t /tmp/app-launchfix.apk
+          unzip -t /tmp/app-v5.apk
 
       - name: Align APK
         run: |
           ZIPALIGN="$ANDROID_HOME/build-tools/35.0.0/zipalign"
-          "$ZIPALIGN" -f -p 4 /tmp/app-launchfix.apk /tmp/app-aligned.apk
+          "$ZIPALIGN" -f -p 4 /tmp/app-v5.apk /tmp/app-aligned.apk
           "$ZIPALIGN" -c -v 4 /tmp/app-aligned.apk
 
       - name: Create signing key
         run: |
           keytool -genkeypair -v \
-            -keystore /tmp/network-fix.keystore \
+            -keystore /tmp/network-v5.keystore \
             -storepass android \
             -keypass android \
-            -alias networkfix \
+            -alias networkv5 \
             -keyalg RSA \
             -keysize 2048 \
             -validity 10000 \
-            -dname "CN=Network Academy Fix,O=Godnit,C=US"
+            -dname "CN=Network Academy v5,O=Godnit,C=US"
 
       - name: Sign and verify APK
         run: |
           APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
           ZIPALIGN="$ANDROID_HOME/build-tools/35.0.0/zipalign"
           "$APKSIGNER" sign \
-            --ks /tmp/network-fix.keystore \
+            --ks /tmp/network-v5.keystore \
             --ks-pass pass:android \
             --key-pass pass:android \
             --v1-signing-enabled true \
             --v2-signing-enabled true \
             --v3-signing-enabled true \
-            --out Network_Academy_Beginner_v4_InstallFix2.apk \
+            --out Network_Academy_v5_ThemeFix.apk \
             /tmp/app-aligned.apk
-          "$APKSIGNER" verify --verbose --print-certs Network_Academy_Beginner_v4_InstallFix2.apk
-          "$ZIPALIGN" -c -v 4 Network_Academy_Beginner_v4_InstallFix2.apk
-          unzip -t Network_Academy_Beginner_v4_InstallFix2.apk
-          file Network_Academy_Beginner_v4_InstallFix2.apk
-          sha256sum Network_Academy_Beginner_v4_InstallFix2.apk
+          "$APKSIGNER" verify --verbose --print-certs Network_Academy_v5_ThemeFix.apk
+          "$ZIPALIGN" -c -v 4 Network_Academy_v5_ThemeFix.apk
+          unzip -t Network_Academy_v5_ThemeFix.apk
+          file Network_Academy_v5_ThemeFix.apk
+          sha256sum Network_Academy_v5_ThemeFix.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Network-Academy-v4-InstallFix2
-          path: Network_Academy_Beginner_v4_InstallFix2.apk
+          name: Network-Academy-v5-ThemeFix
+          path: Network_Academy_v5_ThemeFix.apk
           if-no-files-found: error
           retention-days: 7
