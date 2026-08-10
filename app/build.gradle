@@ -11,15 +11,14 @@ android {
         applicationId 'com.godnit.taskcity'
         minSdk 26
         targetSdk 35
-        versionCode 1
-        versionName '1.0-native'
+        versionCode 2
+        versionName '1.1-libgdx'
     }
 
     buildTypes {
         release {
-            minifyEnabled true
-            shrinkResources true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
+            minifyEnabled false
+            shrinkResources false
             signingConfig signingConfigs.debug
         }
     }
@@ -34,7 +33,44 @@ android {
     }
 }
 
+def gdxVersion = '1.13.1'
+
+configurations {
+    natives
+}
+
 dependencies {
-    // Intentionally empty: Android framework + OpenGL ES only.
-    // This keeps the APK small and avoids game engines / WebView runtimes.
+    implementation "com.badlogicgames.gdx:gdx:$gdxVersion"
+    implementation "com.badlogicgames.gdx:gdx-backend-android:$gdxVersion"
+
+    natives "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-armeabi-v7a"
+    natives "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-arm64-v8a"
+    natives "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-x86"
+    natives "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-x86_64"
+}
+
+tasks.register('copyAndroidNatives') {
+    doLast {
+        delete file('src/main/jniLibs')
+        configurations.natives.files.each { jar ->
+            String abi = null
+            if (jar.name.contains('natives-armeabi-v7a')) abi = 'armeabi-v7a'
+            else if (jar.name.contains('natives-arm64-v8a')) abi = 'arm64-v8a'
+            else if (jar.name.contains('natives-x86_64')) abi = 'x86_64'
+            else if (jar.name.contains('natives-x86')) abi = 'x86'
+            if (abi != null) {
+                def outDir = file("src/main/jniLibs/$abi")
+                outDir.mkdirs()
+                copy {
+                    from zipTree(jar)
+                    into outDir
+                    include '*.so'
+                }
+            }
+        }
+    }
+}
+
+tasks.named('preBuild').configure {
+    dependsOn tasks.named('copyAndroidNatives')
 }
