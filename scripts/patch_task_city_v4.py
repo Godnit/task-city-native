@@ -3,11 +3,9 @@ from pathlib import Path
 p=Path('app/src/main/java/com/godnit/taskcity/MainActivity.kt')
 s=p.read_text()
 
-# CI preview should reveal all twenty designed homes.
 s=s.replace('val count = if (intent.getBooleanExtra("preview_all", false)) 12',
             'val count = if (intent.getBooleanExtra("preview_all", false)) 20',1)
 
-# Replace touch control with horizontal panning only. No rotate, no pinch zoom.
 start=s.index('private class CityGLView(context: Context) : GLSurfaceView(context) {')
 end=s.index('\nprivate data class MaterialInfo(',start)
 new_view=r'''private class CityGLView(context: Context) : GLSurfaceView(context) {
@@ -28,14 +26,11 @@ new_view=r'''private class CityGLView(context: Context) : GLSurfaceView(context)
                 lastX = event.x
                 gestureBlocked = false
             }
-            MotionEvent.ACTION_POINTER_DOWN -> {
-                // Multi-touch is intentionally ignored: camera angle and zoom are locked.
-                gestureBlocked = true
-            }
+            MotionEvent.ACTION_POINTER_DOWN -> gestureBlocked = true
             MotionEvent.ACTION_MOVE -> {
                 if (!gestureBlocked && event.pointerCount == 1) {
                     val dx = event.x - lastX
-                    cityRenderer.panBy(-dx * 0.0105f)
+                    cityRenderer.panBy(-dx * 0.0038f)
                     lastX = event.x
                 }
             }
@@ -47,11 +42,10 @@ new_view=r'''private class CityGLView(context: Context) : GLSurfaceView(context)
 '''
 s=s[:start]+new_view+s[end:]
 
-# Fixed isometric camera plus bounded horizontal world pan.
 s=s.replace('private var yaw = -35f\n    private var pitch = 30f\n    private var cameraDistance = 4.30f',
 '''private val yaw = -35f
     private val pitch = 31f
-    private val cameraDistance = 5.05f
+    private val cameraDistance = 2.35f
     @Volatile private var panX = 0f''',1)
 
 old_funcs='''    fun rotateBy(dx: Float, dy: Float) {
@@ -63,20 +57,18 @@ old_funcs='''    fun rotateBy(dx: Float, dy: Float) {
         cameraDistance = (cameraDistance * factor).coerceIn(2.8f, 8.0f)
     }'''
 new_funcs='''    fun panBy(delta: Float) {
-        panX = (panX + delta).coerceIn(-1.55f, 1.55f)
+        panX = (panX + delta).coerceIn(-0.95f, 0.95f)
     }'''
 if old_funcs not in s:
     raise SystemExit('camera functions marker not found')
 s=s.replace(old_funcs,new_funcs,1)
 
 s=s.replace('Matrix.setLookAtM(view, 0, 0f, 0.9f, cameraDistance, 0f, 0f, 0f, 0f, 1f, 0f)',
-            'Matrix.setLookAtM(view, 0, panX, 1.00f, cameraDistance, panX, 0f, 0f, 0f, 1f, 0f)',1)
+            'Matrix.setLookAtM(view, 0, panX, 0.88f, cameraDistance, panX, 0f, 0f, 0f, 1f, 0f)',1)
 
-# Stronger, warm daylight while keeping gentle shading.
-s=s.replace('vLight = 0.76 + 0.24 * sun;', 'vLight = 0.84 + 0.30 * sun;',1)
+s=s.replace('vLight = 0.76 + 0.24 * sun;', 'vLight = 0.86 + 0.30 * sun;',1)
 s=s.replace('GLES20.glClearColor(0.56f, 0.84f, 0.98f, 1f)', 'GLES20.glClearColor(0.49f, 0.82f, 0.98f, 1f)',1)
 
-# Yard parts use their real material instead of the house trim color.
 old='''            if (buildingIndex >= 0) {
                 val colors = housePalette(buildingIndex)
                 when {
@@ -105,9 +97,7 @@ new='''            if (buildingIndex >= 0) {
                     batch.group.endsWith("_DETAIL") -> {
                         baseR = 0.24f; baseG = 0.39f; baseB = 0.46f; useTexture = false
                     }
-                    else -> {
-                        // Fences, hedges, paths and flowers keep their own materials.
-                    }
+                    else -> { }
                 }
             }'''
 if old not in s:
@@ -115,4 +105,4 @@ if old not in s:
 s=s.replace(old,new,1)
 
 p.write_text(s)
-print('TASK_CITY_V4_PATCH_OK')
+print('TASK_CITY_V5_FIXED_CAMERA_OK')
