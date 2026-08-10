@@ -20,27 +20,39 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y blender
-          blender --version
+          blender --version | tee blender-version.txt
 
       - name: Build house geometry
         run: |
           mkdir -p output/blue-roof-house
-          blender -b --python tools/blue_roof_house/build_house.py -- --output output/blue-roof-house || true
+          blender -b --python tools/blue_roof_house/build_house.py -- --output output/blue-roof-house > output/blue-roof-house/build.log 2>&1 || true
           test -s output/blue-roof-house/blue_roof_cottage.blend
 
       - name: Export GLB and render preview
+        id: export
+        continue-on-error: true
         run: |
+          set +e
           blender -b output/blue-roof-house/blue_roof_cottage.blend \
             --python tools/blue_roof_house/export_and_render.py \
-            -- --output output/blue-roof-house
-          test -s output/blue-roof-house/blue_roof_cottage.glb
-          test -s output/blue-roof-house/blue_roof_cottage_preview.png
-          ls -lh output/blue-roof-house
+            -- --output output/blue-roof-house 2>&1 | tee output/blue-roof-house/export.log
+          code=${PIPESTATUS[0]}
+          echo "blender_exit_code=$code" | tee -a output/blue-roof-house/export.log
+          ls -lh output/blue-roof-house | tee -a output/blue-roof-house/export.log
+          exit $code
 
-      - name: Upload 3D house artifact
+      - name: Upload 3D house artifact and logs
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: blue-roof-cottage-3d
-          path: output/blue-roof-house/*
+          path: |
+            output/blue-roof-house/*
+            blender-version.txt
           if-no-files-found: error
           retention-days: 30
+
+      - name: Verify required outputs
+        run: |
+          test -s output/blue-roof-house/blue_roof_cottage.glb
+          test -s output/blue-roof-house/blue_roof_cottage_preview.png
