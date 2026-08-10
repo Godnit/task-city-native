@@ -20,7 +20,8 @@ jobs:
           node --check godot-academy/app/src/main/assets/godot-fixes-v3.js
           grep -q 'godot-fixes-v3.css' godot-academy/app/src/main/assets/index.html
           grep -q 'godot-fixes-v3.js' godot-academy/app/src/main/assets/index.html
-          grep -q "setAcademyFilterV3('programming')" godot-academy/app/src/main/assets/godot-fixes-v3.js
+          grep -q 'function setAcademyFilterV3' godot-academy/app/src/main/assets/godot-fixes-v3.js
+          grep -q "\['all','الكل'\]" godot-academy/app/src/main/assets/godot-fixes-v3.js
           grep -q 'data-tab="script"' godot-academy/app/src/main/assets/godot-fixes-v3.js
           grep -q 'toggleAcademySearchV3' godot-academy/app/src/main/assets/godot-fixes-v3.js
       - uses: actions/setup-java@v4
