@@ -18,17 +18,18 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
 
         Window window = getWindow();
-        window.setStatusBarColor(Color.rgb(13, 20, 32));
-        window.setNavigationBarColor(Color.rgb(13, 20, 32));
+        window.setStatusBarColor(Color.rgb(7, 16, 27));
+        window.setNavigationBarColor(Color.rgb(7, 16, 27));
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         webView = new WebView(this);
-        webView.setBackgroundColor(Color.rgb(13, 20, 32));
+        webView.setBackgroundColor(Color.rgb(7, 16, 27));
         setContentView(webView);
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
-        settings.setDomStorageEnabled(false);
+        settings.setDomStorageEnabled(true);
+        settings.setDatabaseEnabled(true);
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(false);
         settings.setBuiltInZoomControls(false);
@@ -36,6 +37,7 @@ public class MainActivity extends Activity {
         settings.setLoadWithOverviewMode(true);
         settings.setUseWideViewPort(true);
         settings.setDefaultTextEncodingName("UTF-8");
+        settings.setTextZoom(100);
 
         webView.setWebViewClient(new WebViewClient());
         webView.setWebChromeClient(new WebChromeClient());
@@ -53,9 +55,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
-        if (webView != null) {
-            webView.destroy();
-        }
+        if (webView != null) webView.destroy();
         super.onDestroy();
     }
 }
