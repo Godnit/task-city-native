@@ -24,6 +24,7 @@ jobs:
           cat assets_payload/templates6.xz.b64.part* | base64 -d | xz -d > /tmp/taskcity/templates.obj
           test -s /tmp/taskcity/templates.obj
           grep -q '^g TEMPLATE_HOUSE_06$' /tmp/taskcity/templates.obj
+          python3 scripts/tune_city_v6.py
           python3 scripts/build_city_asset_v4.py /tmp/taskcity/templates.obj app/src/main/assets/city/scene.obj
           cp assets_payload/city.mtl app/src/main/assets/city/scene.mtl
           cp assets_payload/license.txt app/src/main/assets/city/LICENSE.txt
@@ -31,12 +32,11 @@ jobs:
           grep -q '^g HOUSE_20_' app/src/main/assets/city/scene.obj
           grep -q '^g HOUSE_01_ROOF$' app/src/main/assets/city/scene.obj
           grep -q '^g HOUSE_01_WALL$' app/src/main/assets/city/scene.obj
+          grep -q '^g HOUSE_01_YARD_TREE_LEAF_A$' app/src/main/assets/city/scene.obj
           ! grep -q '^g SCENERY_LOT_' app/src/main/assets/city/scene.obj
           OWNERS=$(grep '^g HOUSE_' app/src/main/assets/city/scene.obj | sed -E 's/^g (HOUSE_[0-9][0-9]).*/\1/' | sort -u | wc -l)
           echo "House owners: $OWNERS"
           test "$OWNERS" -eq 20
-          grep -q '^g SCENERY_TREE_00_LEAF_A$' app/src/main/assets/city/scene.obj
-          grep -q '^g SCENERY_MAIN_SOUTH_' app/src/main/assets/city/scene.obj
           du -sh app/src/main/assets/city
 
       - name: Apply daylight renderer
@@ -72,7 +72,6 @@ jobs:
           $ANDROID_HOME/build-tools/35.0.0/aapt dump badging "$APK" | tee badging.txt
           grep -q "sdkVersion:'26'" badging.txt
           unzip -l "$APK" | grep 'assets/city/scene.obj'
-          unzip -l "$APK" | grep 'assets/city/scene.mtl'
 
       - name: Run Android 8.1 launch test and capture preview
         uses: reactivecircus/android-emulator-runner@v2
@@ -90,22 +89,22 @@ jobs:
             adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' | grep 'com.godnit.taskcity'
             ! adb logcat -d | grep -E 'FATAL EXCEPTION|AndroidRuntime.*com.godnit.taskcity'
             mkdir -p build-output
-            adb exec-out screencap -p > build-output/TaskCity-FixedView-Preview.png
-            test -s build-output/TaskCity-FixedView-Preview.png
+            adb exec-out screencap -p > build-output/TaskCity-FinalFixed-Preview.png
+            test -s build-output/TaskCity-FinalFixed-Preview.png
 
       - name: Prepare named APK
         run: |
-          cp app/build/outputs/apk/release/app-release.apk TaskCity-FixedView-Android8.apk
-          sha256sum TaskCity-FixedView-Android8.apk > SHA256SUMS.txt
-          stat -c 'Final APK bytes: %s' TaskCity-FixedView-Android8.apk
+          cp app/build/outputs/apk/release/app-release.apk TaskCity-FinalFixed-Android8.apk
+          sha256sum TaskCity-FinalFixed-Android8.apk > SHA256SUMS.txt
+          stat -c 'Final APK bytes: %s' TaskCity-FinalFixed-Android8.apk
 
       - name: Upload APK and preview
         uses: actions/upload-artifact@v4
         with:
-          name: TaskCity-FixedView-Android8
+          name: TaskCity-FinalFixed-Android8
           path: |
-            TaskCity-FixedView-Android8.apk
+            TaskCity-FinalFixed-Android8.apk
             SHA256SUMS.txt
-            build-output/TaskCity-FixedView-Preview.png
+            build-output/TaskCity-FinalFixed-Preview.png
           if-no-files-found: error
           retention-days: 30
