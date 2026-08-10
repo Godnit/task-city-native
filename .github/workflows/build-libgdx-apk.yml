@@ -23,7 +23,9 @@ jobs:
           python3 scripts/patch_libgdx_city.py
           python3 scripts/patch_libgdx_visual_v2.py
           grep -q 'class MainActivity : AndroidApplication' app/src/main/java/com/godnit/taskcity/MainActivity.kt
-          grep -q 'TaskCityGame' app/src/main/java/com/godnit/taskcity/MainActivity.kt
+          grep -q 'initialize(cityGame, gameConfig)' app/src/main/java/com/godnit/taskcity/MainActivity.kt
+          grep -q 'addContentView' app/src/main/java/com/godnit/taskcity/MainActivity.kt
+          ! grep -q 'initializeForView(cityGame' app/src/main/java/com/godnit/taskcity/MainActivity.kt
           grep -q 'TASKCITY_LIBGDX_READY' app/src/main/java/com/godnit/taskcity/TaskCityGame.kt
           grep -q 'Clearly visible warm sun' app/src/main/java/com/godnit/taskcity/TaskCityGame.kt
 
@@ -53,22 +55,23 @@ jobs:
           test "$SIZE" -lt 20971520
           $ANDROID_HOME/build-tools/35.0.0/aapt dump badging "$APK" | tee badging.txt
           grep -q "sdkVersion:'26'" badging.txt
+          grep -q "versionName='1.2-libgdx-safe'" badging.txt
           unzip -l "$APK" | grep 'lib/x86_64/libgdx.so'
           unzip -l "$APK" | grep 'lib/armeabi-v7a/libgdx.so'
           unzip -l "$APK" | grep 'lib/arm64-v8a/libgdx.so'
 
       - name: Prepare named APK
         run: |
-          cp app/build/outputs/apk/release/app-release.apk TaskCity-libGDX-Android8.apk
-          sha256sum TaskCity-libGDX-Android8.apk > SHA256SUMS.txt
-          stat -c 'Final APK bytes: %s' TaskCity-libGDX-Android8.apk
+          cp app/build/outputs/apk/release/app-release.apk TaskCity-libGDX-Safe-Android8.apk
+          sha256sum TaskCity-libGDX-Safe-Android8.apk > SHA256SUMS.txt
+          stat -c 'Final APK bytes: %s' TaskCity-libGDX-Safe-Android8.apk
 
       - name: Upload verified APK immediately
         uses: actions/upload-artifact@v4
         with:
-          name: TaskCity-libGDX-Android8-APK
+          name: TaskCity-libGDX-Safe-Android8-APK
           path: |
-            TaskCity-libGDX-Android8.apk
+            TaskCity-libGDX-Safe-Android8.apk
             SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30
@@ -83,24 +86,27 @@ jobs:
           emulator-boot-timeout: 480
           disable-animations: true
           script: |
+            set -euxo pipefail
             adb install -r app/build/outputs/apk/release/app-release.apk
             adb logcat -c
-            adb shell am start -W -n com.godnit.taskcity/.MainActivity --ez preview_all true | tee launch.txt
-            sleep 10
-            adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' | grep 'com.godnit.taskcity'
-            adb logcat -d | grep 'TASKCITY_LIBGDX_READY' | tee libgdx-status.txt
-            ! adb logcat -d | grep -E 'FATAL EXCEPTION|AndroidRuntime.*com.godnit.taskcity'
+            adb shell am start -n com.godnit.taskcity/.MainActivity --ez preview_all true
+            sleep 12
             mkdir -p build-output
-            adb exec-out screencap -p > build-output/TaskCity-libGDX-Preview.png
-            test -s build-output/TaskCity-libGDX-Preview.png
-            cp libgdx-status.txt build-output/libgdx-status.txt
+            adb logcat -d > build-output/logcat.txt
+            grep 'TASKCITY_LIBGDX_READY' build-output/logcat.txt | tee build-output/libgdx-status.txt
+            ! grep -E 'FATAL EXCEPTION|Process: com.godnit.taskcity|AndroidRuntime.*com.godnit.taskcity' build-output/logcat.txt
+            test -n "$(adb shell pidof com.godnit.taskcity | tr -d '\r')"
+            adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' | grep 'com.godnit.taskcity'
+            adb exec-out screencap -p > build-output/TaskCity-libGDX-Safe-Preview.png
+            test -s build-output/TaskCity-libGDX-Safe-Preview.png
 
       - name: Upload runtime preview
         uses: actions/upload-artifact@v4
         with:
-          name: TaskCity-libGDX-Android8-Preview
+          name: TaskCity-libGDX-Safe-Android8-Preview
           path: |
-            build-output/TaskCity-libGDX-Preview.png
+            build-output/TaskCity-libGDX-Safe-Preview.png
             build-output/libgdx-status.txt
+            build-output/logcat.txt
           if-no-files-found: error
           retention-days: 30
