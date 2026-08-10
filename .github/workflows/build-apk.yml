@@ -1,5 +1,5 @@
 name: Build Hand Gesture Cube Native APK
-# v1.8 Lite realtime validation
+# v1.8.1 direct realtime validation
 
 on:
   push:
@@ -19,28 +19,14 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Build offline Lite hand model bundle
+      - name: Add validated official hand task bundle
         run: |
-          model_root="$RUNNER_TEMP/hand-landmarker-lite"
-          mkdir -p app/src/main/assets "$model_root"
+          mkdir -p app/src/main/assets
           curl -L --fail --retry 3 \
-            -o "$model_root/hand_detector.tflite" \
-            https://storage.googleapis.com/mediapipe-assets/palm_detection_lite.tflite
-          curl -L --fail --retry 3 \
-            -o "$model_root/hand_landmarks_detector.tflite" \
-            https://storage.googleapis.com/mediapipe-assets/hand_landmark_lite.tflite
-          (cd "$model_root" && zip -q -0 \
-            "$GITHUB_WORKSPACE/app/src/main/assets/hand_landmarker.task" \
-            hand_detector.tflite hand_landmarks_detector.tflite)
-          unzip -l app/src/main/assets/hand_landmarker.task
-          if strings "$model_root/hand_detector.tflite" | grep -q 'palmdetector_full'; then
-            echo 'Full palm model was included instead of Lite'
-            exit 1
-          fi
-          if strings "$model_root/hand_landmarks_detector.tflite" | grep -q 'handskeleton_handflag_handedness_full'; then
-            echo 'Full landmark model was included instead of Lite'
-            exit 1
-          fi
+            -o app/src/main/assets/hand_landmarker.task \
+            https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task
+          test -s app/src/main/assets/hand_landmarker.task
+          unzip -t app/src/main/assets/hand_landmarker.task
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -90,9 +76,9 @@ jobs:
 
       - name: Create lightweight 32-bit delivery APK
         run: |
-          light_work="$RUNNER_TEMP/hand-gesture-v1.8-light-work.apk"
-          light_aligned="$RUNNER_TEMP/hand-gesture-v1.8-light-aligned.apk"
-          release_keystore="$RUNNER_TEMP/hand-gesture-v1.8.keystore"
+          light_work="$RUNNER_TEMP/hand-gesture-v1.8.1-light-work.apk"
+          light_aligned="$RUNNER_TEMP/hand-gesture-v1.8.1-light-aligned.apk"
+          release_keystore="$RUNNER_TEMP/hand-gesture-v1.8.1.keystore"
           cp app/build/outputs/apk/release/app-release.apk "$light_work"
           zip -q -d "$light_work" 'lib/x86/*'
           "$ANDROID_HOME/build-tools/35.0.0/zipalign" -p -f 4 "$light_work" "$light_aligned"
@@ -119,29 +105,13 @@ jobs:
             exit 1
           fi
 
-      - name: Verify Lite models in delivery APK
-        run: |
-          model_check="$RUNNER_TEMP/delivery-lite-models"
-          mkdir -p "$model_check"
-          unzip -p app/build/outputs/apk/release/app-release.apk assets/hand_landmarker.task > "$model_check/hand_landmarker.task"
-          unzip -q "$model_check/hand_landmarker.task" -d "$model_check/models"
-          if strings "$model_check/models/hand_detector.tflite" | grep -q 'palmdetector_full'; then
-            echo 'Delivery APK contains the full palm model'
-            exit 1
-          fi
-          if strings "$model_check/models/hand_landmarks_detector.tflite" | grep -q 'handskeleton_handflag_handedness_full'; then
-            echo 'Delivery APK contains the full landmark model'
-            exit 1
-          fi
-          echo 'Verified Lite palm and landmark models in delivery APK'
-
       - name: Prepare named APK
-        run: cp app/build/outputs/apk/release/app-release.apk Hand-Gesture-Cube-v1.8-Lite-Realtime.apk
+        run: cp app/build/outputs/apk/release/app-release.apk Hand-Gesture-Cube-v1.8.1-Direct-Realtime.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hand-Gesture-Cube-v1.8-Lite-Realtime
-          path: Hand-Gesture-Cube-v1.8-Lite-Realtime.apk
+          name: Hand-Gesture-Cube-v1.8.1-Direct-Realtime
+          path: Hand-Gesture-Cube-v1.8.1-Direct-Realtime.apk
           if-no-files-found: error
           retention-days: 30
