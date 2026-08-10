@@ -248,9 +248,9 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
                     it.setSurfaceProvider(previewView.surfaceProvider)
                 }
                 val analysis = ImageAnalysis.Builder()
-                    // Keep enough source detail for the hand model while making
-                    // CameraX's RGBA conversion inexpensive on older 32-bit phones.
-                    .setTargetResolution(Size(240, 320))
+                    // A smaller source frame reduces CameraX RGBA conversion and
+                    // memory bandwidth; MediaPipe still performs its own model resize.
+                    .setTargetResolution(Size(192, 256))
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                     .build()
@@ -274,9 +274,10 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
             }
             lastResultAt = now
             val diagnosticsDue = now - lastDiagnosticsAt >= DIAGNOSTICS_INTERVAL_MS
+            val framePath = if (bundle.zeroCopy) "ZC" else "COPY"
             if (diagnosticsDue) {
                 lastDiagnosticsAt = now
-                fpsText.text = "DIRECT $trackerDelegate  •  FPS ${smoothFps.toInt()}  •  ${bundle.inferenceMs} ms"
+                fpsText.text = "$framePath $trackerDelegate  •  FPS ${smoothFps.toInt()}  •  ${bundle.inferenceMs} ms"
             }
 
             val landmarks = bundle.result.landmarks().firstOrNull()
@@ -305,14 +306,19 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
             missedHandFrames = 0
             handFrames++
 
-            // These two calls are intentionally on every result: they are the
-            // realtime path. Diagnostic text below is throttled so TextView
-            // layout work cannot delay the skeleton or cube.
-            overlayView.setResults(bundle.result, bundle.inputWidth, bundle.inputHeight, bundle.mirrorX)
+            // Use exactly the same rotation + front-camera mirror transform for
+            // the skeleton and the cube so neither can move opposite the preview.
+            overlayView.setResults(
+                bundle.result,
+                bundle.inputWidth,
+                bundle.inputHeight,
+                bundle.rotationDegrees,
+                bundle.mirrorX
+            )
             if (!handVisible) {
                 handVisible = true
                 hintText.visibility = View.GONE
-                statusText.text = "تم اكتشاف اليد ✓ • DIRECT $trackerDelegate"
+                statusText.text = "تم اكتشاف اليد ✓ • $framePath $trackerDelegate"
                 statusText.setTextColor(Color.rgb(55, 232, 178))
             }
 
@@ -329,14 +335,15 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
                 if (cubeGrabbed && pinch > RELEASE_THRESHOLD) cubeGrabbed = false
 
                 val rawPinchX = (landmarks[4].x() + landmarks[8].x()) * 0.5f
-                val pinchX = if (bundle.mirrorX) 1f - rawPinchX else rawPinchX
-                val pinchY = (landmarks[4].y() + landmarks[8].y()) * 0.5f
+                val rawPinchY = (landmarks[4].y() + landmarks[8].y()) * 0.5f
+                val pinchX = displayX(rawPinchX, rawPinchY, bundle.rotationDegrees, bundle.mirrorX)
+                val pinchY = displayY(rawPinchX, rawPinchY, bundle.rotationDegrees)
                 cubeView.setGrab(cubeGrabbed, pinchX, pinchY)
 
                 if (cubeGrabbed != wasGrabbed || diagnosticsDue) {
                     if (cubeGrabbed) {
                         gestureText.text = "👌  تم الإمساك بالمكعب"
-                        resultText.text = "حرّك يدك • المكعب يتبع أحدث نقطة مباشرة"
+                        resultText.text = "حرّك يدك • المكعب يتحرك بنفس اتجاه يدك"
                     } else {
                         resultText.text = "المكعب ثابت • ضم الإبهام والسبابة 👌 للإمساك به"
                     }
@@ -350,7 +357,7 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
                     "الإبهام ${mark(hand.thumb)}", "السبابة ${mark(hand.index)}", "الوسطى ${mark(hand.middle)}",
                     "البنصر ${mark(hand.ring)}", "الخنصر ${mark(hand.pinky)}"
                 ).joinToString("   ")
-                if (!cubeMode) resultText.text = "تتبع مباشر بدون تنعيم متأخر • ${handFrames.coerceAtMost(20) * 5}%"
+                if (!cubeMode) resultText.text = "تتبع مباشر • اتجاه مصحح • ${handFrames.coerceAtMost(20) * 5}%"
             }
         }
     }
@@ -406,6 +413,25 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
         val dy = a.y() - b.y()
         val dz = a.z() - b.z()
         return sqrt(dx * dx + dy * dy + dz * dz)
+    }
+
+    private fun displayX(x: Float, y: Float, rotation: Int, mirror: Boolean): Float {
+        val rotatedX = when (rotation) {
+            90 -> y
+            180 -> 1f - x
+            270 -> 1f - y
+            else -> x
+        }
+        return (if (mirror) 1f - rotatedX else rotatedX).coerceIn(0f, 1f)
+    }
+
+    private fun displayY(x: Float, y: Float, rotation: Int): Float {
+        return when (rotation) {
+            90 -> 1f - x
+            180 -> 1f - y
+            270 -> x
+            else -> y
+        }.coerceIn(0f, 1f)
     }
 
     private fun mark(open: Boolean) = if (open) "✓" else "●"
