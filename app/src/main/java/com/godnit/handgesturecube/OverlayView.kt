@@ -10,9 +10,8 @@ import com.google.mediapipe.tasks.vision.handlandmarker.HandLandmarkerResult
 import kotlin.math.max
 
 /**
- * Draws the newest hand result immediately. There is deliberately no visual
- * interpolation here: smoothing looked pleasant but made the skeleton visibly
- * trail behind the real hand on slower phones.
+ * Draws the newest hand result immediately. No visual smoothing is used so the
+ * skeleton never intentionally trails behind the newest tracker result.
  */
 class OverlayView(context: Context) : View(context) {
     private val pointX = FloatArray(LANDMARK_COUNT)
@@ -52,6 +51,7 @@ class OverlayView(context: Context) : View(context) {
         newResult: HandLandmarkerResult,
         inputWidth: Int,
         inputHeight: Int,
+        rotationDegrees: Int,
         mirrorX: Boolean
     ) {
         val landmarks = newResult.landmarks().firstOrNull() ?: return
@@ -61,8 +61,9 @@ class OverlayView(context: Context) : View(context) {
 
         for (index in 0 until LANDMARK_COUNT) {
             val rawX = landmarks[index].x()
-            pointX[index] = if (mirrorX) 1f - rawX else rawX
-            pointY[index] = landmarks[index].y()
+            val rawY = landmarks[index].y()
+            pointX[index] = displayX(rawX, rawY, rotationDegrees, mirrorX)
+            pointY[index] = displayY(rawX, rawY, rotationDegrees)
         }
         hasHand = true
         postInvalidateOnAnimation()
@@ -99,6 +100,31 @@ class OverlayView(context: Context) : View(context) {
         }
     }
 
+    /**
+     * CameraX rotationDegrees tells how the sensor buffer must be rotated to the
+     * target orientation. HandLandmarker reports normalized coordinates tied to
+     * that source buffer, so the overlay applies the inverse coordinate rotation
+     * and then the front-camera mirror used by PreviewView.
+     */
+    private fun displayX(x: Float, y: Float, rotation: Int, mirror: Boolean): Float {
+        val rotatedX = when (rotation) {
+            90 -> y
+            180 -> 1f - x
+            270 -> 1f - y
+            else -> x
+        }
+        return (if (mirror) 1f - rotatedX else rotatedX).coerceIn(0f, 1f)
+    }
+
+    private fun displayY(x: Float, y: Float, rotation: Int): Float {
+        return when (rotation) {
+            90 -> 1f - x
+            180 -> 1f - y
+            270 -> x
+            else -> y
+        }.coerceIn(0f, 1f)
+    }
+
     override fun onDetachedFromWindow() {
         removeCallbacks(clearRunnable)
         super.onDetachedFromWindow()
@@ -108,6 +134,6 @@ class OverlayView(context: Context) : View(context) {
 
     companion object {
         private const val LANDMARK_COUNT = 21
-        private const val LOST_HAND_GRACE_MS = 180L
+        private const val LOST_HAND_GRACE_MS = 160L
     }
 }
