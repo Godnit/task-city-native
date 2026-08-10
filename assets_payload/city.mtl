@@ -1,26 +1,47 @@
 newmtl house_wall
-Kd 0.94 0.88 0.73
+Kd 0.96 0.90 0.76
 
 newmtl house_roof
-Kd 0.84 0.28 0.16
+Kd 0.88 0.32 0.17
 
 newmtl house_detail
 Kd 0.25 0.43 0.52
 
 newmtl tree_trunk
-Kd 0.42 0.25 0.12
+Kd 0.39 0.23 0.10
 
 newmtl tree_leaf
-Kd 0.25 0.67 0.25
+Kd 0.22 0.66 0.24
+
+newmtl tree_leaf2
+Kd 0.30 0.76 0.28
 
 newmtl shrub
-Kd 0.31 0.73 0.29
+Kd 0.29 0.72 0.26
+
+newmtl hedge
+Kd 0.20 0.62 0.22
+
+newmtl flower
+Kd 0.92 0.34 0.32
+
+newmtl fence
+Kd 0.96 0.96 0.92
+
+newmtl path
+Kd 0.82 0.73 0.61
 
 newmtl grass
-Kd 0.34 0.73 0.31
+Kd 0.34 0.75 0.30
 
 newmtl road
-Kd 0.20 0.23 0.27
+Kd 0.18 0.21 0.24
 
 newmtl sidewalk
-Kd 0.79 0.77 0.69
+Kd 0.82 0.80 0.72
+
+newmtl lamp_pole
+Kd 0.20 0.26 0.29
+
+newmtl lamp
+Kd 1.00 0.82 0.40
