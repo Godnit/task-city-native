@@ -1,10 +1,6 @@
-name: Build Task City Native OpenGL APK
+name: Build Task City Mega Pack Native APK
 
 on:
-  push:
-    branches: [task-city-opengl-native]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -18,47 +14,23 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Prepare selected city model for lightweight OpenGL renderer
+      - name: Reconstruct curated Mega Pack neighborhood
         run: |
           set -euxo pipefail
-          sudo apt-get update
-          sudo apt-get install -y assimp-utils
-          rm -rf /tmp/taskcity-model app/src/main/assets/city
-          mkdir -p /tmp/taskcity-model/textures app/src/main/assets/city/textures
-          BASE="https://threejsfundamentals.org/threejs/resources/models/cartoon_lowpoly_small_city_free_pack"
-          curl -L --fail --retry 3 -o /tmp/taskcity-model/scene.gltf "$BASE/scene.gltf"
-          curl -L --fail --retry 3 -o /tmp/taskcity-model/scene.bin "$BASE/scene.bin"
-          for tex in \
-            World_ap_baseColor.jpeg \
-            World_ap.8_baseColor.jpeg \
-            World_ap.9_baseColor.jpeg \
-            World_ap.11_baseColor.jpeg \
-            World_ap.15_baseColor.jpeg \
-            World_ap.16_baseColor.jpeg \
-            World_ap.17_baseColor.jpeg \
-            World_ap.19_baseColor.jpeg; do
-            curl -L --fail --retry 3 -o "/tmp/taskcity-model/textures/$tex" "$BASE/textures/$tex"
-          done
-          cd /tmp/taskcity-model
-          assimp export scene.gltf scene.obj
-          test -s scene.obj
-          test -s scene.mtl
-          cp scene.obj scene.mtl "$GITHUB_WORKSPACE/app/src/main/assets/city/"
-          cp textures/* "$GITHUB_WORKSPACE/app/src/main/assets/city/textures/"
-          echo "OBJ groups:"
-          grep -E '^(o|g) ' scene.obj | head -40 || true
-          du -sh "$GITHUB_WORKSPACE/app/src/main/assets/city"
+          rm -rf app/src/main/assets/city
+          mkdir -p app/src/main/assets/city/textures
+          cat assets_payload/city.obj.gz.b64.part* | base64 -d | gunzip > app/src/main/assets/city/scene.obj
+          cat assets_payload/palette_baseColor.jpeg.b64 | base64 -d > app/src/main/assets/city/textures/palette_baseColor.jpeg
+          cat assets_payload/palette_windows_baseColor.jpeg.b64 | base64 -d > app/src/main/assets/city/textures/palette_windows_baseColor.jpeg
+          cp assets_payload/city.mtl app/src/main/assets/city/scene.mtl
+          cp assets_payload/license.txt app/src/main/assets/city/LICENSE.txt
+          test -s app/src/main/assets/city/scene.obj
+          grep -q '^g HOUSE_12$' app/src/main/assets/city/scene.obj
+          echo "House groups: $(grep -c '^g HOUSE_' app/src/main/assets/city/scene.obj)"
+          du -sh app/src/main/assets/city
 
-      - name: Apply tiny source compile fix
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('app/src/main/java/com/godnit/taskcity/MainActivity.kt')
-          s = p.read_text()
-          s = s.replace('val text = TextView(this).apply {', 'val taskText = TextView(this).apply {', 1)
-          s = s.replace('row.addView(text, LinearLayout.LayoutParams(0, dp(64), 1f))', 'row.addView(taskText, LinearLayout.LayoutParams(0, dp(64), 1f))')
-          p.write_text(s)
-          PY
+      - name: Apply Task City v2 renderer and gesture patch
+        run: python3 scripts/patch_task_city_v2.py
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -74,24 +46,23 @@ jobs:
       - name: Build signed release APK
         run: gradle --no-daemon assembleRelease
 
-      - name: Verify small Android 8.1-compatible APK
+      - name: Verify compact Android 8.1-compatible APK
         run: |
           APK=app/build/outputs/apk/release/app-release.apk
           test -s "$APK"
           unzip -t "$APK"
           $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose "$APK"
-          unzip -l "$APK" | grep 'assets/city/scene.obj'
-          unzip -l "$APK" | grep 'assets/city/scene.mtl'
           SIZE=$(stat -c '%s' "$APK")
           echo "APK_BYTES=$SIZE"
-          if [ "$SIZE" -gt 15728640 ]; then
-            echo "APK unexpectedly larger than 15 MiB"
+          if [ "$SIZE" -gt 12582912 ]; then
+            echo "APK unexpectedly larger than 12 MiB"
             exit 1
           fi
           $ANDROID_HOME/build-tools/35.0.0/aapt dump badging "$APK" | tee badging.txt
           grep -q "sdkVersion:'26'" badging.txt
+          unzip -l "$APK" | grep 'assets/city/scene.obj'
 
-      - name: Run real launch test on Android 8.1
+      - name: Run launch test on Android 8.1 and capture full-city preview
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 27
@@ -102,27 +73,27 @@ jobs:
           script: |
             adb install -r app/build/outputs/apk/release/app-release.apk
             adb logcat -c
-            adb shell am start -W com.godnit.taskcity/.MainActivity | tee launch.txt
-            sleep 7
+            adb shell am start -W -n com.godnit.taskcity/.MainActivity --ez preview_all true | tee launch.txt
+            sleep 8
             adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' | grep 'com.godnit.taskcity'
             ! adb logcat -d | grep -E 'FATAL EXCEPTION|AndroidRuntime.*com.godnit.taskcity'
             mkdir -p build-output
-            adb exec-out screencap -p > build-output/TaskCity-Native-Android8-Preview.png
-            test -s build-output/TaskCity-Native-Android8-Preview.png
+            adb exec-out screencap -p > build-output/TaskCity-MegaPack-Preview.png
+            test -s build-output/TaskCity-MegaPack-Preview.png
 
       - name: Prepare named APK
         run: |
-          cp app/build/outputs/apk/release/app-release.apk TaskCity-Native-Android8.apk
-          sha256sum TaskCity-Native-Android8.apk > SHA256SUMS.txt
-          stat -c 'Final APK bytes: %s' TaskCity-Native-Android8.apk
+          cp app/build/outputs/apk/release/app-release.apk TaskCity-MegaPack-Android8.apk
+          sha256sum TaskCity-MegaPack-Android8.apk > SHA256SUMS.txt
+          stat -c 'Final APK bytes: %s' TaskCity-MegaPack-Android8.apk
 
-      - name: Upload APK and real Android 8.1 preview
+      - name: Upload APK and Android 8.1 preview
         uses: actions/upload-artifact@v4
         with:
-          name: TaskCity-Native-Android8
+          name: TaskCity-MegaPack-Android8
           path: |
-            TaskCity-Native-Android8.apk
+            TaskCity-MegaPack-Android8.apk
             SHA256SUMS.txt
-            build-output/TaskCity-Native-Android8-Preview.png
+            build-output/TaskCity-MegaPack-Preview.png
           if-no-files-found: error
           retention-days: 30
