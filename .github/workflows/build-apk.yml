@@ -100,7 +100,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
           script: |
-            set -euxo pipefail
+            set -eux
             APK=app/build/outputs/apk/release/app-release.apk
             adb install -r "$APK"
             adb logcat -c
