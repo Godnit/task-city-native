@@ -3,6 +3,10 @@ from pathlib import Path
 p = Path('app/src/main/java/com/godnit/taskcity/MainActivity.kt')
 s = p.read_text()
 
+# Raw source has a Kotlin receiver-name collision in taskRow; fix it before compiling.
+s = s.replace('val text = TextView(this).apply {', 'val taskText = TextView(this).apply {', 1)
+s = s.replace('row.addView(text, LinearLayout.LayoutParams(0, dp(64), 1f))', 'row.addView(taskText, LinearLayout.LayoutParams(0, dp(64), 1f))', 1)
+
 # Add WebView imports while keeping the old OpenGL renderer source unused as a fallback/reference.
 anchor = 'import android.widget.Toast\n'
 imports = '''import android.widget.Toast
