@@ -12,11 +12,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate JavaScript
+      - name: Validate JavaScript and UI wiring
         run: |
           node --check godot-academy/app/src/main/assets/app.js
           node --check godot-academy/app/src/main/assets/data.js
           node --check godot-academy/app/src/main/assets/godot-ui-v2.js
+          node --check godot-academy/app/src/main/assets/godot-fixes-v3.js
+          grep -q 'godot-fixes-v3.css' godot-academy/app/src/main/assets/index.html
+          grep -q 'godot-fixes-v3.js' godot-academy/app/src/main/assets/index.html
+          grep -q "setAcademyFilterV3('programming')" godot-academy/app/src/main/assets/godot-fixes-v3.js
+          grep -q 'data-tab="script"' godot-academy/app/src/main/assets/godot-fixes-v3.js
+          grep -q 'toggleAcademySearchV3' godot-academy/app/src/main/assets/godot-fixes-v3.js
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -30,6 +36,12 @@ jobs:
       - name: Build debug APK
         working-directory: godot-academy
         run: gradle --no-daemon assembleDebug
+      - name: Verify APK contents
+        run: |
+          unzip -l godot-academy/app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/godot-fixes-v3.js'
+          unzip -l godot-academy/app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/godot-fixes-v3.css'
+          unzip -l godot-academy/app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/app.js'
+          unzip -l godot-academy/app/build/outputs/apk/debug/app-debug.apk | grep -q 'classes.dex'
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
