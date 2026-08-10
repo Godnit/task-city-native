@@ -25,6 +25,7 @@ jobs:
           grep -q 'class MainActivity : AndroidApplication' app/src/main/java/com/godnit/taskcity/MainActivity.kt
           grep -q 'initialize(cityGame, gameConfig)' app/src/main/java/com/godnit/taskcity/MainActivity.kt
           grep -q 'addContentView' app/src/main/java/com/godnit/taskcity/MainActivity.kt
+          grep -q '@JvmField val handler' app/src/main/java/com/godnit/taskcity/MainActivity.kt
           ! grep -q 'initializeForView(cityGame' app/src/main/java/com/godnit/taskcity/MainActivity.kt
           grep -q 'TASKCITY_LIBGDX_READY' app/src/main/java/com/godnit/taskcity/TaskCityGame.kt
           grep -q 'Clearly visible warm sun' app/src/main/java/com/godnit/taskcity/TaskCityGame.kt
@@ -55,23 +56,23 @@ jobs:
           test "$SIZE" -lt 20971520
           $ANDROID_HOME/build-tools/35.0.0/aapt dump badging "$APK" | tee badging.txt
           grep -q "sdkVersion:'26'" badging.txt
-          grep -q "versionName='1.2-libgdx-safe'" badging.txt
+          grep -q "versionName='1.3-libgdx-android8'" badging.txt
           unzip -l "$APK" | grep 'lib/x86_64/libgdx.so'
           unzip -l "$APK" | grep 'lib/armeabi-v7a/libgdx.so'
           unzip -l "$APK" | grep 'lib/arm64-v8a/libgdx.so'
 
       - name: Prepare named APK
         run: |
-          cp app/build/outputs/apk/release/app-release.apk TaskCity-libGDX-Safe-Android8.apk
-          sha256sum TaskCity-libGDX-Safe-Android8.apk > SHA256SUMS.txt
-          stat -c 'Final APK bytes: %s' TaskCity-libGDX-Safe-Android8.apk
+          cp app/build/outputs/apk/release/app-release.apk TaskCity-libGDX-v1.3-Android8.apk
+          sha256sum TaskCity-libGDX-v1.3-Android8.apk > SHA256SUMS.txt
+          stat -c 'Final APK bytes: %s' TaskCity-libGDX-v1.3-Android8.apk
 
       - name: Upload verified APK immediately
         uses: actions/upload-artifact@v4
         with:
-          name: TaskCity-libGDX-Safe-Android8-APK
+          name: TaskCity-libGDX-v1.3-Android8-APK
           path: |
-            TaskCity-libGDX-Safe-Android8.apk
+            TaskCity-libGDX-v1.3-Android8.apk
             SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30
@@ -96,15 +97,15 @@ jobs:
             if grep -E 'FATAL EXCEPTION|Process: com.godnit.taskcity|AndroidRuntime.*com.godnit.taskcity' build-output/logcat.txt; then exit 1; fi
             test -n "$(adb shell pidof com.godnit.taskcity | tr -d '\r')"
             adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' | grep 'com.godnit.taskcity'
-            adb exec-out screencap -p > build-output/TaskCity-libGDX-Safe-Preview.png
-            test -s build-output/TaskCity-libGDX-Safe-Preview.png
+            adb exec-out screencap -p > build-output/TaskCity-libGDX-v1.3-Preview.png
+            test -s build-output/TaskCity-libGDX-v1.3-Preview.png
 
       - name: Upload runtime preview
         uses: actions/upload-artifact@v4
         with:
-          name: TaskCity-libGDX-Safe-Android8-Preview
+          name: TaskCity-libGDX-v1.3-Android8-Preview
           path: |
-            build-output/TaskCity-libGDX-Safe-Preview.png
+            build-output/TaskCity-libGDX-v1.3-Preview.png
             build-output/libgdx-status.txt
             build-output/logcat.txt
           if-no-files-found: error
