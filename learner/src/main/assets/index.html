@@ -3,210 +3,152 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>الكائن المتعلم</title>
+<title>الكائن المتطور</title>
 <style>
-:root{--bg:#0d1420;--panel:#151f2e;--panel2:#1b2839;--line:#2c3b4f;--text:#eef4fb;--muted:#a8b7c9;--accent:#6ee7b7;--accent2:#60a5fa;--warn:#fbbf24;--bad:#fb7185;--good:#86efac}
-*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font-family:Tahoma,Arial,sans-serif;-webkit-tap-highlight-color:transparent}body{min-height:100vh}button,select{font:inherit}#app{max-width:900px;margin:auto;padding:12px 12px 24px}.top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.title{font-size:20px;font-weight:700}.tag{font-size:12px;color:var(--accent);border:1px solid #315a50;background:#112920;border-radius:999px;padding:5px 9px;white-space:nowrap}.rules{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:10px 12px;margin-bottom:10px}.rules b{display:block;margin-bottom:6px;font-size:14px}.rules-row{display:flex;flex-wrap:wrap;gap:6px}.rule{font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:5px 8px}.thought{min-height:58px;display:flex;align-items:center;background:#112126;border:1px solid #285256;border-radius:16px;padding:11px 13px;margin-bottom:10px;font-size:15px;line-height:1.6}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:10px}.stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:8px}.stat .name{font-size:11px;color:var(--muted);margin-bottom:4px}.stat .value{font-size:15px;font-weight:700}.track{height:7px;border-radius:999px;background:#263548;overflow:hidden;margin-top:5px}.track i{display:block;height:100%;border-radius:inherit;background:var(--accent2)}.world-wrap{position:relative;background:#101a27;border:1px solid var(--line);border-radius:18px;overflow:hidden;margin-bottom:10px}.world-wrap canvas{display:block;width:100%;aspect-ratio:1.42/1;background:linear-gradient(180deg,#19273a,#111b29)}.legend{position:absolute;left:8px;bottom:7px;background:rgba(8,13,21,.76);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:5px 7px;font-size:10px;color:#d9e5f2}.controls{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:10px}.btn,.speed{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:12px;padding:8px 11px}.btn.primary{background:#16382f;border-color:#2d6a58;color:#dcfff3}.age{margin-inline-start:auto;font-size:12px;color:var(--muted)}.cols{display:grid;grid-template-columns:1fr 1fr;gap:10px}.box{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:10px}.box h3{font-size:14px;margin:0 0 8px}.memory,.log{display:flex;flex-direction:column;gap:6px}.item{background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:8px;font-size:12px;line-height:1.5}.item small{display:block;color:var(--muted);margin-top:3px}.empty{font-size:12px;color:var(--muted);padding:5px 0}.confidence{height:5px;background:#2a384b;border-radius:999px;overflow:hidden;margin-top:5px}.confidence span{display:block;height:100%;background:var(--accent)}.footer{font-size:11px;color:var(--muted);text-align:center;margin-top:10px;line-height:1.6}@media(max-width:620px){#app{padding:8px 8px 18px}.title{font-size:18px}.stats{grid-template-columns:repeat(2,1fr)}.cols{grid-template-columns:1fr}.world-wrap canvas{aspect-ratio:1.18/1}.thought{font-size:14px}.age{width:100%;margin:0}.box{padding:9px}}
+:root{--bg:#09111d;--panel:#101d2c;--panel2:#132338;--line:#27405c;--text:#edf5ff;--muted:#9fb2c9;--accent:#54d6a5;--accent2:#69a9ff;--warn:#f3bf65;--bad:#ee6f7b;--good:#71df9d}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#07101b,#0b1624 65%,#08111c);color:var(--text);font-family:Tahoma,Arial,sans-serif;min-height:100vh}.app{max-width:980px;margin:auto;padding:14px 12px 30px}.top{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:10px}.brand b{font-size:20px}.brand small{display:block;color:var(--muted);margin-top:3px}.pill{border:1px solid var(--line);background:#0e1a29;border-radius:999px;padding:8px 11px;font-size:12px;color:#cfe0f4}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}.metric{background:rgba(16,29,44,.94);border:1px solid var(--line);border-radius:15px;padding:9px 10px;min-width:0}.metric span{display:block;color:var(--muted);font-size:11px}.metric strong{display:block;margin-top:3px;font-size:16px}.meter{height:5px;background:#20364e;border-radius:99px;margin-top:6px;overflow:hidden}.meter i{display:block;height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent));border-radius:99px;width:0}.stage{border:1px solid #294966;background:#0b1725;border-radius:20px;padding:8px;position:relative;overflow:hidden}.canvasWrap{width:100%;aspect-ratio:1000/650;min-height:330px;position:relative;border-radius:15px;overflow:hidden;background:#142332}.canvasWrap canvas{width:100%;height:100%;display:block}.observer{position:absolute;right:12px;bottom:10px;background:rgba(5,12,20,.8);border:1px solid #38516d;padding:6px 10px;border-radius:10px;font-size:11px;color:#d4e2f2;pointer-events:none}.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0}.controls button,.controls select{border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:13px;padding:10px 13px;font:inherit}.controls button.primary{background:#164c3d;border-color:#26705a}.controls button:active{transform:translateY(1px)}.controls label{color:var(--muted);font-size:12px}.thoughtStrip{border:1px solid #24566c;background:linear-gradient(135deg,#0d2730,#102235);border-radius:16px;padding:12px 14px;margin:8px 0 10px}.thoughtStrip small{color:#87bfd0}.thoughtStrip div{margin-top:5px;font-size:15px;line-height:1.7}.grid{display:grid;grid-template-columns:1.15fr .85fr;gap:10px}.card{background:var(--panel);border:1px solid var(--line);border-radius:17px;padding:12px}.card h3{font-size:15px;margin:0 0 10px}.log{display:flex;flex-direction:column;gap:7px;max-height:210px;overflow:auto}.entry{background:#0c1826;border:1px solid #203b55;border-radius:11px;padding:8px 9px;font-size:12px;line-height:1.55}.entry.success{border-color:#2e6a52}.entry.fail{border-color:#65404a}.knowledge{display:flex;flex-wrap:wrap;gap:7px}.chip{border:1px solid #2b4865;border-radius:11px;padding:7px 8px;font-size:11px;background:#0c1928}.chip b{display:block;font-size:12px;margin-bottom:3px}.chip em{font-style:normal;color:var(--muted)}.legend{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:8px}.legend div{font-size:11px;color:var(--muted);border-top:1px solid #20364e;padding-top:6px}@media(max-width:650px){.app{padding:10px 8px 24px}.brand b{font-size:17px}.metrics{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}.canvasWrap{min-height:300px}.pill{display:none}.controls button,.controls select{padding:9px 11px}.thoughtStrip div{font-size:14px}}
 </style>
 </head>
 <body>
-<div id="app">
+<div class="app">
   <div class="top">
-    <div class="title">🧠 الكائن المتعلم</div>
-    <div class="tag">يتعلم من التجربة فقط</div>
+    <div class="brand"><b>الكائن المتطوّر</b><small>أنت مراقب فقط — لا توجد أوامر للكائن</small></div>
+    <div class="pill" id="age">الدقيقة 0 · الجيل 1</div>
   </div>
 
-  <section class="rules">
-    <b>المعرفة التي أعطيناه إياها عند الولادة فقط:</b>
-    <div class="rules-row">
-      <span class="rule">أستطيع التحرك</span>
-      <span class="rule">أستطيع تجربة الأشياء</span>
-      <span class="rule">أشعر بحالتي</span>
-      <span class="rule">أتذكر النتائج</span>
-      <span class="rule">أحاول تحسين حالتي</span>
-    </div>
-  </section>
-
-  <div id="thought" class="thought">💭 لا أعرف أين أنا... ولا أعرف ما وظيفة أي شيء هنا.</div>
-
-  <div class="stats">
-    <div class="stat"><div class="name">الجوع</div><div id="hungerV" class="value">0%</div><div class="track"><i id="hungerB"></i></div></div>
-    <div class="stat"><div class="name">العطش</div><div id="thirstV" class="value">0%</div><div class="track"><i id="thirstB"></i></div></div>
-    <div class="stat"><div class="name">التعب</div><div id="fatigueV" class="value">0%</div><div class="track"><i id="fatigueB"></i></div></div>
-    <div class="stat"><div class="name">المعرفة</div><div id="knowledgeV" class="value">0</div><div class="track"><i id="knowledgeB"></i></div></div>
+  <div class="metrics">
+    <div class="metric"><span>الملاحظة</span><strong id="obsV">1%</strong><div class="meter"><i id="obsB"></i></div></div>
+    <div class="metric"><span>التجريب</span><strong id="expV">1%</strong><div class="meter"><i id="expB"></i></div></div>
+    <div class="metric"><span>الربط بين الأشياء</span><strong id="relV">0%</strong><div class="meter"><i id="relB"></i></div></div>
+    <div class="metric"><span>التخطيط</span><strong id="planV">0%</strong><div class="meter"><i id="planB"></i></div></div>
   </div>
 
-  <div class="world-wrap">
-    <canvas id="world" width="820" height="580"></canvas>
-    <div class="legend">أنت تشاهد فقط — لا تتحكم به</div>
+  <div class="stage">
+    <div class="canvasWrap"><canvas id="world" width="1000" height="650"></canvas><div class="observer">وضع المراقبة · لا تحكم مباشر</div></div>
   </div>
 
   <div class="controls">
-    <button id="pause" class="btn primary" type="button">إيقاف مؤقت</button>
-    <button id="reset" class="btn" type="button">ولادة جديدة</button>
-    <select id="speed" class="speed" aria-label="سرعة الزمن">
-      <option value="1">×1</option><option value="2">×2</option><option value="5">×5</option><option value="10">×10</option>
-    </select>
-    <div id="age" class="age">العمر: 0 ثانية</div>
+    <button class="primary" id="pause">إيقاف مؤقت</button>
+    <button id="newLife">ولادة جديدة</button>
+    <label>سرعة الزمن</label>
+    <select id="speed"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option></select>
   </div>
 
-  <div class="cols">
-    <section class="box"><h3>📚 ما تعلّمه فعلًا</h3><div id="memory" class="memory"></div></section>
-    <section class="box"><h3>🧪 آخر تجاربه</h3><div id="logs" class="log"></div></section>
+  <div class="thoughtStrip"><small>الفكرة الحالية</small><div id="thought">لا أعرف هذا المكان. سأراقب قبل أن ألمس أي شيء.</div></div>
+
+  <div class="grid">
+    <div class="card"><h3>سجل التجارب والاستنتاجات</h3><div class="log" id="log"></div></div>
+    <div class="card"><h3>ما أصبح يعرفه فعلًا</h3><div class="knowledge" id="knowledge"></div><div class="legend"><div>المعلومة لا تثبت من تجربة واحدة.</div><div>الاعتقادات الخاطئة يمكن أن تتغير.</div></div></div>
   </div>
-  <div class="footer">وظائف الأشياء مخفية عن الكائن. البيئة فقط تعرف النتائج، وهو يبني معرفته من ملاحظاته وتجاربه السابقة.</div>
 </div>
 <script>
-(function(){
-'use strict';
-const canvas=document.getElementById('world'),ctx=canvas.getContext('2d');
-const thoughtEl=document.getElementById('thought'),memoryEl=document.getElementById('memory'),logsEl=document.getElementById('logs');
-const pauseBtn=document.getElementById('pause'),resetBtn=document.getElementById('reset'),speedSel=document.getElementById('speed');
-const hungerV=document.getElementById('hungerV'),thirstV=document.getElementById('thirstV'),fatigueV=document.getElementById('fatigueV'),knowledgeV=document.getElementById('knowledgeV');
-const hungerB=document.getElementById('hungerB'),thirstB=document.getElementById('thirstB'),fatigueB=document.getElementById('fatigueB'),knowledgeB=document.getElementById('knowledgeB'),ageEl=document.getElementById('age');
-const W=820,H=580;
-let running=true,speed=1,last=performance.now(),acc=0,state;
-
-const prototypes=[
- {id:'red',visual:'الشيء الأحمر',icon:'🍎',kind:'food',x:125,y:105},
- {id:'blue',visual:'الشيء الأزرق',icon:'💧',kind:'water',x:700,y:105},
- {id:'soft',visual:'الشيء الكبير الناعم',icon:'🛏️',kind:'bed',x:675,y:455},
- {id:'roundSwitch',visual:'الدائرة على الجدار',icon:'🔘',kind:'switch',x:92,y:445},
- {id:'bright',visual:'الشيء اللامع',icon:'🔥',kind:'fire',x:405,y:90},
- {id:'smallMetal',visual:'الشيء المعدني الصغير',icon:'🔑',kind:'key',x:315,y:445},
- {id:'square',visual:'الصندوق',icon:'📦',kind:'box',x:535,y:340},
- {id:'ball',visual:'الشيء المستدير',icon:'⚽',kind:'ball',x:245,y:275}
+(()=>{
+const cv=document.getElementById('world'),g=cv.getContext('2d');
+const thoughtEl=document.getElementById('thought'),logEl=document.getElementById('log'),knowEl=document.getElementById('knowledge');
+const W=1000,H=650;
+const palette={floor:'#172a3a',grid:'rgba(132,170,198,.07)',wall:'#334c60',bench:'#6a503a',benchTop:'#8b6a4d',metal:'#8ca0b2',dark:'#263747',wire:'#e3a73f',power:'#62d39b',blue:'#5c91d7',red:'#d96a71',skin:'#d8a276',shirt:'#477db8',pants:'#293d5a',hair:'#332820',white:'#e9f1f8',glass:'#76b8d2'};
+let running=true,speed=1,last=performance.now(),acc=0,saveAcc=0;
+const baseObjects=[
+{id:'battery',kind:'battery',name:'علبة ذات قطبين',x:155,y:150,portable:true},
+{id:'wire',kind:'wire',name:'سلك نحاسي',x:272,y:150,portable:true},
+{id:'lamp',kind:'lamp',name:'جسم زجاجي',x:415,y:145,portable:true},
+{id:'switch',kind:'switch',name:'قطعة برافعة',x:555,y:145,portable:true},
+{id:'motor',kind:'motor',name:'أسطوانة معدنية',x:700,y:150,portable:true},
+{id:'fanblade',kind:'fanblade',name:'ريش بلاستيكية',x:820,y:180,portable:true},
+{id:'magnet',kind:'magnet',name:'قطعة منحنية',x:145,y:470,portable:true},
+{id:'metal',kind:'metal',name:'كتلة معدنية',x:270,y:490,portable:true},
+{id:'screwdriver',kind:'screwdriver',name:'أداة طويلة',x:405,y:480,portable:true},
+{id:'board',kind:'board',name:'لوح خفيف',x:560,y:475,portable:true},
+{id:'wheelset',kind:'wheelset',name:'زوج أقراص',x:705,y:490,portable:true},
+{id:'panel',kind:'panel',name:'لوحة مثبتة',x:905,y:335,portable:false}
 ];
-
-function fresh(){
- return {age:0,hunger:17,thirst:13,fatigue:8,health:100,x:410,y:285,target:null,held:null,boxOpen:false,light:false,memory:{},logs:[],thought:'لا أعرف أين أنا... ولا أعرف ما وظيفة أي شيء هنا.',objects:prototypes.map(o=>Object.assign({},o,{available:true,respawnAt:0})),decisionAt:0,stuck:0,discoveries:0};
+const recipes={
+  'battery|lamp':{id:'light',title:'إضاءة محمولة',idea:'عندما يلامس القطبان هذا الجسم الزجاجي يظهر ضوء. أستطيع استخدامه لأرى المكان أفضل.'},
+  'battery|motor':{id:'spin',title:'تحويل الطاقة إلى حركة',idea:'هذه الأسطوانة تدور عندما تلامس العلبة ذات القطبين. الطاقة يمكن أن تصبح حركة.'},
+  'fanblade|motor':{id:'fanCore',title:'تركيب ريش على المحرك',idea:'الريش تثبت على محور الأسطوانة. صنعت شيئًا جديدًا، لكنه لا يعمل بعد.'},
+  'battery|fanCore':{id:'fan',title:'مروحة تعمل بالطاقة',idea:'نجح! صنعت جهازًا يحرك الهواء. هذه أول أداة مركبة صنعتها بنفسي.'},
+  'board|wheelset':{id:'cart',title:'عربة بسيطة',idea:'اللوح فوق الأقراص يتحرك بسهولة. يمكنني نقل الأشياء بجهد أقل.'},
+  'magnet|metal':{id:'magnetism',title:'جذب المعدن',idea:'هذه القطعة تسحب المعدن دون ربطه. توجد قوة لا أراها.'},
+  'panel|screwdriver':{id:'panelOpen',title:'فتح اللوحة بالأداة',idea:'الأداة الطويلة تناسب البراغي. أستطيع فتح أشياء كانت مغلقة.'},
+  'switch|wire':{id:'controlHint',title:'السلك يثبت في المفتاح',idea:'السلك يمكن أن يدخل في هذه القطعة ذات الرافعة. ربما هي للتحكم في شيء آخر.'}
+};
+function pairKey(a,b){return [a,b].sort().join('|')}
+function fresh(){return{gen:1,t:0,objects:baseObjects.map(o=>({...o,seen:0,tests:0,state:'normal'})),agent:{x:500,y:330,angle:0,held:null,state:'THINK',timer:3.5,target:null,second:null,thought:'لا أعرف هذا المكان. سأراقب قبل أن ألمس أي شيء.',step:0},knowledge:{},pairTrials:{},discoveries:{},logs:[],skills:{obs:1,exp:1,rel:0,plan:0},light:false,fan:false,cart:false,panelOpen:false,focus:null};}
+let S=fresh();
+function obj(id){return S.objects.find(o=>o.id===id)}
+function heldObj(){return S.agent.held?obj(S.agent.held):null}
+function addLog(text,type=''){S.logs.unshift({text,type,time:Math.floor(S.t)});if(S.logs.length>16)S.logs.length=16;renderPanels()}
+function think(t){S.agent.thought=t;thoughtEl.textContent=t}
+function learnObject(o,detail){const k=S.knowledge[o.id]||(S.knowledge[o.id]={name:o.name,confidence:0,detail:'شيء غير مفهوم'});k.confidence=Math.min(100,k.confidence+12+Math.random()*9);if(detail)k.detail=detail;S.skills.obs=Math.min(100,S.skills.obs+1.2)}
+function recordPair(a,b,success,desc){const key=pairKey(a.kind,b.kind);S.pairTrials[key]=(S.pairTrials[key]||0)+1;S.skills.exp=Math.min(100,S.skills.exp+(success?3.2:1.0));if(success){S.skills.rel=Math.min(100,S.skills.rel+7);if(desc){const ka=S.knowledge[a.id]||(S.knowledge[a.id]={name:a.name,confidence:0,detail:''});ka.confidence=Math.min(100,ka.confidence+15);ka.detail=desc}}}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function candidates(){return S.objects.filter(o=>o.state!=='consumed' && o.id!==S.agent.held)}
+function chooseObservation(){let list=candidates().map(o=>({o,score:(4-o.seen)*28+Math.random()*35-dist(S.agent,o)*.018}));list.sort((a,b)=>b.score-a.score);return list[0]?.o}
+function choosePairTarget(h){let list=candidates().filter(o=>dist(h,o)>8).map(o=>{let tries=S.pairTrials[pairKey(h.kind,o.kind)]||0;let recipe=recipes[pairKey(h.kind,o.kind)]?30:0;return{o,score:35-tries*10+Math.random()*28+recipe-dist(S.agent,o)*.012}});list.sort((a,b)=>b.score-a.score);return list[0]?.o}
+function chooseAction(){const a=S.agent,h=heldObj();a.step++;
+  if(h){const t=choosePairTarget(h);if(t){a.target=t.id;a.state='MOVE';think(`أحمل ${nameOf(h)}. سأقارنها مع ${nameOf(t)}، لكنني لا أعرف إن كان بينهما علاقة.`);return}}
+  const target=chooseObservation();if(target){a.target=target.id;a.state='MOVE';if(target.seen===0)think(`لم أفحص ${nameOf(target)} من قبل. سأقترب ببطء وأراقبها.`);else think(`رأيت ${nameOf(target)} سابقًا، لكن معرفتي بها ضعيفة. سأحاول ملاحظة تفاصيل أخرى.`)}
 }
-function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
-function rnd(a,b){return a+Math.random()*(b-a)}
-function dxy(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
-function say(t){state.thought=t;thoughtEl.textContent='💭 '+t}
-function log(t){state.logs.unshift(t);if(state.logs.length>7)state.logs.pop()}
-function mem(id){if(!state.memory[id])state.memory[id]={tries:0,reliefH:0,reliefT:0,reliefF:0,harm:0,curiosity:0,note:'',blocked:0};return state.memory[id]}
-function knownCount(){return Object.keys(state.memory).length}
-function confidence(m){return Math.min(99,18+m.tries*17)}
-function needsWeight(m){return m.reliefH*(state.hunger/100)*2.4+m.reliefT*(state.thirst/100)*2.7+m.reliefF*(state.fatigue/100)*2.1-m.harm*2.9+m.curiosity*.5}
-function snapshot(){return {h:state.hunger,t:state.thirst,f:state.fatigue,hp:state.health}}
-function learn(o,before,after,note,extraCuriosity){
- const m=mem(o.id),n=m.tries;m.tries++;
- const rh=Math.max(0,before.h-after.h),rt=Math.max(0,before.t-after.t),rf=Math.max(0,before.f-after.f),harm=Math.max(0,before.hp-after.hp);
- m.reliefH=(m.reliefH*n+rh)/(n+1);m.reliefT=(m.reliefT*n+rt)/(n+1);m.reliefF=(m.reliefF*n+rf)/(n+1);m.harm=(m.harm*n+harm)/(n+1);m.curiosity=(m.curiosity*n+(extraCuriosity||0))/(n+1);if(note)m.note=note;
+function nameOf(o){return (S.knowledge[o.id]?.confidence||0)>55?(S.knowledge[o.id].detail.split('؛')[0]||o.name):o.name}
+function update(dt){S.t+=dt;const a=S.agent;a.timer-=dt;
+  if(a.state==='THINK'){if(a.timer<=0){chooseAction()}}
+  else if(a.state==='MOVE'){
+    const t=obj(a.target);if(!t){a.state='THINK';a.timer=2;return}const dx=t.x-a.x,dy=t.y-a.y,d=Math.hypot(dx,dy);a.angle=Math.atan2(dy,dx);if(d<54){a.state='OBSERVE';a.timer=2.5+Math.random()*3;think(`سأتوقف هنا. الشكل والموضع قد يخبرانني بشيء قبل أن أجرب.`)}else{const v=56+S.skills.plan*.18;a.x+=dx/d*v*dt;a.y+=dy/d*v*dt}}
+  else if(a.state==='OBSERVE'){if(a.timer<=0){const t=obj(a.target);if(!t)return;t.seen++;learnObject(t,t.seen>2?guessDetail(t):null);addLog(`راقب «${t.name}» مدة قصيرة. لم يعتبر المعلومة مؤكدة بعد.`);a.state='DECIDE';a.timer=1.8+Math.random()*2.5;think(observationThought(t))}}
+  else if(a.state==='DECIDE'){if(a.timer<=0){const t=obj(a.target),h=heldObj();if(h&&t){a.state='TEST';a.timer=2.8+Math.random()*3;think(`سأجرب ${nameOf(h)} مع ${nameOf(t)}. قد لا يحدث شيء، وهذا بحد ذاته معلومة.`)}else if(t&&t.portable&&Math.random()<.72){a.held=t.id;a.state='THINK';a.timer=2.2+Math.random()*2;think(`سأحمل ${nameOf(t)} قليلًا. ربما تتضح فائدتها عند وضعها قرب شيء آخر.`);addLog(`حمل «${t.name}» دون أن يعرف فائدتها.`)}else{a.state='TOUCH';a.timer=2.2+Math.random()*2.2;think(`سألمس أو أحرّك ${nameOf(t)} بحذر وأراقب النتيجة.`)}}}
+  else if(a.state==='TOUCH'){if(a.timer<=0){const t=obj(a.target);if(t){t.tests++;learnObject(t,directDetail(t));addLog(directResult(t),directSuccess(t)?'success':'fail')}a.state='THINK';a.timer=2.8+Math.random()*3.2}}
+  else if(a.state==='TEST'){if(a.timer<=0){const t=obj(a.target),h=heldObj();if(h&&t)testPair(h,t);a.state='THINK';a.timer=3.2+Math.random()*4}}
+  S.skills.plan=Math.min(100,Math.max(S.skills.plan,Object.keys(S.discoveries).length*7+Math.max(0,S.skills.rel-28)*.35));
 }
-function objectById(id){return state.objects.find(o=>o.id===id)}
-function describe(o){return o.visual}
-function choose(){
- const candidates=state.objects.filter(o=>o.available && !(o.id==='square'&&state.boxOpen));
- if(!candidates.length)return;
- let best=null,bestScore=-1e9,reason='';
- for(const o of candidates){
-   const m=state.memory[o.id];let score=Math.random()*7;
-   if(!m){score+=34+Math.random()*18}
-   else{
-     score+=needsWeight(m);
-     score+=Math.max(2,16/(1+m.tries*.7));
-     if(m.harm>8)score-=40;
-     if(m.blocked>0)score-=Math.min(18,m.blocked*4);
-   }
-   if(o.kind==='box'&&state.held==='smallMetal'&&!state.boxOpen)score+=45;
-   if(o.kind==='key'&&!state.held)score+=8;
-   score-=dxy(state,o)*.012;
-   if(score>bestScore){best=o;bestScore=score}
- }
- if(!best)return;
- state.target=best;
- const m=state.memory[best.id];
- if(!m){reason='لا أعرف '+describe(best)+'، سأجربه لأعرف ماذا يفعل.'}
- else if(m.harm>5){reason='هذا آذاني من قبل، لكني أراقبه بحذر.'}
- else if(state.hunger>60&&m.reliefH>4){reason='الجوع يزداد. أتذكر أن '+describe(best)+' خفّفه سابقًا.'}
- else if(state.thirst>60&&m.reliefT>4){reason='أنا عطشان. لدي ذكرى أن '+describe(best)+' ساعدني.'}
- else if(state.fatigue>68&&m.reliefF>4){reason='أنا متعب. أظن أن '+describe(best)+' يجعلني أرتاح.'}
- else if(best.kind==='box'&&state.held){reason='الصندوق لم يفتح سابقًا... سأجرب معه الشيء الذي أحمله.'}
- else{reason='سأعيد تجربة '+describe(best)+' لأتأكد من معرفتي.'}
- say(reason);
+function observationThought(o){const n=o.seen;if(n===1)return `لاحظت تفاصيل في ${o.name}، لكن تجربة واحدة لا تكفي. ربما تكون للزينة أو جزءًا من شيء أكبر.`;if(n===2)return `أصبحت أميز ${o.name} عن بقية الأشياء. ما زلت لا أعرف الغرض منها.`;return `أعرف شكل ${o.name} ومكانها الآن. الخطوة التالية هي اختبار ما تتفاعل معه.`}
+function guessDetail(o){const m={battery:'قطبان مختلفان على جسم واحد',wire:'موصل مرن ذو طرفين',lamp:'جسم زجاجي له نقطتا تماس',switch:'رافعة تغير وضعها',motor:'محور حر داخل أسطوانة',fanblade:'ريش لها فتحة في الوسط',magnet:'معدن منحنٍ وثقيل',metal:'قطعة معدنية صلبة',screwdriver:'طرفها يلائم شقوقًا صغيرة',board:'سطح خفيف ومسطح',wheelset:'أقراص تدور حول محور',panel:'لوحة مغلقة بعدة براغٍ'};return m[o.kind]||'أصبح شكلها مألوفًا'}
+function directDetail(o){if(o.kind==='switch')return 'الرافعة تتحرك لكنها لا تفعل شيئًا وحدها';if(o.kind==='motor')return 'المحور يدور باليد ثم يتوقف';if(o.kind==='wheelset')return 'الأقراص تقلل الاحتكاك عند الدفع';if(o.kind==='panel')return 'لوحة ثابتة ببراغٍ';return guessDetail(o)}
+function directSuccess(o){return ['switch','motor','wheelset','panel'].includes(o.kind)}
+function directResult(o){if(o.kind==='switch'){think('الرافعة تتحرك، لكن لا نتيجة واضحة. ربما تحتاج أن تكون متصلة بشيء.');return 'حرّك الرافعة ولم يحدث شيء مرئي.'}if(o.kind==='wheelset'){think('الأقراص تدور بسهولة. قد يكون هذا مفيدًا لتحريك شيء ثقيل.');return 'اكتشف أن الأقراص تدور وتقلل مقاومة الحركة.'}if(o.kind==='panel'){think('هذه اللوحة لا تفتح بيدي. البراغي تمنعها. سأحتاج أداة مناسبة.');return 'حاول فتح اللوحة بيده وفشل.'}think('لم أحصل على نتيجة واضحة. سأحتفظ بالملاحظة بدل أن أخترع تفسيرًا.');return `جرّب «${o.name}» وحدها ولم تظهر فائدة واضحة.`}
+function testPair(a,b){const key=pairKey(a.kind,b.kind),recipe=recipes[key];recordPair(a,b,!!recipe,recipe?recipe.title:null);
+  if(!recipe){addLog(`جرّب «${a.name}» مع «${b.name}» ولم يحدث شيء واضح.`,'fail');think('لا نتيجة. لن أعتبرهما مرتبطين الآن، لكن قد أعود لهما إذا تغيرت الظروف.');if(Math.random()<.55)S.agent.held=null;return}
+  if(!S.discoveries[recipe.id]){S.discoveries[recipe.id]={title:recipe.title,time:S.t};addLog(`اكتشاف جديد: ${recipe.title}`,'success');think(recipe.idea);applyDiscovery(recipe.id,a,b);S.skills.obs=Math.min(100,S.skills.obs+2);S.skills.exp=Math.min(100,S.skills.exp+4);S.skills.rel=Math.min(100,S.skills.rel+8)}else{addLog(`أعاد تجربة «${recipe.title}» ونجحت النتيجة مرة أخرى.`,'success');think('النتيجة تكررت. أصبحت أكثر ثقة أن العلاقة حقيقية وليست مصادفة.')}
+  S.agent.held=null;
 }
-function consume(o,type){
- o.available=false;o.respawnAt=state.age+rnd(9,15);o.x=rnd(95,725);o.y=rnd(95,480);
- if(type==='food'){state.hunger=clamp(state.hunger-47,0,100);log('🍎 استخدم الشيء الأحمر، فانخفض الجوع كثيرًا.');say('حدث شيء مهم: بعد استخدام هذا انخفض الجوع. سأحفظ العلاقة.')}
- else{state.thirst=clamp(state.thirst-58,0,100);log('💧 استخدم الشيء الأزرق، فانخفض العطش.');say('العطش انخفض مباشرة بعد استخدام هذا الشيء. هذه معلومة مفيدة.')}
+function applyDiscovery(id,a,b){if(id==='light'){S.light=true;const lamp=[a,b].find(x=>x.kind==='lamp');if(lamp)lamp.state='lit'}
+if(id==='fanCore'){const motor=[a,b].find(x=>x.kind==='motor');const blade=[a,b].find(x=>x.kind==='fanblade');if(motor&&blade){motor.kind='fanCore';motor.name='تركيب المحرك والريش';motor.state='assembled';blade.state='consumed'}}
+if(id==='fan'){S.fan=true;const f=[a,b].find(x=>x.kind==='fanCore');if(f)f.state='fan'}
+if(id==='cart'){S.cart=true;const board=[a,b].find(x=>x.kind==='board');const wheels=[a,b].find(x=>x.kind==='wheelset');if(board&&wheels){board.kind='cart';board.name='عربة صنعها الكائن';board.state='cart';wheels.state='consumed'}}
+if(id==='panelOpen'){S.panelOpen=true;const p=[a,b].find(x=>x.kind==='panel');if(p)p.state='open'}
+if(id==='magnetism'){const m=[a,b].find(x=>x.kind==='metal');if(m){m.x-=28;m.y-=12}}
 }
-function interact(o){
- const before=snapshot();let note='',cur=0;
- if(o.kind==='food'){consume(o,'food');note='يرتبط بانخفاض الجوع';}
- else if(o.kind==='water'){consume(o,'water');note='يرتبط بانخفاض العطش';}
- else if(o.kind==='bed'){state.fatigue=clamp(state.fatigue-63,0,100);log('🛏️ بقي عند الشيء الناعم قليلًا وشعر براحة.');say('التعب انخفض وأنا هنا. يبدو أن لهذا المكان علاقة بالراحة.');note='يرتبط بانخفاض التعب';}
- else if(o.kind==='fire'){state.health=clamp(state.health-19,0,100);state.fatigue=clamp(state.fatigue+5,0,100);log('🔥 لمس الشيء اللامع وتأذى.');say('هذا مؤلم! سأتذكر أن الاقتراب منه سيئ.');note='مؤذٍ؛ يجب تجنبه';}
- else if(o.kind==='switch'){state.light=!state.light;cur=12;log('🔘 لمس الدائرة فتغيّر ضوء الغرفة.');say('عندما لمست هذه الدائرة تغيّر الضوء! إذًا عملي عليها يسبب تغييرًا في الغرفة.');note='يغيّر حالة الضوء';}
- else if(o.kind==='key'){
-   if(!state.held){state.held=o.id;o.available=false;cur=9;log('🔑 التقط الشيء المعدني الصغير وحمله معه.');say('أستطيع حمل هذا الشيء. لا أعرف فائدته بعد، لكن سأحتفظ به.');note='يمكن حمله';}
- }
- else if(o.kind==='box'){
-   const m=mem(o.id);
-   if(state.boxOpen){say('هذا الصندوق مفتوح بالفعل.')}
-   else if(state.held==='smallMetal'){
-     state.boxOpen=true;cur=25;log('📦 جرّب الشيء المعدني مع الصندوق فانفتح.');say('نجح! الشيء المعدني الذي أحمله غيّر الصندوق وفتحه. اكتشفت علاقة بين شيئين.');note='يفتح عند استخدام الشيء المعدني الصغير';
-     const food=objectById('red');if(food&&!food.available){food.available=true;food.respawnAt=0;food.x=550;food.y=385}
-   }else{m.blocked++;log('📦 حاول استخدام الصندوق لكنه بقي مغلقًا.');say('الصندوق لا يستجيب لي وحدي. ربما ينقصني شيء آخر.');note='مغلق؛ المحاولة المباشرة لا تكفي';cur=5;}
- }
- else if(o.kind==='ball'){o.x=rnd(100,720);o.y=rnd(110,470);cur=7;log('⚽ لمس الشيء المستدير فتحرك إلى مكان آخر.');say('هذا الشيء يتحرك عندما أدفعه. ليس كل شيء ثابتًا.');note='يمكن دفعه وتحريكه';}
- learn(o,before,snapshot(),note,cur);state.target=null;state.decisionAt=state.age+rnd(.5,1.1);
+function draw(){g.clearRect(0,0,W,H);drawRoom();drawBench();for(const o of S.objects)if(o.state!=='consumed')drawObject(o);drawConnections();drawAgent(S.agent);drawBubble(S.agent)}
+function drawRoom(){g.fillStyle=palette.floor;g.fillRect(0,0,W,H);g.strokeStyle=palette.grid;g.lineWidth=1;for(let x=0;x<W;x+=50){g.beginPath();g.moveTo(x,0);g.lineTo(x,H);g.stroke()}for(let y=0;y<H;y+=50){g.beginPath();g.moveTo(0,y);g.lineTo(W,y);g.stroke()}g.strokeStyle=palette.wall;g.lineWidth=14;g.strokeRect(7,7,W-14,H-14);g.fillStyle=S.light?'rgba(255,235,165,.08)':'rgba(0,0,0,.12)';g.fillRect(14,14,W-28,H-28);if(S.light){const l=obj('lamp');if(l&&l.state==='lit'){const grd=g.createRadialGradient(l.x,l.y,10,l.x,l.y,190);grd.addColorStop(0,'rgba(255,230,132,.25)');grd.addColorStop(1,'rgba(255,230,132,0)');g.fillStyle=grd;g.beginPath();g.arc(l.x,l.y,190,0,Math.PI*2);g.fill()}}}
+function drawBench(){g.fillStyle='#503d2d';g.fillRect(85,75,780,120);g.fillStyle=palette.benchTop;g.fillRect(92,82,766,92);g.strokeStyle='#a17b58';g.lineWidth=3;g.strokeRect(92,82,766,92);g.fillStyle='#0e1b27';g.fillRect(830,285,125,150);g.strokeStyle='#627b90';g.lineWidth=5;g.strokeRect(830,285,125,150);g.fillStyle='#91b0c5';g.font='16px Tahoma';g.textAlign='center';g.fillText('لوحة تقنية',892,455)}
+function drawObject(o){g.save();g.translate(o.x,o.y);g.lineWidth=3;g.strokeStyle='#152332';switch(o.kind){
+case'battery':g.fillStyle='#394b58';round(-24,-31,48,62,8,true);g.fillStyle='#d55e64';g.fillRect(-15,-38,10,9);g.fillStyle='#b8c6cf';g.fillRect(7,-38,10,9);g.fillStyle='#e9edf0';g.font='bold 13px Arial';g.textAlign='center';g.fillText('+  −',0,5);break;
+case'wire':g.strokeStyle=palette.wire;g.lineWidth=8;g.beginPath();g.moveTo(-30,-10);g.bezierCurveTo(-5,-35,15,32,34,5);g.stroke();g.fillStyle='#c0c8ce';g.fillRect(-37,-15,10,10);g.fillRect(31,0,10,10);break;
+case'lamp':case'light':g.fillStyle=o.state==='lit'?'#ffe089':'#9fb9c8';g.beginPath();g.arc(0,-7,24,0,Math.PI*2);g.fill();g.fillStyle='#566b78';g.fillRect(-13,16,26,22);g.strokeStyle='#d3e3ec';g.stroke();break;
+case'switch':g.fillStyle='#657783';round(-31,-23,62,46,7,true);g.strokeStyle='#d0d8dc';g.lineWidth=8;g.beginPath();g.moveTo(-5,5);g.lineTo(15,-18);g.stroke();break;
+case'motor':case'fanCore':g.fillStyle='#8293a0';round(-29,-22,58,44,12,true);g.fillStyle='#d1d9df';g.fillRect(29,-5,20,10);if(o.kind==='fanCore')drawFanBlades(49,0,false);break;
+case'fanblade':drawFanBlades(0,0,false);break;
+case'magnet':g.strokeStyle='#c85e66';g.lineWidth=18;g.beginPath();g.arc(0,0,28,.25*Math.PI,1.75*Math.PI);g.stroke();g.strokeStyle='#d8e1e6';g.lineWidth=18;g.beginPath();g.arc(0,0,28,.25*Math.PI,.47*Math.PI);g.stroke();g.beginPath();g.arc(0,0,28,1.53*Math.PI,1.75*Math.PI);g.stroke();break;
+case'metal':g.fillStyle='#8496a4';round(-30,-22,60,44,5,true);g.strokeStyle='#c2ced6';g.stroke();g.beginPath();g.moveTo(-25,-10);g.lineTo(25,10);g.stroke();break;
+case'screwdriver':g.fillStyle='#d76c52';round(-34,-11,38,22,9,true);g.fillStyle='#b9c6cc';g.fillRect(4,-4,45,8);g.beginPath();g.moveTo(49,-4);g.lineTo(58,0);g.lineTo(49,4);g.fill();break;
+case'board':g.fillStyle='#9a7650';round(-46,-24,92,48,5,true);g.strokeStyle='#c79b6b';g.stroke();break;
+case'cart':g.fillStyle='#9a7650';round(-48,-25,96,45,5,true);g.fillStyle='#303d49';g.beginPath();g.arc(-31,27,14,0,Math.PI*2);g.arc(31,27,14,0,Math.PI*2);g.fill();break;
+case'wheelset':g.fillStyle='#2d3944';g.beginPath();g.arc(-22,0,19,0,Math.PI*2);g.arc(22,0,19,0,Math.PI*2);g.fill();g.strokeStyle='#93a6b3';g.lineWidth=5;g.beginPath();g.moveTo(-22,0);g.lineTo(22,0);g.stroke();break;
+case'panel':g.fillStyle=o.state==='open'?'#24303a':'#516775';round(-38,-55,76,110,5,true);g.strokeStyle='#aab9c2';g.stroke();for(const sx of[-27,27])for(const sy of[-43,43]){g.beginPath();g.arc(sx,sy,4,0,Math.PI*2);g.stroke()}if(o.state==='open'){g.fillStyle='#315b67';g.fillRect(-27,-36,54,72);g.strokeStyle='#d28b45';g.lineWidth=3;for(let i=-20;i<=20;i+=10){g.beginPath();g.moveTo(i,-30);g.lineTo(-i,30);g.stroke()}}break;
+case'fan':g.fillStyle='#8293a0';round(-29,-22,58,44,12,true);drawFanBlades(49,0,true);break;
 }
-function respawn(){for(const o of state.objects){if(!o.available&&o.respawnAt>0&&state.age>=o.respawnAt){o.available=true;o.respawnAt=0}}}
-function step(dt){
- state.age+=dt;respawn();
- state.hunger=clamp(state.hunger+dt*.72,0,100);state.thirst=clamp(state.thirst+dt*.91,0,100);state.fatigue=clamp(state.fatigue+dt*.49,0,100);
- if(state.hunger>95||state.thirst>95)state.health=clamp(state.health-dt*.8,0,100);
- if(state.health<=0){say('لم أستطع الحفاظ على نفسي... انتهت هذه الحياة.');running=false;pauseBtn.textContent='تشغيل';return}
- if(!state.target||!state.target.available){if(state.age>=state.decisionAt)choose();return}
- const o=state.target,dx=o.x-state.x,dy=o.y-state.y,dist=Math.hypot(dx,dy);
- if(dist<27){interact(o);return}
- const movement=Math.min(dist,82*dt);state.x+=dx/dist*movement;state.y+=dy/dist*movement;
-}
-function css(name,fallback){const v=getComputedStyle(document.documentElement).getPropertyValue(name).trim();return v||fallback}
-function roundedRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
-function drawRoom(){
- ctx.clearRect(0,0,W,H);
- const floor=state.light?'#24364b':'#172536';ctx.fillStyle=floor;ctx.fillRect(18,18,W-36,H-36);
- ctx.strokeStyle='#3a5067';ctx.lineWidth=5;ctx.strokeRect(18,18,W-36,H-36);
- ctx.strokeStyle='rgba(255,255,255,.035)';ctx.lineWidth=1;for(let x=45;x<W;x+=55){ctx.beginPath();ctx.moveTo(x,20);ctx.lineTo(x,H-20);ctx.stroke()}for(let y=45;y<H;y+=55){ctx.beginPath();ctx.moveTo(20,y);ctx.lineTo(W-20,y);ctx.stroke()}
- if(!state.light){ctx.fillStyle='rgba(0,0,0,.14)';ctx.fillRect(20,20,W-40,H-40)}
-}
-function drawObjects(){
- for(const o of state.objects){if(!o.available&&o.id!=='square')continue;
-   const remembered=!!state.memory[o.id];
-   ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='38px sans-serif';
-   let ic=o.icon;if(o.id==='square'&&state.boxOpen)ic='📭';ctx.fillText(ic,o.x,o.y);
-   if(remembered){ctx.font='11px Tahoma,Arial';ctx.fillStyle='#c5d7e8';ctx.fillText(confidence(state.memory[o.id])+'%',o.x,o.y+34)}
- }
-}
-function drawCreature(){
- if(state.target){ctx.strokeStyle='rgba(110,231,183,.24)';ctx.lineWidth=2;ctx.setLineDash([6,7]);ctx.beginPath();ctx.moveTo(state.x,state.y);ctx.lineTo(state.target.x,state.target.y);ctx.stroke();ctx.setLineDash([])}
- ctx.shadowColor='rgba(110,231,183,.35)';ctx.shadowBlur=15;ctx.beginPath();ctx.arc(state.x,state.y,19,0,Math.PI*2);ctx.fillStyle='#6ee7b7';ctx.fill();ctx.shadowBlur=0;
- ctx.fillStyle='#0b1d18';ctx.beginPath();ctx.arc(state.x-6,state.y-3,2.5,0,Math.PI*2);ctx.arc(state.x+6,state.y-3,2.5,0,Math.PI*2);ctx.fill();
- ctx.strokeStyle='#0b1d18';ctx.lineWidth=2;ctx.beginPath();ctx.arc(state.x,state.y+3,7,.2,Math.PI-.2);ctx.stroke();
- if(state.held){ctx.font='20px sans-serif';ctx.fillText('🔑',state.x+26,state.y-23)}
- ctx.textAlign='center';ctx.font='12px Tahoma,Arial';ctx.fillStyle='#e8f4ff';ctx.fillText('الكائن',state.x,state.y+34);
-}
-function draw(){drawRoom();drawObjects();drawCreature()}
-function pct(v){return Math.round(v)+'%'}
-function render(){
- hungerV.textContent=pct(state.hunger);thirstV.textContent=pct(state.thirst);fatigueV.textContent=pct(state.fatigue);knowledgeV.textContent=knownCount()+' / '+prototypes.length;
- hungerB.style.width=state.hunger+'%';thirstB.style.width=state.thirst+'%';fatigueB.style.width=state.fatigue+'%';knowledgeB.style.width=(knownCount()/prototypes.length*100)+'%';
- hungerB.style.background=state.hunger>78?'var(--bad)':'var(--accent2)';thirstB.style.background=state.thirst>78?'var(--bad)':'var(--accent2)';fatigueB.style.background=state.fatigue>78?'var(--warn)':'var(--accent2)';
- ageEl.textContent='العمر: '+Math.floor(state.age)+' ثانية · الصحة '+Math.round(state.health)+'%';
- const entries=Object.entries(state.memory);
- memoryEl.innerHTML=entries.length?entries.map(([id,m])=>{const o=prototypes.find(p=>p.id===id),c=confidence(m);return '<div class="item"><b>'+o.icon+' '+o.visual+'</b><br>'+escapeHtml(m.note||'ما زلت أجمع معلومات')+'<small>التجارب: '+m.tries+' · الثقة: '+c+'%</small><div class="confidence"><span style="width:'+c+'%"></span></div></div>'}).join(''):'<div class="empty">لا توجد أي معرفة بعد. سيبنيها بنفسه.</div>';
- logsEl.innerHTML=state.logs.length?state.logs.map(v=>'<div class="item">'+escapeHtml(v)+'</div>').join(''):'<div class="empty">لم تحدث تجربة بعد.</div>';
-}
-function escapeHtml(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
-function loop(now){const dt=Math.min(.06,(now-last)/1000);last=now;if(running){acc+=dt*speed;while(acc>=.035){step(.035);acc-=.035}}draw();render();requestAnimationFrame(loop)}
-pauseBtn.addEventListener('click',function(){running=!running;pauseBtn.textContent=running?'إيقاف مؤقت':'تشغيل'});
-resetBtn.addEventListener('click',function(){state=fresh();running=true;pauseBtn.textContent='إيقاف مؤقت';say(state.thought)});
-speedSel.addEventListener('change',function(){speed=Number(speedSel.value)||1});
-state=fresh();requestAnimationFrame(loop);
+if(o.state==='fan')drawFanBlades(49,0,true);g.restore()}
+function drawFanBlades(x,y,spin){g.save();g.translate(x,y);if(spin)g.rotate((S.t*8)%(Math.PI*2));g.fillStyle='#78a9c8';for(let i=0;i<4;i++){g.rotate(Math.PI/2);g.beginPath();g.moveTo(0,0);g.quadraticCurveTo(12,-11,35,-5);g.quadraticCurveTo(23,12,0,0);g.fill()}g.fillStyle='#d2dde4';g.beginPath();g.arc(0,0,7,0,Math.PI*2);g.fill();g.restore()}
+function drawConnections(){if(S.discoveries.controlHint){const sw=obj('switch'),w=obj('wire');if(sw&&w&&w.state!=='consumed'){g.strokeStyle='rgba(227,167,63,.4)';g.setLineDash([8,8]);g.beginPath();g.moveTo(sw.x,sw.y);g.lineTo(w.x,w.y);g.stroke();g.setLineDash([])}}}
+function drawAgent(a){g.save();g.translate(a.x,a.y);g.rotate(a.angle+Math.PI/2);g.fillStyle='rgba(0,0,0,.22)';g.beginPath();g.ellipse(0,12,22,13,0,0,Math.PI*2);g.fill();g.fillStyle=palette.pants;round(-13,4,26,33,8,true);g.fillStyle=palette.shirt;round(-18,-18,36,35,10,true);g.fillStyle=palette.skin;g.beginPath();g.arc(0,-29,14,0,Math.PI*2);g.fill();g.fillStyle=palette.hair;g.beginPath();g.arc(0,-33,14,Math.PI,Math.PI*2);g.fill();g.strokeStyle=palette.skin;g.lineWidth=7;g.beginPath();g.moveTo(-15,-10);g.lineTo(-25,5);g.moveTo(15,-10);g.lineTo(25,5);g.stroke();g.restore();if(a.held){const h=obj(a.held);g.fillStyle='#d8edf7';g.font='12px Tahoma';g.textAlign='center';g.fillText('يحمل: '+nameOf(h),a.x,a.y+48)}}
+function drawBubble(a){const text=a.thought;const max=32;let lines=[];for(let s=text;s.length;){if(s.length<=max){lines.push(s);break}let cut=s.lastIndexOf(' ',max);if(cut<10)cut=max;lines.push(s.slice(0,cut));s=s.slice(cut).trim()}lines=lines.slice(0,3);const bw=290,bh=27+lines.length*20,bx=Math.max(12,Math.min(W-bw-12,a.x-bw/2)),by=Math.max(18,a.y-115-bh/2);g.fillStyle='rgba(8,17,28,.94)';g.strokeStyle='#4e748e';g.lineWidth=2;round(bx,by,bw,bh,14,true,true);g.beginPath();g.moveTo(a.x-8,by+bh);g.lineTo(a.x,by+bh+14);g.lineTo(a.x+10,by+bh);g.fill();g.fillStyle='#e8f2fa';g.font='15px Tahoma';g.textAlign='right';lines.forEach((l,i)=>g.fillText(l,bx+bw-13,by+25+i*20))}
+function round(x,y,w,h,r,fill,stroke){g.beginPath();g.roundRect(x,y,w,h,r);if(fill)g.fill();if(stroke)g.stroke()}
+function renderPanels(){logEl.innerHTML=S.logs.length?S.logs.map(e=>`<div class="entry ${e.type}"><span style="color:#8ea5bc">${Math.floor(e.time/60)}:${String(e.time%60).padStart(2,'0')}</span> · ${e.text}</div>`).join(''):'<div class="entry">لم يبدأ الاستكشاف بعد.</div>';const ds=Object.values(S.discoveries);knowEl.innerHTML=ds.length?ds.map(d=>`<div class="chip"><b>${d.title}</b><em>اكتشاف بعد ${Math.max(1,Math.floor(d.time/60))} د</em></div>`).join(''):'<div class="chip"><b>لا معرفة مؤكدة</b><em>سيبدأ من الملاحظة والتجربة</em></div>'}
+function renderUI(){const sk=S.skills;for(const [k,v] of[['obs',sk.obs],['exp',sk.exp],['rel',sk.rel],['plan',sk.plan]]){document.getElementById(k+'V').textContent=Math.round(v)+'%';document.getElementById(k+'B').style.width=Math.round(v)+'%'}document.getElementById('age').textContent=`الدقيقة ${Math.floor(S.t/60)} · الجيل ${S.gen}`;thoughtEl.textContent=S.agent.thought}
+function save(){try{localStorage.setItem('learningCreatureV02',JSON.stringify({t:S.t,knowledge:S.knowledge,pairTrials:S.pairTrials,discoveries:S.discoveries,skills:S.skills,light:S.light,fan:S.fan,cart:S.cart,panelOpen:S.panelOpen,objects:S.objects.map(o=>({id:o.id,kind:o.kind,name:o.name,state:o.state,seen:o.seen,tests:o.tests,x:o.x,y:o.y}))}))}catch(e){}}
+function restore(){try{const p=JSON.parse(localStorage.getItem('learningCreatureV02')||'null');if(!p)return;S.t=p.t||0;S.knowledge=p.knowledge||{};S.pairTrials=p.pairTrials||{};S.discoveries=p.discoveries||{};S.skills=p.skills||S.skills;S.light=!!p.light;S.fan=!!p.fan;S.cart=!!p.cart;S.panelOpen=!!p.panelOpen;if(Array.isArray(p.objects))for(const q of p.objects){const o=obj(q.id);if(o)Object.assign(o,q)}S.agent.thought='أتذكر ما تعلمته سابقًا. سأواصل من حيث توقفت.';addLog('استعاد ذاكرته من الجلسة السابقة.')}catch(e){}}
+function loop(now){const real=Math.min(.05,(now-last)/1000);last=now;if(running){acc+=real*speed;saveAcc+=real;while(acc>.033){update(.033);acc-=.033}if(saveAcc>5){save();saveAcc=0}}draw();renderUI();requestAnimationFrame(loop)}
+document.getElementById('pause').addEventListener('click',e=>{running=!running;e.target.textContent=running?'إيقاف مؤقت':'متابعة'});document.getElementById('speed').addEventListener('change',e=>speed=Number(e.target.value));document.getElementById('newLife').addEventListener('click',()=>{if(confirm('هل تريد محو ذاكرة هذا الكائن وبدء جيل جديد؟')){localStorage.removeItem('learningCreatureV02');S=fresh();renderPanels()}});
+restore();renderPanels();requestAnimationFrame(loop);
 })();
 </script>
 </body>
