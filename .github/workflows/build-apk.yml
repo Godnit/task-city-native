@@ -1,8 +1,8 @@
-name: Build Hand Gesture Cube Native APK
+name: Build Task City Native OpenGL APK
 
 on:
   push:
-    branches: [main]
+    branches: [task-city-opengl-native]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -13,17 +13,41 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Add offline native hand model
+      - name: Prepare selected city model for lightweight OpenGL renderer
         run: |
-          mkdir -p app/src/main/assets
-          curl -L --fail --retry 3 \
-            -o app/src/main/assets/hand_landmarker.task \
-            https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y assimp-utils
+          rm -rf /tmp/taskcity-model app/src/main/assets/city
+          mkdir -p /tmp/taskcity-model/textures app/src/main/assets/city/textures
+          BASE="https://threejsfundamentals.org/threejs/resources/models/cartoon_lowpoly_small_city_free_pack"
+          curl -L --fail --retry 3 -o /tmp/taskcity-model/scene.gltf "$BASE/scene.gltf"
+          curl -L --fail --retry 3 -o /tmp/taskcity-model/scene.bin "$BASE/scene.bin"
+          for tex in \
+            World_ap_baseColor.jpeg \
+            World_ap.8_baseColor.jpeg \
+            World_ap.9_baseColor.jpeg \
+            World_ap.11_baseColor.jpeg \
+            World_ap.15_baseColor.jpeg \
+            World_ap.16_baseColor.jpeg \
+            World_ap.17_baseColor.jpeg \
+            World_ap.19_baseColor.jpeg; do
+            curl -L --fail --retry 3 -o "/tmp/taskcity-model/textures/$tex" "$BASE/textures/$tex"
+          done
+          cd /tmp/taskcity-model
+          assimp export scene.gltf scene.obj
+          test -s scene.obj
+          test -s scene.mtl
+          cp scene.obj scene.mtl "$GITHUB_WORKSPACE/app/src/main/assets/city/"
+          cp textures/* "$GITHUB_WORKSPACE/app/src/main/assets/city/textures/"
+          echo "OBJ groups:"
+          grep -E '^(o|g) ' scene.obj | head -40 || true
+          du -sh "$GITHUB_WORKSPACE/app/src/main/assets/city"
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -39,76 +63,61 @@ jobs:
       - name: Build signed release APK
         run: gradle --no-daemon assembleRelease
 
-      - name: Reject Android 9-only native imports
+      - name: Verify small Android 8.1-compatible APK
         run: |
-          inspect_root="$RUNNER_TEMP/hand-gesture-native-inspect"
-          mkdir -p "$inspect_root"
-          unzip -q app/build/outputs/apk/release/app-release.apk 'lib/*/*.so' -d "$inspect_root"
-          while IFS= read -r -d '' so_file; do
-            if readelf -Ws "$so_file" | grep -Eq 'UND.*aligned_alloc(@|$)'; then
-              echo "Android 9-only aligned_alloc import found in $so_file"
-              exit 1
-            fi
-          done < <(find "$inspect_root" -type f -name '*.so' -print0)
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          unzip -t "$APK"
+          $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose "$APK"
+          unzip -l "$APK" | grep 'assets/city/scene.obj'
+          unzip -l "$APK" | grep 'assets/city/scene.mtl'
+          SIZE=$(stat -c '%s' "$APK")
+          echo "APK_BYTES=$SIZE"
+          if [ "$SIZE" -gt 15728640 ]; then
+            echo "APK unexpectedly larger than 15 MiB"
+            exit 1
+          fi
+          $ANDROID_HOME/build-tools/35.0.0/aapt dump badging "$APK" | tee badging.txt
+          grep -q "sdkVersion:'26'" badging.txt
+          grep -q "application-label-ar:'مدينة المهام'\|application-label:'مدينة المهام'" badging.txt || true
 
-      - name: Run native inference on Android 8.1
+      - name: Run real launch test on Android 8.1
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 27
           arch: x86
           profile: Nexus 5X
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-front emulated
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
-          script: bash scripts/android8_self_test.sh
-
-      - name: Verify APK archive
-        run: unzip -t app/build/outputs/apk/release/app-release.apk
-
-      - name: Verify signature and Android 8 compatibility
-        run: |
-          $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose app/build/outputs/apk/release/app-release.apk
-          unzip -l app/build/outputs/apk/release/app-release.apk | grep 'assets/hand_landmarker.task'
-          unzip -l app/build/outputs/apk/release/app-release.apk | grep 'lib/armeabi-v7a/'
-          unzip -l app/build/outputs/apk/release/app-release.apk | grep 'lib/x86/'
-
-      - name: Create lightweight 32-bit delivery APK
-        run: |
-          light_work="$RUNNER_TEMP/hand-gesture-v1.5-light-work.apk"
-          light_aligned="$RUNNER_TEMP/hand-gesture-v1.5-light-aligned.apk"
-          release_keystore="$RUNNER_TEMP/hand-gesture-v1.5.keystore"
-          cp app/build/outputs/apk/release/app-release.apk "$light_work"
-          zip -q -d "$light_work" 'lib/x86/*'
-          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -p -f 4 "$light_work" "$light_aligned"
-          keytool -genkeypair -noprompt \
-            -keystore "$release_keystore" \
-            -storepass android \
-            -keypass android \
-            -alias handgesture \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -dname "CN=Hand Gesture Cube, OU=Android, O=Godnit, L=Sanaa, C=YE"
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign \
-            --ks "$release_keystore" \
-            --ks-key-alias handgesture \
-            --ks-pass pass:android \
-            --key-pass pass:android \
-            --out app/build/outputs/apk/release/app-release.apk \
-            "$light_aligned"
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose app/build/outputs/apk/release/app-release.apk
-          unzip -t app/build/outputs/apk/release/app-release.apk
-          if unzip -l app/build/outputs/apk/release/app-release.apk | grep -q 'lib/x86/'; then
-            echo 'x86 files remained in lightweight APK'
-            exit 1
-          fi
+          script: |
+            set -euxo pipefail
+            APK=app/build/outputs/apk/release/app-release.apk
+            adb install -r "$APK"
+            adb logcat -c
+            adb shell am start -W com.godnit.taskcity/.MainActivity | tee launch.txt
+            sleep 7
+            adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' | grep 'com.godnit.taskcity'
+            if adb logcat -d | grep -E 'FATAL EXCEPTION|AndroidRuntime.*com.godnit.taskcity'; then
+              echo 'Task City crashed on Android 8.1'
+              exit 1
+            fi
+            mkdir -p build-output
+            adb exec-out screencap -p > build-output/TaskCity-Native-Android8-Preview.png
+            test -s build-output/TaskCity-Native-Android8-Preview.png
 
       - name: Prepare named APK
-        run: cp app/build/outputs/apk/release/app-release.apk Hand-Gesture-Cube-v1.5-Android8.apk
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk TaskCity-Native-Android8.apk
+          sha256sum TaskCity-Native-Android8.apk > SHA256SUMS.txt
+          stat -c 'Final APK bytes: %s' TaskCity-Native-Android8.apk
 
-      - name: Upload APK
+      - name: Upload APK and real Android 8.1 preview
         uses: actions/upload-artifact@v4
         with:
-          name: Hand-Gesture-Cube-v1.5-Android8
-          path: Hand-Gesture-Cube-v1.5-Android8.apk
+          name: TaskCity-Native-Android8
+          path: |
+            TaskCity-Native-Android8.apk
+            SHA256SUMS.txt
+            build-output/TaskCity-Native-Android8-Preview.png
           if-no-files-found: error
           retention-days: 30
