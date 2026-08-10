@@ -63,8 +63,8 @@ class HandLandmarkerHelper(
             .setRunningMode(RunningMode.LIVE_STREAM)
             .setNumHands(1)
             .setMinHandDetectionConfidence(0.38f)
-            // Keep MediaPipe on its cheaper tracking path for as long as the
-            // hand is still visible instead of repeatedly running palm detect.
+            // Prefer the cheaper landmark-tracking path while the hand remains
+            // visible instead of frequently re-running palm detection.
             .setMinHandPresenceConfidence(0.24f)
             .setMinTrackingConfidence(0.16f)
             .setResultListener(::onResult)
@@ -83,7 +83,8 @@ class HandLandmarkerHelper(
             return
         }
 
-        // Never form a queue of old camera frames. The newest frame wins.
+        // Never queue stale camera frames. If inference is still running, the
+        // current frame is discarded immediately and CameraX retains the newest.
         if (!frameInFlight.compareAndSet(false, true)) {
             imageProxy.close()
             return
@@ -91,7 +92,7 @@ class HandLandmarkerHelper(
 
         val width = imageProxy.width
         val height = imageProxy.height
-        val rotation = imageProxy.imageInfo.rotationDegrees.normalizeRotation()
+        val rotation = normalizeRotation(imageProxy.imageInfo.rotationDegrees)
         pendingWidth = if (rotation % 180 == 0) width else height
         pendingHeight = if (rotation % 180 == 0) height else width
         pendingRotation = rotation
@@ -102,32 +103,43 @@ class HandLandmarkerHelper(
             .setRotationDegrees(rotation)
             .build()
 
-        // CameraX RGBA output is normally one tightly packed direct buffer.
-        // Wrap that buffer directly in MPImage so we skip createBitmap() and a
-        // complete width*height*4 memory copy on every tracking result.
+        // Fast path: CameraX RGBA often arrives as one tightly-packed direct
+        // buffer. Wrap it as MPImage and keep ImageProxy alive until MediaPipe's
+        // callback, eliminating a full-frame Bitmap allocation/copy per result.
         val plane = imageProxy.planes.firstOrNull()
         val expectedBytes = width * height * 4
         if (plane != null && plane.pixelStride == 4 && plane.rowStride == width * 4) {
-            try {
+            val fastImage = try {
                 val source = plane.buffer.duplicate()
                 source.rewind()
-                if (source.remaining() >= expectedBytes) {
+                if (source.remaining() < expectedBytes) {
+                    null
+                } else {
                     source.limit(expectedBytes)
-                    val packed = source.slice()
-                    val mpImage = ByteBufferImageBuilder(
-                        packed,
+                    ByteBufferImageBuilder(
+                        source.slice(),
                         width,
                         height,
                         MPImage.IMAGE_FORMAT_RGBA
                     ).build()
-                    pendingProxy = imageProxy
-                    pendingMpImage = mpImage
-                    pendingZeroCopy = true
-                    detector.detectAsync(mpImage, processing, SystemClock.uptimeMillis())
+                }
+            } catch (builderError: Throwable) {
+                Log.w(TAG, "Zero-copy MPImage builder unavailable; using bitmap fallback", builderError)
+                null
+            }
+
+            if (fastImage != null) {
+                pendingProxy = imageProxy
+                pendingMpImage = fastImage
+                pendingZeroCopy = true
+                try {
+                    detector.detectAsync(fastImage, processing, SystemClock.uptimeMillis())
+                    return
+                } catch (error: Throwable) {
+                    releaseInFlight()
+                    listener.onError("تعذّر تحليل صورة الكاميرا: ${error.message ?: error.javaClass.simpleName}")
                     return
                 }
-            } catch (fastPathError: Throwable) {
-                Log.w(TAG, "Zero-copy camera path unavailable; using bitmap fallback", fastPathError)
             }
         }
 
@@ -139,13 +151,19 @@ class HandLandmarkerHelper(
             bitmap.copyPixelsFromBuffer(buffer)
         } catch (error: Throwable) {
             imageProxy.close()
-            releaseInFlight()
+            frameInFlight.set(false)
             listener.onError("تعذّرت قراءة صورة الكاميرا: ${error.message ?: error.javaClass.simpleName}")
             return
         }
         imageProxy.close()
 
-        val mpImage = BitmapImageBuilder(bitmap).build()
+        val mpImage = try {
+            BitmapImageBuilder(bitmap).build()
+        } catch (error: Throwable) {
+            frameInFlight.set(false)
+            listener.onError("تعذّر تجهيز إطار الكاميرا: ${error.message ?: error.javaClass.simpleName}")
+            return
+        }
         pendingProxy = null
         pendingMpImage = mpImage
         try {
@@ -230,8 +248,8 @@ class HandLandmarkerHelper(
         private const val TAG = "HandGestureCube"
         private const val MODEL_PATH = "hand_landmarker.task"
 
-        private fun Int.normalizeRotation(): Int {
-            val normalized = ((this % 360) + 360) % 360
+        private fun normalizeRotation(value: Int): Int {
+            val normalized = ((value % 360) + 360) % 360
             return when {
                 normalized < 45 -> 0
                 normalized < 135 -> 90
