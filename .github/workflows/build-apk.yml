@@ -2,7 +2,7 @@ name: Build Hand Gesture Cube Native APK
 
 on:
   push:
-    branches: [main]
+    branches: [main, agent/hand-cube-smooth-grab-v16]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -73,9 +73,9 @@ jobs:
 
       - name: Create lightweight 32-bit delivery APK
         run: |
-          light_work="$RUNNER_TEMP/hand-gesture-v1.5-light-work.apk"
-          light_aligned="$RUNNER_TEMP/hand-gesture-v1.5-light-aligned.apk"
-          release_keystore="$RUNNER_TEMP/hand-gesture-v1.5.keystore"
+          light_work="$RUNNER_TEMP/hand-gesture-v1.6-light-work.apk"
+          light_aligned="$RUNNER_TEMP/hand-gesture-v1.6-light-aligned.apk"
+          release_keystore="$RUNNER_TEMP/hand-gesture-v1.6.keystore"
           cp app/build/outputs/apk/release/app-release.apk "$light_work"
           zip -q -d "$light_work" 'lib/x86/*'
           "$ANDROID_HOME/build-tools/35.0.0/zipalign" -p -f 4 "$light_work" "$light_aligned"
@@ -103,12 +103,12 @@ jobs:
           fi
 
       - name: Prepare named APK
-        run: cp app/build/outputs/apk/release/app-release.apk Hand-Gesture-Cube-v1.5-Android8.apk
+        run: cp app/build/outputs/apk/release/app-release.apk Hand-Gesture-Cube-v1.6-Smooth-Grab.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hand-Gesture-Cube-v1.5-Android8
-          path: Hand-Gesture-Cube-v1.5-Android8.apk
+          name: Hand-Gesture-Cube-v1.6-Smooth-Grab
+          path: Hand-Gesture-Cube-v1.6-Smooth-Grab.apk
           if-no-files-found: error
           retention-days: 30
