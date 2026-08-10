@@ -8,6 +8,7 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Size
 import android.view.Gravity
 import android.view.View
@@ -46,11 +47,13 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
     private var handFrames = 0
     private var totalResultFrames = 0
     private var lastResultAt = 0L
+    private var lastDiagnosticsAt = 0L
     private var smoothFps = 0f
     private var trackerDelegate = "…"
     private var cubeMode = false
     private var cubeGrabbed = false
     private var missedHandFrames = 0
+    private var handVisible = false
     private val uiHandler = Handler(Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -228,7 +231,7 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
     override fun onReady(delegateName: String) {
         trackerDelegate = delegateName
         runOnUiThread {
-            statusText.text = "النموذج الخفيف جاهز • $delegateName"
+            statusText.text = "المسار السريع جاهز • $delegateName"
             resultText.text = "المتتبع يعمل — ارفع يدك الآن"
             bindCamera()
         }
@@ -245,9 +248,8 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
                     it.setSurfaceProvider(previewView.surfaceProvider)
                 }
                 val analysis = ImageAnalysis.Builder()
-                    // The bundled palm/landmark models consume 192x192 and
-                    // 224x224 inputs. 240x320 preserves enough source detail
-                    // while avoiding four times the camera preprocessing work.
+                    // Keep enough source detail for the hand model while making
+                    // CameraX's RGBA conversion inexpensive on older 32-bit phones.
                     .setTargetResolution(Size(240, 320))
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
@@ -265,13 +267,17 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
     override fun onResults(bundle: HandLandmarkerHelper.ResultBundle) {
         runOnUiThread {
             totalResultFrames++
-            val now = System.currentTimeMillis()
+            val now = SystemClock.uptimeMillis()
             if (lastResultAt > 0) {
                 val instant = 1000f / (now - lastResultAt).coerceAtLeast(1)
                 smoothFps = if (smoothFps == 0f) instant else smoothFps * 0.86f + instant * 0.14f
             }
             lastResultAt = now
-            fpsText.text = "LITE $trackerDelegate  •  FPS ${smoothFps.toInt()}  •  ${bundle.inferenceMs} ms"
+            val diagnosticsDue = now - lastDiagnosticsAt >= DIAGNOSTICS_INTERVAL_MS
+            if (diagnosticsDue) {
+                lastDiagnosticsAt = now
+                fpsText.text = "DIRECT $trackerDelegate  •  FPS ${smoothFps.toInt()}  •  ${bundle.inferenceMs} ms"
+            }
 
             val landmarks = bundle.result.landmarks().firstOrNull()
             if (landmarks == null) {
@@ -279,13 +285,17 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
                 handFrames = (handFrames - 1).coerceAtLeast(0)
                 missedHandFrames++
                 if (missedHandFrames >= 3) {
-                    statusText.text = "المتتبع يعمل • لم يجد يدًا"
+                    if (handVisible) {
+                        handVisible = false
+                        statusText.text = "المتتبع يعمل • لم يجد يدًا"
+                    }
                     if (!cubeMode) {
-                        resultText.text = "لم تظهر اليد — أبعدها قليلًا واجعل الكف كاملًا"
+                        if (diagnosticsDue) resultText.text = "لم تظهر اليد — أبعدها قليلًا واجعل الكف كاملًا"
                         hintText.visibility = View.VISIBLE
                     } else if (cubeGrabbed) {
                         cubeGrabbed = false
                         cubeView.release()
+                        gestureText.text = "الإيماءة: —"
                         resultText.text = "توقّف المكعب • أظهر يدك ثم أمسكه مجددًا 👌"
                     }
                 }
@@ -294,38 +304,53 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
 
             missedHandFrames = 0
             handFrames++
-            overlayView.setResults(bundle.result, bundle.inputWidth, bundle.inputHeight)
-            hintText.visibility = View.GONE
-            statusText.text = "تم اكتشاف اليد ✓ • LITE $trackerDelegate"
-            statusText.setTextColor(Color.rgb(55, 232, 178))
-            val hand = analyze(landmarks)
-            gestureText.text = "${hand.emoji}  ${hand.name}"
-            fingersText.text = listOf(
-                "الإبهام ${mark(hand.thumb)}", "السبابة ${mark(hand.index)}", "الوسطى ${mark(hand.middle)}",
-                "البنصر ${mark(hand.ring)}", "الخنصر ${mark(hand.pinky)}"
-            ).joinToString("   ")
-            if (!cubeMode) resultText.text = "الخطوط تتبع يدك بنجاح • ${handFrames.coerceAtMost(20) * 5}%"
-            if (handFrames >= 8) {
+
+            // These two calls are intentionally on every result: they are the
+            // realtime path. Diagnostic text below is throttled so TextView
+            // layout work cannot delay the skeleton or cube.
+            overlayView.setResults(bundle.result, bundle.inputWidth, bundle.inputHeight, bundle.mirrorX)
+            if (!handVisible) {
+                handVisible = true
+                hintText.visibility = View.GONE
+                statusText.text = "تم اكتشاف اليد ✓ • DIRECT $trackerDelegate"
+                statusText.setTextColor(Color.rgb(55, 232, 178))
+            }
+
+            if (handFrames >= 8 && !actionButton.isEnabled) {
                 actionButton.isEnabled = true
                 actionButton.background = rounded(Color.rgb(37, 174, 141), 20f, Color.TRANSPARENT)
             }
+
             if (cubeMode) {
                 val palm = distance(landmarks[5], landmarks[17]).coerceAtLeast(0.001f)
                 val pinch = distance(landmarks[4], landmarks[8]) / palm
-                // Two different thresholds stop the cube rapidly alternating
-                // between held/released when fingertips hover near the limit.
+                val wasGrabbed = cubeGrabbed
                 if (!cubeGrabbed && pinch < GRAB_THRESHOLD) cubeGrabbed = true
                 if (cubeGrabbed && pinch > RELEASE_THRESHOLD) cubeGrabbed = false
 
-                val pinchX = (landmarks[4].x() + landmarks[8].x()) * 0.5f
+                val rawPinchX = (landmarks[4].x() + landmarks[8].x()) * 0.5f
+                val pinchX = if (bundle.mirrorX) 1f - rawPinchX else rawPinchX
                 val pinchY = (landmarks[4].y() + landmarks[8].y()) * 0.5f
                 cubeView.setGrab(cubeGrabbed, pinchX, pinchY)
-                if (cubeGrabbed) {
-                    gestureText.text = "👌  تم الإمساك بالمكعب"
-                    resultText.text = "حرّك يدك • افتح الإبهام والسبابة لترك المكعب"
-                } else {
-                    resultText.text = "المكعب ثابت • ضم الإبهام والسبابة 👌 للإمساك به"
+
+                if (cubeGrabbed != wasGrabbed || diagnosticsDue) {
+                    if (cubeGrabbed) {
+                        gestureText.text = "👌  تم الإمساك بالمكعب"
+                        resultText.text = "حرّك يدك • المكعب يتبع أحدث نقطة مباشرة"
+                    } else {
+                        resultText.text = "المكعب ثابت • ضم الإبهام والسبابة 👌 للإمساك به"
+                    }
                 }
+            }
+
+            if (diagnosticsDue) {
+                val hand = analyze(landmarks)
+                if (!cubeMode || !cubeGrabbed) gestureText.text = "${hand.emoji}  ${hand.name}"
+                fingersText.text = listOf(
+                    "الإبهام ${mark(hand.thumb)}", "السبابة ${mark(hand.index)}", "الوسطى ${mark(hand.middle)}",
+                    "البنصر ${mark(hand.ring)}", "الخنصر ${mark(hand.pinky)}"
+                ).joinToString("   ")
+                if (!cubeMode) resultText.text = "تتبع مباشر بدون تنعيم متأخر • ${handFrames.coerceAtMost(20) * 5}%"
             }
         }
     }
@@ -417,6 +442,7 @@ class MainActivity : AppCompatActivity(), HandLandmarkerHelper.Listener {
         private const val TRACKER_SELF_TEST = "tracker_self_test"
         private const val GRAB_THRESHOLD = 0.40f
         private const val RELEASE_THRESHOLD = 0.55f
+        private const val DIAGNOSTICS_INTERVAL_MS = 250L
         private const val MATCH = -1
         private const val WRAP = -2
     }
