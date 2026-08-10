@@ -17,6 +17,7 @@ import com.google.mediapipe.tasks.core.Delegate
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.handlandmarker.HandLandmarker
 import com.google.mediapipe.tasks.vision.handlandmarker.HandLandmarkerResult
+import java.util.concurrent.atomic.AtomicBoolean
 
 class HandLandmarkerHelper(
     private val context: Context,
@@ -24,36 +25,56 @@ class HandLandmarkerHelper(
 ) {
     private var handLandmarker: HandLandmarker? = null
     private var resultCount = 0
+    private val frameInFlight = AtomicBoolean(false)
+    private var activeDelegate = "CPU"
 
     fun setup() {
         try {
-            val baseOptions = BaseOptions.builder()
-                .setDelegate(Delegate.CPU)
-                .setModelAssetPath(MODEL_PATH)
-                .build()
-
-            val options = HandLandmarker.HandLandmarkerOptions.builder()
-                .setBaseOptions(baseOptions)
-                .setRunningMode(RunningMode.LIVE_STREAM)
-                .setNumHands(1)
-                .setMinHandDetectionConfidence(0.42f)
-                .setMinHandPresenceConfidence(0.42f)
-                .setMinTrackingConfidence(0.42f)
-                .setResultListener(::onResult)
-                .setErrorListener { listener.onError(it.message ?: "خطأ غير معروف في متتبع اليد") }
-                .build()
-
-            handLandmarker = HandLandmarker.createFromOptions(context, options)
-            Log.i(TAG, "HAND_TRACKER_READY")
-            listener.onReady()
+            handLandmarker = try {
+                createLandmarker(Delegate.GPU).also { activeDelegate = "GPU" }
+            } catch (gpuError: Throwable) {
+                Log.w(TAG, "GPU delegate unavailable; falling back to CPU", gpuError)
+                createLandmarker(Delegate.CPU).also { activeDelegate = "CPU" }
+            }
+            Log.i(TAG, "HAND_TRACKER_READY_$activeDelegate")
+            listener.onReady(activeDelegate)
         } catch (error: Throwable) {
             listener.onError("تعذّر تحميل نموذج اليد: ${error.message ?: error.javaClass.simpleName}")
         }
     }
 
+    private fun createLandmarker(delegate: Delegate): HandLandmarker {
+        val baseOptions = BaseOptions.builder()
+            .setDelegate(delegate)
+            .setModelAssetPath(MODEL_PATH)
+            .build()
+        val options = HandLandmarker.HandLandmarkerOptions.builder()
+            .setBaseOptions(baseOptions)
+            .setRunningMode(RunningMode.LIVE_STREAM)
+            .setNumHands(1)
+            .setMinHandDetectionConfidence(0.42f)
+            .setMinHandPresenceConfidence(0.42f)
+            .setMinTrackingConfidence(0.42f)
+            .setResultListener(::onResult)
+            .setErrorListener {
+                frameInFlight.set(false)
+                listener.onError(it.message ?: "خطأ غير معروف في متتبع اليد")
+            }
+            .build()
+        return HandLandmarker.createFromOptions(context, options)
+    }
+
     fun detect(imageProxy: ImageProxy, frontCamera: Boolean) {
         val detector = handLandmarker
         if (detector == null) {
+            imageProxy.close()
+            return
+        }
+
+        // MediaPipe ignores detectAsync calls while a previous frame is still
+        // running. Drop those frames before bitmap allocation/rotation so an
+        // older phone spends its CPU on inference instead of discarded input.
+        if (!frameInFlight.compareAndSet(false, true)) {
             imageProxy.close()
             return
         }
@@ -65,6 +86,7 @@ class HandLandmarkerHelper(
         try {
             bitmap.copyPixelsFromBuffer(imageProxy.planes[0].buffer)
         } catch (error: Throwable) {
+            frameInFlight.set(false)
             listener.onError("تعذّرت قراءة صورة الكاميرا: ${error.message ?: error.javaClass.simpleName}")
             imageProxy.close()
             return
@@ -80,6 +102,7 @@ class HandLandmarkerHelper(
         val rotated = try {
             Bitmap.createBitmap(bitmap, 0, 0, width, height, matrix, true)
         } catch (error: Throwable) {
+            frameInFlight.set(false)
             listener.onError("تعذّر تدوير صورة الكاميرا: ${error.message ?: error.javaClass.simpleName}")
             return
         }
@@ -87,11 +110,13 @@ class HandLandmarkerHelper(
         try {
             detector.detectAsync(mpImage, SystemClock.uptimeMillis())
         } catch (error: Throwable) {
+            frameInFlight.set(false)
             listener.onError("تعذّر تحليل صورة الكاميرا: ${error.message ?: error.javaClass.simpleName}")
         }
     }
 
     private fun onResult(result: HandLandmarkerResult, input: MPImage) {
+        frameInFlight.set(false)
         resultCount++
         if (resultCount == 1 || resultCount == 10) {
             Log.i(TAG, "HAND_TRACKER_RESULT_$resultCount")
@@ -107,6 +132,7 @@ class HandLandmarkerHelper(
     }
 
     fun close() {
+        frameInFlight.set(false)
         handLandmarker?.close()
         handLandmarker = null
     }
@@ -119,7 +145,7 @@ class HandLandmarkerHelper(
     )
 
     interface Listener {
-        fun onReady()
+        fun onReady(delegateName: String)
         fun onResults(bundle: ResultBundle)
         fun onError(message: String)
     }
