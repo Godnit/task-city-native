@@ -44,6 +44,9 @@ jobs:
           grep -q "sdkVersion:'26'" apk-badging.txt
           unzip -t "$APK"
 
+      - name: Prepare named APK
+        run: cp app/build/outputs/apk/release/app-release.apk Task-City-v0.1-Android8.apk
+
       - name: Android 8.1 real-launch smoke test and screenshot
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -53,26 +56,29 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
           script: |
-            set -eu
             adb logcat -c
             adb install -r app/build/outputs/apk/release/app-release.apk
             adb shell am force-stop com.godnit.taskcity || true
             adb shell monkey -p com.godnit.taskcity -c android.intent.category.LAUNCHER 1
             sleep 8
-            adb shell dumpsys activity activities > activity.txt
-            grep -q 'com.godnit.taskcity' activity.txt
-            adb shell screencap -p /sdcard/task-city-preview.png
-            adb pull /sdcard/task-city-preview.png task-city-preview.png
-            adb logcat -d -v time > task-city-logcat.txt
-            if grep -A15 'FATAL EXCEPTION' task-city-logcat.txt | grep -q 'com.godnit.taskcity'; then
+            adb shell dumpsys activity activities > activity.txt || true
+            adb shell screencap -p /sdcard/task-city-preview.png || true
+            adb pull /sdcard/task-city-preview.png task-city-preview.png || true
+            adb logcat -d -v time > task-city-logcat.txt || true
+            if ! grep -q 'com.godnit.taskcity' activity.txt; then
+              echo 'Task City is not the active Android 8.1 activity.'
+              grep -A30 -B5 'FATAL EXCEPTION' task-city-logcat.txt || true
+              grep -A30 -B5 'AndroidRuntime' task-city-logcat.txt || true
+              exit 1
+            fi
+            if grep -A20 'FATAL EXCEPTION' task-city-logcat.txt | grep -q 'com.godnit.taskcity'; then
               echo 'Task City crashed during Android 8.1 launch test.'
+              grep -A30 -B5 'FATAL EXCEPTION' task-city-logcat.txt || true
               exit 1
             fi
 
-      - name: Prepare named APK
-        run: cp app/build/outputs/apk/release/app-release.apk Task-City-v0.1-Android8.apk
-
-      - name: Upload APK and Android 8.1 preview
+      - name: Upload APK and Android 8.1 diagnostics
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: Task-City-v0.1-Android8
@@ -81,5 +87,6 @@ jobs:
             task-city-preview.png
             apk-badging.txt
             task-city-logcat.txt
-          if-no-files-found: error
+            activity.txt
+          if-no-files-found: warn
           retention-days: 30
