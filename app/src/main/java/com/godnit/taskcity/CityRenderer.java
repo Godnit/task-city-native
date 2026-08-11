@@ -44,6 +44,8 @@ final class CityRenderer implements GLSurfaceView.Renderer {
     };
 
     private static final float YAW = 38f;
+    private static final float[] DAY_FACE_LIGHT = {.94f,.70f,.77f,1.02f,1.16f,.62f};
+    private static final float[] NIGHT_FACE_LIGHT = {.79f,.62f,.68f,.85f,.94f,.56f};
     private final FloatBuffer cubeBuffer = buffer(CUBE);
     private final FloatBuffer octaBuffer = buffer(OCTAHEDRON);
     private final FloatBuffer circleXZ = buffer(makeCircle(false, 20));
@@ -56,6 +58,7 @@ final class CityRenderer implements GLSurfaceView.Renderer {
     private final float[] temp = new float[16];
     private final float[] mvp = new float[16];
     private final float[] identity = new float[16];
+    private final float[] shadedColor = new float[4];
 
     private int program;
     private int positionHandle;
@@ -126,8 +129,6 @@ final class CityRenderer implements GLSurfaceView.Renderer {
 
         GLES20.glUseProgram(program);
         drawEnvironment();
-        drawBuildingPlots();
-        drawTaskFoundations();
     }
 
     void setCity(int type, int count) {
@@ -166,6 +167,12 @@ final class CityRenderer implements GLSurfaceView.Renderer {
         desiredDistance = clamp(desiredDistance / scale, 14.5f, 27f);
     }
 
+    void beginZoom() {
+        // Freeze any remaining pan interpolation so a pinch only changes distance.
+        desiredX = cameraX;
+        desiredZ = cameraZ;
+    }
+
     private void drawSky() {
         GLES20.glDisable(GLES20.GL_DEPTH_TEST);
         GLES20.glDisable(GLES20.GL_CULL_FACE);
@@ -180,12 +187,17 @@ final class CityRenderer implements GLSurfaceView.Renderer {
         GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 6);
 
         GLES20.glUseProgram(program);
-        drawClipCircle(0.63f, 0.69f, 0.105f,
-                cityType == TaskItem.NORMAL ? rgba(1f,0.93f,0.58f,1f) : rgba(1f,0.82f,0.48f,1f));
         if (cityType == TaskItem.NORMAL) {
-            drawCloud(-0.68f, 0.50f, 0.18f);
-            drawCloud(0.54f, 0.34f, 0.22f);
+            // A large, unmistakable sun with a soft cartoon glow.
+            drawClipCircle(0.60f, 0.57f, 0.205f, rgba(1f,0.90f,0.42f,.10f));
+            drawClipCircle(0.60f, 0.57f, 0.158f, rgba(1f,0.91f,0.43f,.20f));
+            drawClipCircle(0.60f, 0.57f, 0.112f, rgba(1f,0.91f,0.38f,1f));
+            drawClipCircle(0.575f, 0.602f, 0.045f, rgba(1f,0.98f,0.72f,.72f));
+            drawCloud(-0.70f, 0.49f, 0.18f);
+            drawCloud(0.23f, 0.33f, 0.16f);
         } else {
+            drawClipCircle(0.60f, 0.57f, 0.165f, rgba(1f,0.84f,0.45f,.12f));
+            drawClipCircle(0.60f, 0.57f, 0.105f, rgba(1f,0.84f,0.48f,1f));
             float[][] stars = {{-.78f,.78f},{-.48f,.61f},{-.12f,.82f},{.18f,.56f},{.83f,.84f},{.74f,.49f}};
             for (float[] star : stars) drawClipCircle(star[0], star[1], 0.009f, rgba(1f,0.94f,0.70f,.9f));
         }
@@ -202,21 +214,55 @@ final class CityRenderer implements GLSurfaceView.Renderer {
     }
 
     private void drawEnvironment() {
-        float[] grass = cityType == TaskItem.NORMAL ? rgba(.38f,.72f,.28f,1f) : rgba(.24f,.48f,.32f,1f);
-        float[] farGrass = cityType == TaskItem.NORMAL ? rgba(.28f,.59f,.25f,1f) : rgba(.16f,.34f,.29f,1f);
-        drawCube(0,-.48f,0,78f,.9f,78f,farGrass);
-        drawCube(0,-.06f,0,38f,.18f,38f,grass);
+        float[] grass = cityType == TaskItem.NORMAL ? rgba(.39f,.72f,.25f,1f) : rgba(.23f,.47f,.31f,1f);
+        float[] farGrass = cityType == TaskItem.NORMAL ? rgba(.27f,.57f,.23f,1f) : rgba(.15f,.33f,.28f,1f);
+        drawCube(0,-.50f,0,90f,.9f,90f,farGrass);
+        drawCube(0,-.07f,0,50f,.20f,50f,grass);
 
         drawDistantHills();
-        drawRoad(-9f, true); drawRoad(-3f, true); drawRoad(3f, true); drawRoad(9f, true);
-        drawRoad(-9f, false); drawRoad(-3f, false); drawRoad(3f, false); drawRoad(9f, false);
+        drawGrassDetails();
 
         float[][] trees = {
-                {-15,-14},{-12,-15},{-7,-15},{-1,-15},{5,-15},{11,-15},{15,-13},
-                {-15,-8},{15,-7},{-15,-2},{15,0},{-15,5},{15,7},{-14,13},{-9,15},{-3,15},{4,15},{10,15},{15,13},
-                {-11,-6},{-11,6},{12,-5},{12,6},{-6,12},{6,-12}
+                {-20,-18},{-15,-20},{-9,-20},{-2,-21},{6,-20},{13,-20},{20,-17},
+                {-20,-10},{20,-9},{-21,-2},{21,1},{-20,8},{20,10},
+                {-18,18},{-12,20},{-5,21},{3,20},{10,21},{17,18}
         };
         for (int i=0;i<trees.length;i++) drawTree(trees[i][0], trees[i][1], .82f + (i%4)*.08f);
+    }
+
+    private void drawGrassDetails() {
+        float[] patch = cityType == TaskItem.NORMAL
+                ? rgba(.20f,.55f,.18f,.16f) : rgba(.11f,.34f,.24f,.18f);
+        float[][] patches = {
+                {-11,-6,2.8f,1.8f},{-4,9,2.1f,1.5f},{7,-10,2.7f,1.6f},
+                {11,5,2.2f,1.4f},{-13,13,2.4f,1.5f},{3,14,1.8f,1.2f}
+        };
+        for (float[] p : patches) drawGroundCircle(p[0], p[1], p[2], p[3], patch);
+
+        float[][] bushes = {{-16,-5,.65f},{15,-13,.72f},{-14,9,.62f},{13,13,.70f}};
+        for (float[] b : bushes) drawBush(b[0], b[1], b[2]);
+
+        float[][] flowers = {{-8,5},{5,8},{9,-4},{-3,-11},{12,2}};
+        for (int i=0;i<flowers.length;i++) {
+            float[] f=flowers[i];
+            float[] color=i%2==0 ? rgba(1f,.78f,.24f,1f) : rgba(1f,.47f,.55f,1f);
+            drawOcta(f[0],.17f,f[1],.12f,.20f,.12f,color);
+            drawOcta(f[0]+.28f,.15f,f[1]-.18f,.10f,.17f,.10f,color);
+        }
+    }
+
+    private void drawGroundCircle(float x,float z,float sx,float sz,float[] color) {
+        GLES20.glDisable(GLES20.GL_CULL_FACE);
+        draw(circleXZ,60,x,.045f,z,sx,.01f,sz,color);
+        GLES20.glEnable(GLES20.GL_CULL_FACE);
+    }
+
+    private void drawBush(float x,float z,float scale) {
+        drawShadow(x+.25f,z+.22f,.60f*scale,.48f*scale,.12f);
+        float[] leaf=cityType==TaskItem.NORMAL ? rgba(.17f,.55f,.18f,1f) : rgba(.10f,.37f,.24f,1f);
+        drawOcta(x,.48f*scale,z,.74f*scale,.55f*scale,.65f*scale,leaf);
+        drawOcta(x-.35f*scale,.38f*scale,z+.12f*scale,.48f*scale,.42f*scale,.45f*scale,leaf);
+        drawOcta(x+.34f*scale,.39f*scale,z-.10f*scale,.48f*scale,.43f*scale,.45f*scale,leaf);
     }
 
     private void drawDistantHills() {
@@ -319,7 +365,26 @@ final class CityRenderer implements GLSurfaceView.Renderer {
     }
 
     private void drawCube(float x,float y,float z,float sx,float sy,float sz,float[] color) {
-        draw(cubeBuffer,36,x,y,z,sx,sy,sz,color);
+        Matrix.setIdentityM(model,0);
+        Matrix.translateM(model,0,x,y,z);
+        Matrix.scaleM(model,0,sx,sy,sz);
+        Matrix.multiplyMM(temp,0,view,0,model,0);
+        Matrix.multiplyMM(mvp,0,projection,0,temp,0);
+        cubeBuffer.position(0);
+        GLES20.glVertexAttribPointer(positionHandle,3,GLES20.GL_FLOAT,false,12,cubeBuffer);
+        GLES20.glEnableVertexAttribArray(positionHandle);
+        GLES20.glUniformMatrix4fv(matrixHandle,1,false,mvp,0);
+
+        float[] daylight = cityType == TaskItem.NORMAL ? DAY_FACE_LIGHT : NIGHT_FACE_LIGHT;
+        for (int face=0;face<6;face++) {
+            float factor=daylight[face];
+            shadedColor[0]=clamp(color[0]*factor,0f,1f);
+            shadedColor[1]=clamp(color[1]*factor,0f,1f);
+            shadedColor[2]=clamp(color[2]*factor,0f,1f);
+            shadedColor[3]=color[3];
+            GLES20.glUniform4fv(colorHandle,1,shadedColor,0);
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLES,face*6,6);
+        }
     }
 
     private void drawOcta(float x,float y,float z,float sx,float sy,float sz,float[] color) {
