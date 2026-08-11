@@ -44,8 +44,8 @@ final class CityRenderer implements GLSurfaceView.Renderer {
     };
 
     private static final float YAW = 38f;
-    private static final float[] DAY_FACE_LIGHT = {.94f,.70f,.77f,1.02f,1.16f,.62f};
-    private static final float[] NIGHT_FACE_LIGHT = {.79f,.62f,.68f,.85f,.94f,.56f};
+    private static final float[] DAY_FACE_LIGHT = {.96f,.58f,.72f,1.08f,1.24f,.48f};
+    private static final float[] NIGHT_FACE_LIGHT = {.74f,.47f,.55f,.82f,.90f,.40f};
     private final FloatBuffer cubeBuffer = buffer(CUBE);
     private final FloatBuffer octaBuffer = buffer(OCTAHEDRON);
     private final FloatBuffer circleXZ = buffer(makeCircle(false, 20));
@@ -75,6 +75,7 @@ final class CityRenderer implements GLSurfaceView.Renderer {
     private float cameraX;
     private float cameraZ;
     private float distance = 22f;
+    private float viewportRatio = 1f;
     private volatile long constructionStart;
     private volatile int constructionIndex = -1;
     private volatile long demolitionStart;
@@ -109,6 +110,7 @@ final class CityRenderer implements GLSurfaceView.Renderer {
     public void onSurfaceChanged(GL10 unused, int width, int height) {
         GLES20.glViewport(0, 0, width, height);
         float ratio = (float) width / Math.max(1, height);
+        viewportRatio = Math.max(.5f, ratio);
         Matrix.perspectiveM(projection, 0, 39f, ratio, 0.8f, 120f);
     }
 
@@ -125,7 +127,11 @@ final class CityRenderer implements GLSurfaceView.Renderer {
         float eyeX = cameraX + (float)(distance * Math.cos(pitch) * Math.sin(yaw));
         float eyeY = (float)(distance * Math.sin(pitch));
         float eyeZ = cameraZ + (float)(distance * Math.cos(pitch) * Math.cos(yaw));
-        Matrix.setLookAtM(view, 0, eyeX, eyeY, eyeZ, cameraX, 0f, cameraZ, 0f, 1f, 0f);
+        // Look slightly above the ground so the horizon and the sun stay visible.
+        // The old camera looked directly at y=0, so the huge ground plane hid the
+        // entire sky even though a sun was rendered behind it.
+        float lookY = 5.4f * (22f / Math.max(14.5f, distance));
+        Matrix.setLookAtM(view, 0, eyeX, eyeY, eyeZ, cameraX, lookY, cameraZ, 0f, 1f, 0f);
 
         GLES20.glUseProgram(program);
         drawEnvironment();
@@ -188,13 +194,13 @@ final class CityRenderer implements GLSurfaceView.Renderer {
 
         GLES20.glUseProgram(program);
         if (cityType == TaskItem.NORMAL) {
-            // A large, unmistakable sun with a soft cartoon glow.
-            drawClipCircle(0.60f, 0.57f, 0.205f, rgba(1f,0.90f,0.42f,.10f));
-            drawClipCircle(0.60f, 0.57f, 0.158f, rgba(1f,0.91f,0.43f,.20f));
-            drawClipCircle(0.60f, 0.57f, 0.112f, rgba(1f,0.91f,0.38f,1f));
-            drawClipCircle(0.575f, 0.602f, 0.045f, rgba(1f,0.98f,0.72f,.72f));
-            drawCloud(-0.70f, 0.49f, 0.18f);
-            drawCloud(0.23f, 0.33f, 0.16f);
+            // Keep the sun on the upper-left, away from the city status label.
+            drawClipCircle(-0.62f, 0.72f, 0.205f, rgba(1f,0.88f,0.34f,.12f));
+            drawClipCircle(-0.62f, 0.72f, 0.152f, rgba(1f,0.90f,0.38f,.24f));
+            drawClipCircle(-0.62f, 0.72f, 0.102f, rgba(1f,0.91f,0.33f,1f));
+            drawClipCircle(-0.645f, 0.752f, 0.037f, rgba(1f,0.99f,0.76f,.78f));
+            drawCloud(0.10f, 0.62f, 0.14f);
+            drawCloud(0.72f, 0.43f, 0.11f);
         } else {
             drawClipCircle(0.60f, 0.57f, 0.165f, rgba(1f,0.84f,0.45f,.12f));
             drawClipCircle(0.60f, 0.57f, 0.105f, rgba(1f,0.84f,0.48f,1f));
@@ -214,20 +220,49 @@ final class CityRenderer implements GLSurfaceView.Renderer {
     }
 
     private void drawEnvironment() {
-        float[] grass = cityType == TaskItem.NORMAL ? rgba(.39f,.72f,.25f,1f) : rgba(.23f,.47f,.31f,1f);
-        float[] farGrass = cityType == TaskItem.NORMAL ? rgba(.27f,.57f,.23f,1f) : rgba(.15f,.33f,.28f,1f);
-        drawCube(0,-.50f,0,90f,.9f,90f,farGrass);
-        drawCube(0,-.07f,0,50f,.20f,50f,grass);
+        float[] grass = cityType == TaskItem.NORMAL ? rgba(.43f,.76f,.27f,1f) : rgba(.22f,.46f,.30f,1f);
+        float[] outerGrass = cityType == TaskItem.NORMAL ? rgba(.31f,.64f,.25f,1f) : rgba(.14f,.32f,.27f,1f);
 
-        drawDistantHills();
-        drawGrassDetails();
+        // Two clean rectangular slabs. There are no large octahedron "hills"
+        // intersecting the camera anymore, which were the triangular cracks in v2.1.
+        drawCube(0,-.46f,0,58f,.75f,58f,outerGrass);
+        drawCube(0,-.055f,0,40f,.18f,40f,grass);
+
+        drawBoundaryWall();
 
         float[][] trees = {
-                {-20,-18},{-15,-20},{-9,-20},{-2,-21},{6,-20},{13,-20},{20,-17},
-                {-20,-10},{20,-9},{-21,-2},{21,1},{-20,8},{20,10},
-                {-18,18},{-12,20},{-5,21},{3,20},{10,21},{17,18}
+                {-22,-21},{-15,-22},{-8,-22},{0,-23},{8,-22},{15,-22},{22,-21},
+                {-22,-14},{22,-14},{-23,-7},{23,-7},{-23,1},{23,1},{-22,9},{22,9},
+                {-21,17},{-14,21},{-7,22},{1,23},{9,22},{16,21},{21,17}
         };
-        for (int i=0;i<trees.length;i++) drawTree(trees[i][0], trees[i][1], .82f + (i%4)*.08f);
+        for (int i=0;i<trees.length;i++) drawTree(trees[i][0], trees[i][1], .88f + (i%3)*.08f);
+    }
+
+    private void drawBoundaryWall() {
+        float[] stone = cityType == TaskItem.NORMAL
+                ? rgba(.83f,.78f,.66f,1f) : rgba(.48f,.49f,.47f,1f);
+        float[] cap = cityType == TaskItem.NORMAL
+                ? rgba(.98f,.91f,.74f,1f) : rgba(.65f,.62f,.55f,1f);
+
+        // One coherent low wall around the playable lawn, with visible directional
+        // shadows. It replaces the broken-looking terrain triangles at the edges.
+        drawWallShadow(0,-19.55f,39.8f,.70f);
+        drawWallShadow(0, 19.55f,39.8f,.70f);
+        drawWallShadow(-19.55f,0,.70f,39.8f);
+        drawWallShadow( 19.55f,0,.70f,39.8f);
+
+        drawCube(0,.38f,-19.55f,40f,.78f,.72f,stone);
+        drawCube(0,.38f, 19.55f,40f,.78f,.72f,stone);
+        drawCube(-19.55f,.38f,0,.72f,.78f,40f,stone);
+        drawCube( 19.55f,.38f,0,.72f,.78f,40f,stone);
+        drawCube(0,.82f,-19.55f,40.25f,.14f,.90f,cap);
+        drawCube(0,.82f, 19.55f,40.25f,.14f,.90f,cap);
+        drawCube(-19.55f,.82f,0,.90f,.14f,40.25f,cap);
+        drawCube( 19.55f,.82f,0,.90f,.14f,40.25f,cap);
+    }
+
+    private void drawWallShadow(float x,float z,float sx,float sz) {
+        drawCube(x-.42f,.052f,z+.48f,sx,.025f,sz,rgba(.07f,.12f,.09f,.27f));
     }
 
     private void drawGrassDetails() {
@@ -310,12 +345,15 @@ final class CityRenderer implements GLSurfaceView.Renderer {
     }
 
     private void drawTree(float x, float z, float scale) {
-        drawShadow(x+.38f,z+.33f,.75f*scale,1.15f*scale,.16f);
+        // A long canopy shadow and a thin trunk shadow use one shared sun direction.
+        drawShadow(x+.72f*scale,z+.82f*scale,1.05f*scale,1.55f*scale,.28f);
+        drawCube(x+.32f*scale,.065f,z+.36f*scale,.18f*scale,.025f,1.20f*scale,
+                rgba(.06f,.11f,.08f,.24f));
         drawCube(x,.68f*scale,z,.28f*scale,1.36f*scale,.28f*scale,rgba(.34f,.20f,.10f,1f));
         float[] leaf = cityType == TaskItem.NORMAL ? rgba(.24f,.62f,.20f,1f) : rgba(.14f,.42f,.27f,1f);
-        drawOcta(x,1.65f*scale,z,.92f*scale,.92f*scale,.92f*scale,leaf);
-        drawOcta(x-.34f*scale,1.48f*scale,z+.12f*scale,.64f*scale,.67f*scale,.64f*scale,leaf);
-        drawOcta(x+.33f*scale,1.49f*scale,z-.10f*scale,.62f*scale,.66f*scale,.62f*scale,leaf);
+        drawLitOcta(x,1.65f*scale,z,.92f*scale,.92f*scale,.92f*scale,leaf);
+        drawLitOcta(x-.34f*scale,1.48f*scale,z+.12f*scale,.64f*scale,.67f*scale,.64f*scale,leaf);
+        drawLitOcta(x+.33f*scale,1.49f*scale,z-.10f*scale,.62f*scale,.66f*scale,.62f*scale,leaf);
     }
 
     private void drawTaskFoundations() {
@@ -347,7 +385,7 @@ final class CityRenderer implements GLSurfaceView.Renderer {
 
     private void drawShadow(float x,float z,float sx,float sz,float alpha) {
         GLES20.glDisable(GLES20.GL_CULL_FACE);
-        draw(circleXZ,60,x,.145f,z,sx,.01f,sz,rgba(.08f,.16f,.12f,alpha));
+        draw(circleXZ,60,x,.055f,z,sx,.01f,sz,rgba(.06f,.12f,.08f,alpha));
         GLES20.glEnable(GLES20.GL_CULL_FACE);
     }
 
@@ -355,7 +393,7 @@ final class CityRenderer implements GLSurfaceView.Renderer {
         GLES20.glDisable(GLES20.GL_CULL_FACE);
         Matrix.setIdentityM(model,0);
         Matrix.translateM(model,0,x,y,0f);
-        Matrix.scaleM(model,0,scale,scale,1f);
+        Matrix.scaleM(model,0,scale/viewportRatio,scale,1f);
         circleXY.position(0);
         GLES20.glVertexAttribPointer(positionHandle,3,GLES20.GL_FLOAT,false,12,circleXY);
         GLES20.glEnableVertexAttribArray(positionHandle);
@@ -389,6 +427,30 @@ final class CityRenderer implements GLSurfaceView.Renderer {
 
     private void drawOcta(float x,float y,float z,float sx,float sy,float sz,float[] color) {
         draw(octaBuffer,24,x,y,z,sx,sy,sz,color);
+    }
+
+    private void drawLitOcta(float x,float y,float z,float sx,float sy,float sz,float[] color) {
+        Matrix.setIdentityM(model,0);
+        Matrix.translateM(model,0,x,y,z);
+        Matrix.scaleM(model,0,sx,sy,sz);
+        Matrix.multiplyMM(temp,0,view,0,model,0);
+        Matrix.multiplyMM(mvp,0,projection,0,temp,0);
+        octaBuffer.position(0);
+        GLES20.glVertexAttribPointer(positionHandle,3,GLES20.GL_FLOAT,false,12,octaBuffer);
+        GLES20.glEnableVertexAttribArray(positionHandle);
+        GLES20.glUniformMatrix4fv(matrixHandle,1,false,mvp,0);
+        float[] light = cityType == TaskItem.NORMAL
+                ? new float[]{1.18f,1.03f,.76f,.58f,.88f,.72f,.50f,.42f}
+                : new float[]{.88f,.78f,.60f,.48f,.69f,.57f,.43f,.37f};
+        for (int face=0;face<8;face++) {
+            float factor=light[face];
+            shadedColor[0]=clamp(color[0]*factor,0f,1f);
+            shadedColor[1]=clamp(color[1]*factor,0f,1f);
+            shadedColor[2]=clamp(color[2]*factor,0f,1f);
+            shadedColor[3]=color[3];
+            GLES20.glUniform4fv(colorHandle,1,shadedColor,0);
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLES,face*3,3);
+        }
     }
 
     private void draw(FloatBuffer vertices,int count,float x,float y,float z,float sx,float sy,float sz,float[] color) {
