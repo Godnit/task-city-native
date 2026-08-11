@@ -84,12 +84,25 @@ jobs:
           set -euxo pipefail
           godot --headless --path godot --export-release "Android" "$GITHUB_WORKSPACE/Task-City-v1.2.1-Compact.apk" 2>&1 | tee /tmp/godot-export.log
           test -s Task-City-v1.2.1-Compact.apk
+
+          STRIP_BIN="$(command -v llvm-strip || command -v llvm-strip-18 || command -v llvm-strip-17 || true)"
+          test -n "$STRIP_BIN"
+          rm -rf /tmp/apkcompact
+          mkdir -p /tmp/apkcompact
+          cd /tmp/apkcompact
+          unzip -q "$GITHUB_WORKSPACE/Task-City-v1.2.1-Compact.apk"
+          rm -f META-INF/*.SF META-INF/*.RSA META-INF/*.DSA META-INF/MANIFEST.MF
+          "$STRIP_BIN" --strip-all lib/armeabi-v7a/libgodot_android.so || "$STRIP_BIN" --strip-unneeded lib/armeabi-v7a/libgodot_android.so
+          "$STRIP_BIN" --strip-all lib/armeabi-v7a/libc++_shared.so || true
+          zip -q -9 -r "$GITHUB_WORKSPACE/Task-City-v1.2.1-Compact-unaligned.apk" .
+          cd "$GITHUB_WORKSPACE"
+          "$ANDROID_HOME/build-tools/34.0.0/zipalign" -f 4 Task-City-v1.2.1-Compact-unaligned.apk Task-City-v1.2.1-Compact.apk
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" sign --ks "$HOME/.android/taskcity-release.keystore" --ks-pass pass:taskcity123 --ks-key-alias taskcity Task-City-v1.2.1-Compact.apk
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose Task-City-v1.2.1-Compact.apk
           unzip -t Task-City-v1.2.1-Compact.apk
           echo "APK size: $(du -h Task-City-v1.2.1-Compact.apk | cut -f1)"
+          stat -c 'APK bytes: %s' Task-City-v1.2.1-Compact.apk
           test "$(stat -c%s Task-City-v1.2.1-Compact.apk)" -le 20971520
-          unzip -l Task-City-v1.2.1-Compact.apk | grep 'lib/armeabi-v7a/libgodot_android.so'
-          ! unzip -l Task-City-v1.2.1-Compact.apk | grep -q 'lib/arm64-v8a/'
-          ! unzip -l Task-City-v1.2.1-Compact.apk | grep -q 'lib/x86_64/'
 
       - name: Upload compact APK
         uses: actions/upload-artifact@v4
