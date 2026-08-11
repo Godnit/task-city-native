@@ -12,6 +12,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Validate phase 1 web app
+        run: |
+          node --check electronics-academy/app/src/main/assets/app.js
+          node --check electronics-academy/app/src/main/assets/electronics-phase1.js
+          grep -q 'electronics-phase1.css' electronics-academy/app/src/main/assets/index.html
+          grep -q 'electronics-phase1.js' electronics-academy/app/src/main/assets/index.html
+          grep -q 'terminal' electronics-academy/app/src/main/assets/electronics-phase1.js
+          grep -q 'bindViewport' electronics-academy/app/src/main/assets/electronics-phase1.js
+          grep -q 'circuitState' electronics-academy/app/src/main/assets/electronics-phase1.js
+          grep -q "versionCode 2" electronics-academy/app/build.gradle
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -25,9 +35,16 @@ jobs:
       - name: Build debug APK
         working-directory: electronics-academy
         run: gradle --no-daemon assembleDebug
+      - name: Verify APK contents
+        run: |
+          APK=electronics-academy/app/build/outputs/apk/debug/app-debug.apk
+          unzip -l "$APK" | grep -q 'assets/electronics-phase1.js'
+          unzip -l "$APK" | grep -q 'assets/electronics-phase1.css'
+          unzip -l "$APK" | grep -q 'assets/app.js'
+          unzip -l "$APK" | grep -q 'classes.dex'
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: ElectronicsAcademy-APK
+          name: ElectronicsAcademy-Phase1-v2
           path: electronics-academy/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
