@@ -16,12 +16,14 @@ jobs:
         run: |
           node --check electronics-academy/app/src/main/assets/app.js
           node --check electronics-academy/app/src/main/assets/electronics-phase1.js
+          node --check electronics-academy/app/src/main/assets/electronics-touch-fix-v3.js
           grep -q 'electronics-phase1.css' electronics-academy/app/src/main/assets/index.html
-          grep -q 'electronics-phase1.js' electronics-academy/app/src/main/assets/index.html
-          grep -q 'terminal' electronics-academy/app/src/main/assets/electronics-phase1.js
-          grep -q 'bindViewport' electronics-academy/app/src/main/assets/electronics-phase1.js
-          grep -q 'circuitState' electronics-academy/app/src/main/assets/electronics-phase1.js
-          grep -q "versionCode 2" electronics-academy/app/build.gradle
+          grep -q 'electronics-touch-fix-v3.css' electronics-academy/app/src/main/assets/index.html
+          grep -q 'electronics-touch-fix-v3.js' electronics-academy/app/src/main/assets/index.html
+          grep -q 'nearestPort' electronics-academy/app/src/main/assets/electronics-touch-fix-v3.js
+          grep -q 'stopImmediatePropagation' electronics-academy/app/src/main/assets/electronics-touch-fix-v3.js
+          grep -q 'eaDropTarget' electronics-academy/app/src/main/assets/electronics-touch-fix-v3.css
+          grep -q "versionCode 3" electronics-academy/app/build.gradle
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -40,11 +42,13 @@ jobs:
           APK=electronics-academy/app/build/outputs/apk/debug/app-debug.apk
           unzip -l "$APK" | grep -q 'assets/electronics-phase1.js'
           unzip -l "$APK" | grep -q 'assets/electronics-phase1.css'
+          unzip -l "$APK" | grep -q 'assets/electronics-touch-fix-v3.js'
+          unzip -l "$APK" | grep -q 'assets/electronics-touch-fix-v3.css'
           unzip -l "$APK" | grep -q 'assets/app.js'
           unzip -l "$APK" | grep -q 'classes.dex'
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: ElectronicsAcademy-Phase1-v2
+          name: ElectronicsAcademy-Phase1-v3-TouchFix
           path: electronics-academy/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
