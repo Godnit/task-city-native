@@ -1,27 +1,23 @@
 plugins {
     id 'com.android.application'
-    id 'org.jetbrains.kotlin.android'
 }
 
 android {
-    namespace 'com.godnit.handgesturecube'
+    namespace 'com.godnit.taskcity'
     compileSdk 35
 
     defaultConfig {
-        applicationId 'com.godnit.handgesturecube'
+        applicationId 'com.godnit.taskcity'
         minSdk 26
         targetSdk 35
-        versionCode 6
-        versionName '1.5'
-
-        // x86 is included only so CI can boot the model on an Android 8.1
-        // emulator. The delivery workflow strips it from the final APK.
-        ndk {
-            abiFilters 'armeabi-v7a', 'x86'
-        }
+        versionCode 1
+        versionName '1.0.0'
     }
 
     buildTypes {
+        debug {
+            debuggable true
+        }
         release {
             minifyEnabled false
             signingConfig signingConfigs.debug
@@ -32,25 +28,7 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
-
-    kotlinOptions {
-        jvmTarget = '17'
-    }
-
-    packaging {
-        jniLibs {
-            useLegacyPackaging = true
-        }
-    }
 }
 
 dependencies {
-    implementation 'androidx.appcompat:appcompat:1.7.0'
-    implementation 'androidx.camera:camera-core:1.4.2'
-    implementation 'androidx.camera:camera-camera2:1.4.2'
-    implementation 'androidx.camera:camera-lifecycle:1.4.2'
-    implementation 'androidx.camera:camera-view:1.4.2'
-    // 1.0.0's prebuilt native library crashes on Android 8.x. This stable
-    // release is built for the older Android API range supported by the app.
-    implementation 'com.google.mediapipe:tasks-vision:0.10.14'
 }
