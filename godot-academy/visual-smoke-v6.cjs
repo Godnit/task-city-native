@@ -35,7 +35,8 @@ function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 
       const routeFns=['home','academy','lab','progress'];
       for(const route of routeFns){
-        await page.evaluate((r)=>go(r),route);
+        const routeErr=await page.evaluate((r)=>{try{go(r);return null}catch(e){return String(e&&e.stack||e)}},route);
+        if(routeErr){errors.push(`${size.name} route ${route}: ${routeErr}`);continue;}
         await sleep(50);
         const m=await page.evaluate(()=>({
           html:document.documentElement.scrollWidth,
@@ -49,7 +50,13 @@ function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
       }
 
       for(let i=0;i<lessonCount;i++){
-        await page.evaluate((idx)=>openLesson(idx),i);
+        const openErr=await page.evaluate((idx)=>{
+          try{openLesson(idx);return null}catch(e){
+            const l=DATA.lessons[idx]||{};
+            return {message:String(e&&e.message||e),title:l.title,optsType:Array.isArray(l.opts)?'array':typeof l.opts,opts:l.opts};
+          }
+        },i);
+        if(openErr){errors.push(`${size.name} lesson ${i+1} open error: ${JSON.stringify(openErr)}`);continue;}
         await sleep(35);
         const report=await page.evaluate(()=>{
           const viewport=document.documentElement.clientWidth;
