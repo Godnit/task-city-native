@@ -71,7 +71,7 @@ jobs:
           cd /tmp/godot-src
           export SCONS_CACHE="$GITHUB_WORKSPACE/.scons_cache"
           scons platform=android target=template_release arch=arm32 generate_apk=yes \
-            optimize=size production=yes lto=thin debug_symbols=no \
+            swappy=no optimize=size production=yes lto=thin debug_symbols=no \
             disable_physics_2d=yes disable_physics_3d=yes \
             module_astcenc_enabled=no \
             module_basis_universal_enabled=no \
