@@ -1,4 +1,4 @@
-name: Build Task City Lightweight APK
+name: Build Task City Godot Compact APK
 
 on:
   push:
@@ -10,8 +10,14 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    env:
+      GODOT_VERSION: 4.4.1
+      ANDROID_PLATFORM: 34
+      ANDROID_BUILD_TOOLS: 34.0.0
+      ANDROID_NDK_VERSION: 23.2.8568313
+      APK_NAME: Task-City-v1.2.2-Godot-Compact.apk
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -22,30 +28,145 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle 8.10.2
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.10.2'
-
-      - name: Build lightweight release APK
+      - name: Install build tools
         shell: bash
         run: |
           set -euxo pipefail
-          gradle :app:assembleRelease --no-daemon
-          APK="app/build/outputs/apk/release/app-release.apk"
-          test -s "$APK"
-          unzip -t "$APK"
-          BYTES="$(stat -c%s "$APK")"
-          echo "APK bytes: $BYTES"
-          echo "APK size: $(du -h "$APK" | cut -f1)"
-          test "$BYTES" -le 20971520
-          cp "$APK" Task-City-v1.2.1-Light.apk
+          python3 -m pip install --user 'scons>=4.4,<5'
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq git unzip zip wget
 
-      - name: Upload lightweight APK
+      - name: Prepare Android SDK and NDK
+        shell: bash
+        run: |
+          set -euxo pipefail
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -perm -111 | head -n 1)"
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses >/dev/null || true
+          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" \
+            "platform-tools" \
+            "build-tools;${ANDROID_BUILD_TOOLS}" \
+            "platforms;android-${ANDROID_PLATFORM}" \
+            "cmake;3.10.2.4988404" \
+            "ndk;${ANDROID_NDK_VERSION}"
+
+      - name: Download official Godot editor
+        shell: bash
+        run: |
+          set -euxo pipefail
+          wget -q "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip" -O /tmp/godot-editor.zip
+          rm -rf /tmp/godot-editor
+          mkdir -p /tmp/godot-editor
+          unzip -q /tmp/godot-editor.zip -d /tmp/godot-editor
+          mv "/tmp/godot-editor/Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
+          chmod +x /usr/local/bin/godot
+          godot --version
+
+      - name: Build size-optimized Godot Android template
+        shell: bash
+        run: |
+          set -euxo pipefail
+          rm -rf /tmp/godot-src
+          git clone --depth 1 --branch "${GODOT_VERSION}-stable" https://github.com/godotengine/godot.git /tmp/godot-src
+          cd /tmp/godot-src
+          export SCONS_CACHE="$GITHUB_WORKSPACE/.scons_cache"
+          scons platform=android target=template_release arch=arm32 generate_apk=yes \
+            optimize=size production=yes lto=thin debug_symbols=no \
+            disable_physics_2d=yes disable_physics_3d=yes \
+            module_astcenc_enabled=no \
+            module_basis_universal_enabled=no \
+            module_bmp_enabled=no \
+            module_camera_enabled=no \
+            module_csg_enabled=no \
+            module_dds_enabled=no \
+            module_enet_enabled=no \
+            module_fbx_enabled=no \
+            module_gltf_enabled=no \
+            module_gridmap_enabled=no \
+            module_hdr_enabled=no \
+            module_jsonrpc_enabled=no \
+            module_ktx_enabled=no \
+            module_mbedtls_enabled=no \
+            module_meshoptimizer_enabled=no \
+            module_mp3_enabled=no \
+            module_mobile_vr_enabled=no \
+            module_multiplayer_enabled=no \
+            module_navigation_2d_enabled=no \
+            module_navigation_3d_enabled=no \
+            module_noise_enabled=no \
+            module_ogg_enabled=no \
+            module_openxr_enabled=no \
+            module_raycast_enabled=no \
+            module_regex_enabled=no \
+            module_svg_enabled=no \
+            module_tga_enabled=no \
+            module_theora_enabled=no \
+            module_tinyexr_enabled=no \
+            module_upnp_enabled=no \
+            module_vhacd_enabled=no \
+            module_vorbis_enabled=no \
+            module_webrtc_enabled=no \
+            module_websocket_enabled=no \
+            module_webxr_enabled=no \
+            module_zip_enabled=no \
+            -j2
+          test -s bin/android_release.apk
+          echo "Custom template: $(du -h bin/android_release.apk | cut -f1)"
+
+      - name: Configure Godot Android signing
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p "$HOME/.config/godot" "$HOME/.android"
+          keytool -genkeypair -v \
+            -keystore "$HOME/.android/taskcity-release.keystore" \
+            -storepass taskcity123 \
+            -alias taskcity \
+            -keypass taskcity123 \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Task City,O=Godnit,C=YE"
+          cat > "$HOME/.config/godot/editor_settings-4.4.tres" <<EOF
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/android_sdk_path = "$ANDROID_HOME"
+          export/android/java_sdk_path = "$JAVA_HOME"
+          EOF
+
+      - name: Export real Godot APK
+        shell: bash
+        env:
+          GODOT_ANDROID_KEYSTORE_RELEASE_PATH: ${{ env.HOME }}/.android/taskcity-release.keystore
+          GODOT_ANDROID_KEYSTORE_RELEASE_USER: taskcity
+          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: taskcity123
+        run: |
+          set -euxo pipefail
+          cp godot/export_presets.cfg /tmp/export_presets.original.cfg
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('godot/export_presets.cfg')
+          s = p.read_text()
+          s = s.replace('custom_template/release=""', 'custom_template/release="/tmp/godot-src/bin/android_release.apk"')
+          s = s.replace('version/code=4', 'version/code=5')
+          s = s.replace('version/name="1.2.1"', 'version/name="1.2.2"')
+          p.write_text(s)
+          PY
+          godot --headless --editor --path godot --quit
+          godot --headless --path godot --export-release "Android" "$GITHUB_WORKSPACE/$APK_NAME"
+          test -s "$APK_NAME"
+          "$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/apksigner" verify --verbose "$APK_NAME"
+          unzip -t "$APK_NAME" >/dev/null
+          BYTES="$(stat -c%s "$APK_NAME")"
+          echo "FINAL_APK_BYTES=$BYTES"
+          echo "FINAL_APK_SIZE=$(du -h "$APK_NAME" | cut -f1)"
+          test "$BYTES" -le 20971520
+          mv /tmp/export_presets.original.cfg godot/export_presets.cfg
+
+      - name: Upload Godot APK
         uses: actions/upload-artifact@v4
         with:
-          name: Task-City-v1.2.1-Light
-          path: Task-City-v1.2.1-Light.apk
+          name: Task-City-v1.2.2-Godot-Compact
+          path: Task-City-v1.2.2-Godot-Compact.apk
           if-no-files-found: error
           compression-level: 0
           retention-days: 30
