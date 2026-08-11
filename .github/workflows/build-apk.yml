@@ -48,11 +48,8 @@ jobs:
             adb shell am start -W -n com.godnit.taskcity/.MainActivity
             sleep 4
             adb shell dumpsys activity activities | grep -q 'com.godnit.taskcity/.MainActivity'
-            if adb logcat -d -t 300 | grep -E 'FATAL EXCEPTION: main|Process: com.godnit.taskcity' | grep -q 'AndroidRuntime'; then
-              echo 'Task City crashed on Android 8.1'
-              adb logcat -d -t 300
-              exit 1
-            fi
+            adb logcat -d -t 300 > /tmp/taskcity-logcat.txt
+            if grep -q 'FATAL EXCEPTION: main' /tmp/taskcity-logcat.txt && grep -q 'Process: com.godnit.taskcity' /tmp/taskcity-logcat.txt; then cat /tmp/taskcity-logcat.txt; exit 1; fi
 
       - name: Prepare named APK
         run: cp app/build/outputs/apk/debug/app-debug.apk Task-City-v1.0.0-Android8.apk
