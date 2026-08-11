@@ -1,13 +1,12 @@
-name: Build Android APK
+name: Build Task City v2 APK
 
 on:
   push:
-    branches: [ main, agent/task-city-environment-v2 ]
-  pull_request:
+    branches: [ agent/task-city-environment-v2 ]
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -31,13 +30,26 @@ jobs:
       - name: Build installable debug APK
         run: gradle --no-daemon assembleDebug
 
-      - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk task-city-v2.0.apk
+      - name: Verify and name APK
+        run: |
+          unzip -t app/build/outputs/apk/debug/app-debug.apk
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk dist/task-city-v2.0.apk
+          sha256sum dist/task-city-v2.0.apk
 
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: task-city-v2.0-apk
-          path: task-city-v2.0.apk
+          path: dist/task-city-v2.0.apk
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish verified preview APK to branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f dist/task-city-v2.0.apk
+          git diff --cached --quiet && exit 0
+          git commit -m "Publish Task City v2 APK [skip ci]"
+          git push origin HEAD:agent/task-city-environment-v2
