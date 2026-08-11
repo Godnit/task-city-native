@@ -137,7 +137,7 @@ public final class MainActivity extends Activity {
         hintParams.bottomMargin = dp(8);
         cityFrame.addView(hint, hintParams);
         root.addView(cityFrame, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, 0, 46));
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 62));
 
         LinearLayout tasksHeader = new LinearLayout(this);
         tasksHeader.setGravity(Gravity.CENTER_VERTICAL);
@@ -167,7 +167,7 @@ public final class MainActivity extends Activity {
         listFrame.addView(emptyLabel, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         root.addView(listFrame, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, 0, 54));
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 38));
         return root;
     }
 
