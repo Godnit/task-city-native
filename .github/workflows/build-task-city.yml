@@ -31,6 +31,19 @@ jobs:
       - name: Restore stable prototype signing key
         run: base64 -d taskcity-release.keystore.b64 > taskcity-release.keystore
 
+      - name: Patch ES2 shader precision for Android 8 GPUs
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/com/godnit/taskcity/CityRenderer.kt')
+          s = p.read_text()
+          old = 'private val VERTEX_SHADER = """\n            uniform mat4 uModel;'
+          new = 'private val VERTEX_SHADER = """\n            precision mediump float;\n            uniform mat4 uModel;'
+          if old not in s:
+              raise SystemExit('Vertex shader marker not found')
+          p.write_text(s.replace(old, new, 1))
+          PY
+
       - name: Build signed release APK
         run: gradle --no-daemon :app:assembleRelease
 
@@ -58,24 +71,16 @@ jobs:
           script: |
             adb logcat -c
             adb install -r app/build/outputs/apk/release/app-release.apk
-            adb shell am force-stop com.godnit.taskcity || true
-            adb shell monkey -p com.godnit.taskcity -c android.intent.category.LAUNCHER 1
+            adb shell am force-stop com.godnit.taskcity
+            adb shell am start -W -n com.godnit.taskcity/.MainActivity
             sleep 8
-            adb shell dumpsys activity activities > activity.txt || true
-            adb shell screencap -p /sdcard/task-city-preview.png || true
-            adb pull /sdcard/task-city-preview.png task-city-preview.png || true
-            adb logcat -d -v time > task-city-logcat.txt || true
-            if ! grep -q 'com.godnit.taskcity' activity.txt; then
-              echo 'Task City is not the active Android 8.1 activity.'
-              grep -A30 -B5 'FATAL EXCEPTION' task-city-logcat.txt || true
-              grep -A30 -B5 'AndroidRuntime' task-city-logcat.txt || true
-              exit 1
-            fi
-            if grep -A20 'FATAL EXCEPTION' task-city-logcat.txt | grep -q 'com.godnit.taskcity'; then
-              echo 'Task City crashed during Android 8.1 launch test.'
-              grep -A30 -B5 'FATAL EXCEPTION' task-city-logcat.txt || true
-              exit 1
-            fi
+            adb shell dumpsys activity activities > activity.txt
+            adb shell screencap -p /sdcard/task-city-preview.png
+            adb pull /sdcard/task-city-preview.png task-city-preview.png
+            adb logcat -d -v time > task-city-logcat.txt
+            adb shell pidof com.godnit.taskcity
+            grep -q 'com.godnit.taskcity' activity.txt
+            ! grep -A20 'FATAL EXCEPTION' task-city-logcat.txt | grep -q 'com.godnit.taskcity'
 
       - name: Upload APK and Android 8.1 diagnostics
         if: always()
