@@ -45,7 +45,7 @@ jobs:
           set -euxo pipefail
           mkdir -p "$HOME/.config/godot"
           cat > "$HOME/.config/godot/editor_settings-4.tres" <<EOF
-          [gd_resource format=3]
+          [gd_resource type="EditorSettings" format=3]
 
           [resource]
           export/android/android_sdk_path = "$ANDROID_HOME"
@@ -56,7 +56,11 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          godot --headless --editor --path godot --quit
+          godot --headless --editor --path godot --quit 2>&1 | tee /tmp/godot-import.log
+          if grep -qE 'SCRIPT ERROR: Parse Error|Failed to load script.*Parse error' /tmp/godot-import.log; then
+            cat /tmp/godot-import.log
+            exit 1
+          fi
 
       - name: Export Android APK
         shell: bash
