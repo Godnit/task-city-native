@@ -1,8 +1,8 @@
-name: Build Network Academy Foundations v7
+name: Build Network Academy Polished v8
 
 on:
   push:
-    branches: [network-academy-foundations-v7]
+    branches: [network-academy-polish-v8]
     paths:
       - 'network-fix/**'
       - '.github/workflows/network-academy-install-fix.yml'
@@ -19,17 +19,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate foundations-first learning code
+      - name: Validate learning and UI polish code
         run: |
           node --check network-fix/v6-guided.js
           node --check network-fix/v7-foundations.js
           node --check network-fix/v7-hotfix.js
-          grep -q 'لا توجد أسئلة مكررة هنا' network-fix/v7-foundations.js
-          grep -q 'ضع الأجهزة المطلوبة فقط — بدون حل المهمة' network-fix/v7-foundations.js
-          grep -q 'IP — عنوان هذا الجهاز' network-fix/v7-foundations.js
-          grep -q '192.168.1.10' network-fix/v7-foundations.js
-          grep -q 'Destination IP' network-fix/v7-foundations.js
-          grep -q "type==='cloud'" network-fix/v7-hotfix.js
+          node --check network-fix/v8-polish.js
+          grep -q 'تهيئة نقطة البداية' network-fix/v8-polish.js
+          grep -q 'v8Ltr' network-fix/v8-polish.js
+          grep -q 'body.light' network-fix/v8-polish.css
+          grep -q 'unicode-bidi' network-fix/v8-polish.css
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
@@ -66,20 +65,18 @@ jobs:
           base64 -d /tmp/app.b64 > /tmp/app-base.apk
           unzip -t /tmp/app-base.apk
 
-      - name: Inject v5 visuals, v6 base guide, v7 foundations, and icon 7
+      - name: Inject visuals, foundations, bidi polish, and icon 7
         run: |
           python3 - <<'PY'
           import zipfile, os
-          src='/tmp/app-base.apk'; dst='/tmp/app-v7.apk'
+          src='/tmp/app-base.apk'; dst='/tmp/app-v8.apk'
           old_activity='com.godnit.networkacadfix.MainActivity'.encode('utf-16le')
           real_activity='com.godnit.networkacademy.MainActivity'.encode('utf-16le')
           old_pkg='com.godnit.networkacadfix'.encode('utf-16le')
-          new_pkg='com.godnit.networkacadv07'.encode('utf-16le')
+          new_pkg='com.godnit.networkacadv08'.encode('utf-16le')
           assert len(old_activity)==len(real_activity)
           assert len(old_pkg)==len(new_pkg)
-          css5=open('network-fix/v5-fix.css','rb').read(); js5=open('network-fix/v5-fix.js','rb').read()
-          css6=open('network-fix/v6-guided.css','rb').read(); js6=open('network-fix/v6-guided.js','rb').read()
-          css7=open('network-fix/v7-foundations.css','rb').read(); js7=open('network-fix/v7-foundations.js','rb').read(); hot7=open('network-fix/v7-hotfix.js','rb').read()
+          files={n:open('network-fix/'+n,'rb').read() for n in ['v5-fix.css','v5-fix.js','v6-guided.css','v6-guided.js','v7-foundations.css','v7-foundations.js','v7-hotfix.js','v8-polish.css','v8-polish.js']}
           brand=open('network-fix/icon7/brand-icon.svg','rb').read()
           with zipfile.ZipFile(src,'r') as zin, zipfile.ZipFile(dst,'w') as zout:
               for info in zin.infolist():
@@ -92,42 +89,34 @@ jobs:
                       data=data.replace(old_pkg,new_pkg)
                   elif info.filename=='assets/index.html':
                       text=data.decode('utf-8')
-                      text=text.replace('</head>','  <link rel="stylesheet" href="v5-fix.css" />\n  <link rel="stylesheet" href="v6-guided.css" />\n  <link rel="stylesheet" href="v7-foundations.css" />\n</head>')
-                      text=text.replace('</body>','  <script src="v5-fix.js"></script>\n  <script src="v6-guided.js"></script>\n  <script src="v7-foundations.js"></script>\n  <script src="v7-hotfix.js"></script>\n</body>')
+                      text=text.replace('</head>','  <link rel="stylesheet" href="v5-fix.css" />\n  <link rel="stylesheet" href="v6-guided.css" />\n  <link rel="stylesheet" href="v7-foundations.css" />\n  <link rel="stylesheet" href="v8-polish.css" />\n</head>')
+                      text=text.replace('</body>','  <script src="v5-fix.js"></script>\n  <script src="v6-guided.js"></script>\n  <script src="v7-foundations.js"></script>\n  <script src="v7-hotfix.js"></script>\n  <script src="v8-polish.js"></script>\n</body>')
                       data=text.encode('utf-8')
                   elif info.filename=='assets/brand-icon.svg': data=brand
                   zout.writestr(info,data)
-              zout.writestr('assets/v5-fix.css',css5,compress_type=zipfile.ZIP_DEFLATED)
-              zout.writestr('assets/v5-fix.js',js5,compress_type=zipfile.ZIP_DEFLATED)
-              zout.writestr('assets/v6-guided.css',css6,compress_type=zipfile.ZIP_DEFLATED)
-              zout.writestr('assets/v6-guided.js',js6,compress_type=zipfile.ZIP_DEFLATED)
-              zout.writestr('assets/v7-foundations.css',css7,compress_type=zipfile.ZIP_DEFLATED)
-              zout.writestr('assets/v7-foundations.js',js7,compress_type=zipfile.ZIP_DEFLATED)
-              zout.writestr('assets/v7-hotfix.js',hot7,compress_type=zipfile.ZIP_DEFLATED)
+              for name,data in files.items(): zout.writestr('assets/'+name,data,compress_type=zipfile.ZIP_DEFLATED)
           with zipfile.ZipFile(dst,'r') as z:
               m=z.read('AndroidManifest.xml'); html=z.read('assets/index.html')
               assert m.count(new_pkg)==1 and m.count(real_activity)==1
-              for name in (b'v5-fix.css',b'v5-fix.js',b'v6-guided.css',b'v6-guided.js',b'v7-foundations.css',b'v7-foundations.js',b'v7-hotfix.js'): assert name in html
-              v7=z.read('assets/v7-foundations.js'); h7=z.read('assets/v7-hotfix.js')
-              assert 'لا توجد أسئلة مكررة هنا'.encode('utf-8') in v7
-              assert 'IP — عنوان هذا الجهاز'.encode('utf-8') in v7
-              assert 'Destination IP'.encode('utf-8') in v7
-              assert b"type==='cloud'" in h7
+              for name in files: assert name.encode() in html
+              assert html.index(b'v7-hotfix.js') < html.index(b'v8-polish.js')
+              assert 'تهيئة نقطة البداية'.encode('utf-8') in z.read('assets/v8-polish.js')
+              assert b'unicode-bidi' in z.read('assets/v8-polish.css')
+              assert b'body.light' in z.read('assets/v8-polish.css')
               assert z.read('assets/brand-icon.svg')==brand
               assert b'Lcom/godnit/networkacademy/MainActivity;' in z.read('classes2.dex')
-          print('Foundations v7 package verified:',os.path.getsize(dst))
+          print('Polished v8 package verified:',os.path.getsize(dst))
           PY
-          unzip -t /tmp/app-v7.apk
+          unzip -t /tmp/app-v8.apk
 
       - name: Replace Android launcher with icon 7
         run: |
-          java -jar /tmp/apktool.jar d -s -f /tmp/app-v7.apk -o /tmp/decoded
+          java -jar /tmp/apktool.jar d -s -f /tmp/app-v8.apk -o /tmp/decoded
           cp network-fix/icon7/ic_launcher.xml /tmp/decoded/res/drawable/ic_launcher.xml
           cp network-fix/icon7/brand-icon.svg /tmp/decoded/assets/brand-icon.svg
           grep -q 'M20,31L54,17L88,31L54,45Z' /tmp/decoded/res/drawable/ic_launcher.xml
-          test -f /tmp/decoded/assets/v7-foundations.js
-          test -f /tmp/decoded/assets/v7-foundations.css
-          test -f /tmp/decoded/assets/v7-hotfix.js
+          test -f /tmp/decoded/assets/v8-polish.js
+          test -f /tmp/decoded/assets/v8-polish.css
           java -jar /tmp/apktool.jar b /tmp/decoded -o /tmp/app-final-unsigned.apk
           unzip -t /tmp/app-final-unsigned.apk
 
@@ -139,25 +128,25 @@ jobs:
 
       - name: Create signing key
         run: |
-          keytool -genkeypair -v -keystore /tmp/network-v7.keystore -storepass android -keypass android -alias networkv7 -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Network Academy Foundations v7,O=Godnit,C=US"
+          keytool -genkeypair -v -keystore /tmp/network-v8.keystore -storepass android -keypass android -alias networkv8 -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Network Academy Polished v8,O=Godnit,C=US"
 
       - name: Sign and verify APK
         run: |
           APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
           ZIPALIGN="$ANDROID_HOME/build-tools/35.0.0/zipalign"
-          "$APKSIGNER" sign --ks /tmp/network-v7.keystore --ks-pass pass:android --key-pass pass:android --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true --out Network_Academy_Foundations_v7_Icon7.apk /tmp/app-aligned.apk
-          "$APKSIGNER" verify --verbose --print-certs Network_Academy_Foundations_v7_Icon7.apk
-          "$ZIPALIGN" -c -v 4 Network_Academy_Foundations_v7_Icon7.apk
-          unzip -t Network_Academy_Foundations_v7_Icon7.apk
-          unzip -p Network_Academy_Foundations_v7_Icon7.apk assets/v7-foundations.js | grep -q 'ضع الأجهزة المطلوبة فقط — بدون حل المهمة'
-          unzip -p Network_Academy_Foundations_v7_Icon7.apk assets/v7-hotfix.js | grep -q "type==='cloud'"
-          file Network_Academy_Foundations_v7_Icon7.apk
-          sha256sum Network_Academy_Foundations_v7_Icon7.apk
+          "$APKSIGNER" sign --ks /tmp/network-v8.keystore --ks-pass pass:android --key-pass pass:android --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true --out Network_Academy_Polished_v8_Icon7.apk /tmp/app-aligned.apk
+          "$APKSIGNER" verify --verbose --print-certs Network_Academy_Polished_v8_Icon7.apk
+          "$ZIPALIGN" -c -v 4 Network_Academy_Polished_v8_Icon7.apk
+          unzip -t Network_Academy_Polished_v8_Icon7.apk
+          unzip -p Network_Academy_Polished_v8_Icon7.apk assets/v8-polish.js | grep -q 'تهيئة نقطة البداية'
+          unzip -p Network_Academy_Polished_v8_Icon7.apk assets/v8-polish.css | grep -q 'body.light'
+          file Network_Academy_Polished_v8_Icon7.apk
+          sha256sum Network_Academy_Polished_v8_Icon7.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Network-Academy-Foundations-v7-Icon7
-          path: Network_Academy_Foundations_v7_Icon7.apk
+          name: Network-Academy-Polished-v8-Icon7
+          path: Network_Academy_Polished_v8_Icon7.apk
           if-no-files-found: error
           retention-days: 7
