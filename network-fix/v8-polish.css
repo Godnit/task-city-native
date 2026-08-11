@@ -1,0 +1,25 @@
+/* Network Academy v8 — bidi/readability + stronger daylight mode */
+.v8Ltr{direction:ltr!important;unicode-bidi:isolate!important;font-family:inherit}.lessonPage,.guidedLab,.v7Foundation,.lessonSectionV4,.glossCard,.practiceCard,.guideStep,.statusBox{direction:rtl;text-align:right}.v7Topo,.v7Packet{direction:rtl}.v7Topo code,.v7Topo small,.v7Packet .v8Ltr{direction:ltr!important;unicode-bidi:isolate!important}
+/* remove spaces left by deleted update-note cards */
+.guidedLab>.guideSteps:first-child{margin-top:0}.guidedLab .guideBtns{margin-top:12px}
+/* clearer daylight palette across legacy and v7 elements */
+body.light{background:#eef5f8!important;color:#102737!important}
+body.light:before{opacity:.5!important}
+body.light #topbar{background:#f9fcfe!important;box-shadow:0 5px 18px rgba(26,60,80,.08)!important}
+body.light #bottomNav{background:#f9fcfe!important;color:#334f60!important}
+body.light .navBtn{color:#607887!important}.light .navBtn span,.light .navBtn small{color:inherit!important}
+body.light .hero,body.light .courseHero,body.light .card,body.light .lessonCard,body.light .stageCard,body.light .v7Foundation,body.light .guidedLab,body.light .practiceCard,body.light .lessonSectionV4,body.light .glossCard{background:#ffffff!important;color:#102737!important;border-color:#b9cfd9!important;box-shadow:0 8px 24px rgba(31,72,93,.08)!important}
+body.light .v7ChainItem{background:#f2f7fa!important;border-color:#c4d6df!important;color:#183648!important}body.light .v7ChainItem span{color:#617987!important}body.light .v7ChainItem.active{background:rgba(var(--accent-rgb),.12)!important;border-color:var(--accent)!important}
+body.light .v7Steps>div,body.light .guideStep,body.light .v7Do{background:#f7fbfd!important;border-color:#c5d7df!important;color:#173344!important}body.light .v7Steps>div>span,body.light .v7Do p,body.light .v7Do li{color:#314f60!important}
+body.light .v7See{background:rgba(var(--accent2-rgb),.10)!important;border-color:rgba(var(--accent2-rgb),.35)!important;color:#365462!important}body.light .v7Idea,body.light .v7Remember{color:#496574!important}body.light .v7Remember{background:#f3faf8!important}
+body.light .v7Topo>div{background:#f7fbfd!important;border-color:#c4d8e1!important;color:#173344!important}body.light .v7Packet{background:#eef8fb!important;color:#375767!important}
+body.light .guidedLab h2,body.light .guidedLab h3,body.light .guideStep strong,body.light .v7Foundation h2{color:#102737!important}
+body.light .statusBox{background:#fff!important;color:#173344!important;border-color:#bdd2dc!important}.light .statusBox *{color:inherit}
+body.light .labViewport{background:#e8f3f7!important}.light .labWorkspace{background-color:#f4f9fb!important}.light .netNode{background:linear-gradient(145deg,#fff,#e9f3f7)!important;color:#183648!important}
+body.light input,body.light select,body.light textarea{background:#fff!important;color:#102737!important;border-color:#aac4d0!important;box-shadow:none!important}body.light input::placeholder,body.light textarea::placeholder{color:#718894!important}
+body.light .secondary,body.light .guideBtns button:not(.primary){background:#edf4f7!important;color:#183648!important;border-color:#b6ccd7!important}body.light .primary{color:#fff!important}
+body.light .lessonTerms span,body.light .pill:not(.active){background:#edf5f8!important;color:#31596e!important;border-color:#c5d9e2!important}body.light .eyebrow{color:var(--accent-deep)!important}
+body.light .locked{opacity:.82!important}.light .locked .lessonInfo h3{color:#405a69!important}.light .locked .lessonInfo p{color:#637b88!important}
+/* keep English technical snippets stable instead of jumping across Arabic punctuation */
+.lessonPage p,.lessonPage li,.lessonPage span,.guidedLab p,.guidedLab li,.guidedLab span,.guidedLab strong,.v7Foundation p,.v7Foundation span,.statusBox{unicode-bidi:plaintext}
+@media(max-width:420px){.v8Ltr{white-space:normal}.v7Packet{line-height:1.9}.guidedLab .guideStep{overflow:hidden}.guidedLab .guideStep>div{min-width:0}}
