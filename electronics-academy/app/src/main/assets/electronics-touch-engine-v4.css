@@ -1,0 +1,33 @@
+/* Electronics Academy v4 — touch targets, stable lab palette, text fixes */
+.eaDragSurfaceV4{position:absolute;inset:0;z-index:6;border-radius:inherit;background:transparent;touch-action:none}
+.terminal{z-index:12!important;width:30px!important;height:30px!important;border-width:3px!important}
+.terminal.left{left:-15px!important}.terminal.right{right:-15px!important}
+.eaComponent.eaDraggingV4{z-index:30!important}.eaComponent.eaDraggingV4 .eaPartBody{box-shadow:0 0 0 3px #55f2db,0 12px 28px rgba(0,0,0,.34)!important}
+.terminal.eaDropTargetV4{transform:translateY(-50%) scale(1.32)!important;box-shadow:0 0 0 5px rgba(255,255,255,.22),0 0 24px currentColor!important}
+.terminal.eaSourcePortV4{box-shadow:0 0 0 5px rgba(255,255,255,.18),0 0 24px currentColor!important}
+.eaTempWireV4{stroke-dasharray:8 8!important;filter:drop-shadow(0 0 8px currentColor)!important}
+.eaTouchHelpV4{position:absolute;z-index:25;left:50%;bottom:10px;transform:translateX(-50%);width:min(90%,420px);display:flex;flex-direction:column;gap:2px;padding:7px 10px;border-radius:12px;background:rgba(5,16,25,.82);border:1px solid #29485c;color:#d9e7ef;pointer-events:none;text-align:center;backdrop-filter:blur(8px)}
+.eaTouchHelpV4 b{font-size:10px;color:#79eedc}.eaTouchHelpV4 span{font-size:8px;line-height:1.55;color:#a9bcc8}
+.v4InspectorGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.v4InspectorGrid small{display:block;color:#839bab;margin-bottom:5px;font-size:9px}.v4ValueRow{display:flex;align-items:center;gap:7px;background:#091722;border:1px solid #244155;border-radius:11px;padding:7px}.v4ValueRow input{min-width:0;width:100%;background:transparent;border:0;color:#fff;direction:ltr;outline:none}.v4ValueRow b{font-size:9px;color:#74ead8;white-space:nowrap}.v4Ports{display:flex;gap:5px;flex-wrap:wrap}.v4Ports span{padding:4px 7px;border-radius:8px;background:#122839;color:#9dd8f5;font-size:9px;direction:ltr}
+/* Lab canvas has one calibrated dark electrical palette in BOTH modes. This keeps polarity and measurements visible. */
+.eaBoardShell,.light .eaBoardShell{background:#06121c!important;border-color:#2b4d64!important;box-shadow:inset 0 0 40px rgba(0,0,0,.35),0 16px 34px rgba(0,0,0,.18)!important}
+.eaWorld,.light .eaWorld{background-color:#071722!important;background-image:linear-gradient(rgba(77,150,188,.14) 1px,transparent 1px),linear-gradient(90deg,rgba(77,150,188,.14) 1px,transparent 1px),linear-gradient(rgba(77,150,188,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(77,150,188,.055) 1px,transparent 1px)!important;background-size:40px 40px,40px 40px,10px 10px,10px 10px!important}
+.eaPartBody,.light .eaPartBody{background:linear-gradient(145deg,#163142,#0b1c29)!important;border-color:#496d82!important}
+.eaUnitBadge,.light .eaUnitBadge{background:#071a27!important;color:#f2f8fb!important;border-color:#35556a!important}
+.terminal:after,.light .terminal:after{background:#071722!important;color:#e7f1f6!important;border:1px solid #2d5067!important}
+.eaLegend,.light .eaLegend{background:rgba(4,15,23,.90)!important;color:#cfdee6!important;border-color:#29475b!important}
+.eaBoardTools button,.light .eaBoardTools button{background:rgba(6,20,30,.94)!important;color:#e7f2f7!important;border-color:#355970!important}
+.eaZoomText,.light .eaZoomText{background:rgba(6,20,30,.9)!important;color:#bed0db!important}
+.terminal.pos,.light .terminal.pos{background:#ff4d5e!important;color:#fff!important}.terminal.neg,.light .terminal.neg{background:#38a8ff!important;color:#fff!important}.terminal.neutral,.light .terminal.neutral{background:#ffb84a!important;color:#231600!important}
+.eaWire.pos,.light .eaWire.pos{stroke:#ff4d5e!important}.eaWire.neg,.light .eaWire.neg{stroke:#38a8ff!important}.eaWire.neutral,.light .eaWire.neutral{stroke:#ffb84a!important}
+.eaPartName,.light .eaPartName{color:#c2d3dc!important;text-shadow:0 1px 2px #000}
+/* Surrounding app properly adapts, while electrical colors keep their meaning. */
+.light .eaGuide,.light .eaInspector,.light .eaShelf .eaPartBtn,.light .eaMetric{background:#f7fbfd!important;border-color:#c4d9e6!important;color:#163043!important}
+.light .eaGuideHead b,.light .eaInspectorHead b,.light .eaPartBtn b{color:#173145!important}.light .eaGuideHead span,.light .eaPartBtn small,.light .eaMetric span{color:#607b8e!important}
+.light .v4ValueRow{background:#eef6fa;border-color:#c2d8e5}.light .v4ValueRow input{color:#173145}.light .v4Ports span{background:#e8f3f9;color:#275878}
+/* text collision and clipping fixes */
+.eaLabTop,.eaGuideHead,.eaInspectorHead{flex-wrap:wrap!important}.eaLabTop>div:first-child,.eaGuideHead>*{min-width:0}
+.eaLabTop h1,.eaLabTop p,.eaGuideHead b,.eaGuideHead span,.eaHintBox,.eaInspectorHead span,.eaConcept p,.eaConcept h3,.eaQuick p,.eaStageP p{white-space:normal!important;overflow-wrap:anywhere!important;word-break:normal!important;max-width:100%!important}
+.eaLabTop p{line-height:1.75!important}.eaGuideHead b{line-height:1.55!important}.eaGuideHead span{line-height:1.5!important}.eaHintBox{line-height:1.75!important}.eaInspectorHead span{line-height:1.55!important;text-align:start;flex:1 1 160px}
+.eaGuideSteps{padding-bottom:2px}.eaPartBtn{flex:0 0 88px!important}.eaShelf{padding-bottom:10px!important}
+@media(max-width:420px){.eaTouchHelpV4{bottom:8px}.v4InspectorGrid{grid-template-columns:1fr}.eaLabTop{display:block}.eaModeSwitch{margin-top:8px;width:max-content}.eaGuideHead{align-items:flex-start}.eaGuideHead span{flex-basis:100%}}
