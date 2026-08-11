@@ -53,7 +53,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
           script: |
-            set -euo pipefail
+            set -eu
             adb logcat -c
             adb install -r app/build/outputs/apk/release/app-release.apk
             adb shell am force-stop com.godnit.taskcity || true
