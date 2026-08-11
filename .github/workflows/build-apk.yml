@@ -1,8 +1,8 @@
-name: Build Hand Gesture Cube Native APK
+name: Build Task City APK
 
 on:
   push:
-    branches: [main]
+    branches: [main, task-city-real-v1]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -18,13 +18,6 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Add offline native hand model
-        run: |
-          mkdir -p app/src/main/assets
-          curl -L --fail --retry 3 \
-            -o app/src/main/assets/hand_landmarker.task \
-            https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task
-
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -36,79 +29,38 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Build signed release APK
-        run: gradle --no-daemon assembleRelease
+      - name: Build debug APK
+        run: gradle --no-daemon assembleDebug
 
-      - name: Reject Android 9-only native imports
-        run: |
-          inspect_root="$RUNNER_TEMP/hand-gesture-native-inspect"
-          mkdir -p "$inspect_root"
-          unzip -q app/build/outputs/apk/release/app-release.apk 'lib/*/*.so' -d "$inspect_root"
-          while IFS= read -r -d '' so_file; do
-            if readelf -Ws "$so_file" | grep -Eq 'UND.*aligned_alloc(@|$)'; then
-              echo "Android 9-only aligned_alloc import found in $so_file"
-              exit 1
-            fi
-          done < <(find "$inspect_root" -type f -name '*.so' -print0)
+      - name: Verify APK archive
+        run: unzip -t app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Run native inference on Android 8.1
+      - name: Smoke test on Android 8.1
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 27
-          arch: x86
+          arch: x86_64
           profile: Nexus 5X
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-front emulated
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
-          script: bash scripts/android8_self_test.sh
-
-      - name: Verify APK archive
-        run: unzip -t app/build/outputs/apk/release/app-release.apk
-
-      - name: Verify signature and Android 8 compatibility
-        run: |
-          $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose app/build/outputs/apk/release/app-release.apk
-          unzip -l app/build/outputs/apk/release/app-release.apk | grep 'assets/hand_landmarker.task'
-          unzip -l app/build/outputs/apk/release/app-release.apk | grep 'lib/armeabi-v7a/'
-          unzip -l app/build/outputs/apk/release/app-release.apk | grep 'lib/x86/'
-
-      - name: Create lightweight 32-bit delivery APK
-        run: |
-          light_work="$RUNNER_TEMP/hand-gesture-v1.5-light-work.apk"
-          light_aligned="$RUNNER_TEMP/hand-gesture-v1.5-light-aligned.apk"
-          release_keystore="$RUNNER_TEMP/hand-gesture-v1.5.keystore"
-          cp app/build/outputs/apk/release/app-release.apk "$light_work"
-          zip -q -d "$light_work" 'lib/x86/*'
-          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -p -f 4 "$light_work" "$light_aligned"
-          keytool -genkeypair -noprompt \
-            -keystore "$release_keystore" \
-            -storepass android \
-            -keypass android \
-            -alias handgesture \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -dname "CN=Hand Gesture Cube, OU=Android, O=Godnit, L=Sanaa, C=YE"
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign \
-            --ks "$release_keystore" \
-            --ks-key-alias handgesture \
-            --ks-pass pass:android \
-            --key-pass pass:android \
-            --out app/build/outputs/apk/release/app-release.apk \
-            "$light_aligned"
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose app/build/outputs/apk/release/app-release.apk
-          unzip -t app/build/outputs/apk/release/app-release.apk
-          if unzip -l app/build/outputs/apk/release/app-release.apk | grep -q 'lib/x86/'; then
-            echo 'x86 files remained in lightweight APK'
-            exit 1
-          fi
+          script: |
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb shell am start -W -n com.godnit.taskcity/.MainActivity
+            sleep 4
+            adb shell dumpsys activity activities | grep -q 'com.godnit.taskcity/.MainActivity'
+            if adb logcat -d -t 300 | grep -E 'FATAL EXCEPTION: main|Process: com.godnit.taskcity' | grep -q 'AndroidRuntime'; then
+              echo 'Task City crashed on Android 8.1'
+              adb logcat -d -t 300
+              exit 1
+            fi
 
       - name: Prepare named APK
-        run: cp app/build/outputs/apk/release/app-release.apk Hand-Gesture-Cube-v1.5-Android8.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Task-City-v1.0.0-Android8.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hand-Gesture-Cube-v1.5-Android8
-          path: Hand-Gesture-Cube-v1.5-Android8.apk
+          name: Task-City-v1.0.0-Android8
+          path: Task-City-v1.0.0-Android8.apk
           if-no-files-found: error
           retention-days: 30
