@@ -16,14 +16,15 @@ jobs:
         run: |
           node --check electronics-academy/app/src/main/assets/app.js
           node --check electronics-academy/app/src/main/assets/electronics-phase1.js
-          node --check electronics-academy/app/src/main/assets/electronics-touch-fix-v3.js
-          grep -q 'electronics-phase1.css' electronics-academy/app/src/main/assets/index.html
-          grep -q 'electronics-touch-fix-v3.css' electronics-academy/app/src/main/assets/index.html
-          grep -q 'electronics-touch-fix-v3.js' electronics-academy/app/src/main/assets/index.html
-          grep -q 'nearestPort' electronics-academy/app/src/main/assets/electronics-touch-fix-v3.js
-          grep -q 'stopImmediatePropagation' electronics-academy/app/src/main/assets/electronics-touch-fix-v3.js
-          grep -q 'eaDropTarget' electronics-academy/app/src/main/assets/electronics-touch-fix-v3.css
-          grep -q "versionCode 3" electronics-academy/app/build.gradle
+          node --check electronics-academy/app/src/main/assets/electronics-touch-engine-v4.js
+          grep -q 'electronics-touch-engine-v4.css' electronics-academy/app/src/main/assets/index.html
+          grep -q 'electronics-touch-engine-v4.js' electronics-academy/app/src/main/assets/index.html
+          ! grep -q 'electronics-touch-fix-v3.js' electronics-academy/app/src/main/assets/index.html
+          grep -q 'screenToWorld' electronics-academy/app/src/main/assets/electronics-touch-engine-v4.js
+          grep -q 'eaDragSurfaceV4' electronics-academy/app/src/main/assets/electronics-touch-engine-v4.js
+          grep -q 'closestPort' electronics-academy/app/src/main/assets/electronics-touch-engine-v4.js
+          grep -q 'eaDropTargetV4' electronics-academy/app/src/main/assets/electronics-touch-engine-v4.css
+          grep -q "versionCode 4" electronics-academy/app/build.gradle
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -41,14 +42,12 @@ jobs:
         run: |
           APK=electronics-academy/app/build/outputs/apk/debug/app-debug.apk
           unzip -l "$APK" | grep -q 'assets/electronics-phase1.js'
-          unzip -l "$APK" | grep -q 'assets/electronics-phase1.css'
-          unzip -l "$APK" | grep -q 'assets/electronics-touch-fix-v3.js'
-          unzip -l "$APK" | grep -q 'assets/electronics-touch-fix-v3.css'
-          unzip -l "$APK" | grep -q 'assets/app.js'
+          unzip -l "$APK" | grep -q 'assets/electronics-touch-engine-v4.js'
+          unzip -l "$APK" | grep -q 'assets/electronics-touch-engine-v4.css'
           unzip -l "$APK" | grep -q 'classes.dex'
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: ElectronicsAcademy-Phase1-v3-TouchFix
+          name: ElectronicsAcademy-Phase1-v4-TouchEngine
           path: electronics-academy/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
