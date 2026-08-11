@@ -14,6 +14,7 @@ final class CityGLSurfaceView extends GLSurfaceView {
     CityGLSurfaceView(Context context) {
         super(context);
         setEGLContextClientVersion(2);
+        setPreserveEGLContextOnPause(true);
         cityRenderer = new CityRenderer();
         setRenderer(cityRenderer);
         setRenderMode(RENDERMODE_CONTINUOUSLY);
@@ -35,10 +36,10 @@ final class CityGLSurfaceView extends GLSurfaceView {
     public boolean onTouchEvent(MotionEvent event) {
         scaleDetector.onTouchEvent(event);
         if (event.getPointerCount() == 1 && !scaleDetector.isInProgress()) {
-            if (event.getAction() == MotionEvent.ACTION_MOVE) {
+            if (event.getActionMasked() == MotionEvent.ACTION_MOVE) {
                 float dx = event.getX() - previousX;
                 float dy = event.getY() - previousY;
-                cityRenderer.rotate(dx * 0.35f, dy * 0.22f);
+                cityRenderer.pan(dx, dy);
             }
             previousX = event.getX();
             previousY = event.getY();
