@@ -27,32 +27,51 @@ final class CityRenderer implements GLSurfaceView.Renderer {
             -0.5f,-0.5f,-0.5f,  0.5f,-0.5f, 0.5f, -0.5f,-0.5f, 0.5f
     };
 
-    private static final float[] ROOF = {
-            -0.65f,0, 0.60f,  0.65f,0, 0.60f,  0,0.72f,0,
-             0.65f,0, 0.60f,  0.65f,0,-0.60f,  0,0.72f,0,
-             0.65f,0,-0.60f, -0.65f,0,-0.60f,  0,0.72f,0,
-            -0.65f,0,-0.60f, -0.65f,0, 0.60f,  0,0.72f,0,
-            -0.65f,0,-0.60f,  0.65f,0,-0.60f,  0.65f,0,0.60f,
-            -0.65f,0,-0.60f,  0.65f,0, 0.60f, -0.65f,0,0.60f
+    private static final float[] OCTAHEDRON = {
+            0,1,0,  1,0,0,  0,0,1,   0,1,0,  0,0,1, -1,0,0,
+            0,1,0, -1,0,0,  0,0,-1,  0,1,0,  0,0,-1, 1,0,0,
+            0,-1,0, 0,0,1, 1,0,0,    0,-1,0,-1,0,0, 0,0,1,
+            0,-1,0, 0,0,-1,-1,0,0,   0,-1,0,1,0,0, 0,0,-1
     };
 
+    private static final float[] SKY = {
+            -1,-1, 0.55f,0.84f,0.96f,  1,-1, 0.55f,0.84f,0.96f,  1,1, 0.12f,0.61f,0.93f,
+            -1,-1, 0.55f,0.84f,0.96f,  1,1, 0.12f,0.61f,0.93f, -1,1, 0.12f,0.61f,0.93f
+    };
+    private static final float[] NIGHT_SKY = {
+            -1,-1, 0.28f,0.47f,0.65f,  1,-1, 0.28f,0.47f,0.65f,  1,1, 0.05f,0.16f,0.34f,
+            -1,-1, 0.28f,0.47f,0.65f,  1,1, 0.05f,0.16f,0.34f, -1,1, 0.05f,0.16f,0.34f
+    };
+
+    private static final float YAW = 38f;
     private final FloatBuffer cubeBuffer = buffer(CUBE);
-    private final FloatBuffer roofBuffer = buffer(ROOF);
+    private final FloatBuffer octaBuffer = buffer(OCTAHEDRON);
+    private final FloatBuffer circleXZ = buffer(makeCircle(false, 20));
+    private final FloatBuffer circleXY = buffer(makeCircle(true, 28));
+    private final FloatBuffer skyDay = buffer(SKY);
+    private final FloatBuffer skyNight = buffer(NIGHT_SKY);
     private final float[] projection = new float[16];
     private final float[] view = new float[16];
     private final float[] model = new float[16];
     private final float[] temp = new float[16];
     private final float[] mvp = new float[16];
+    private final float[] identity = new float[16];
 
     private int program;
     private int positionHandle;
     private int matrixHandle;
     private int colorHandle;
+    private int skyProgram;
+    private int skyPositionHandle;
+    private int skyColorHandle;
     private volatile int houseCount;
     private volatile int cityType = TaskItem.NORMAL;
-    private float yaw = 35f;
-    private float pitch = 38f;
-    private float distance = 16f;
+    private volatile float desiredX;
+    private volatile float desiredZ;
+    private volatile float desiredDistance = 22f;
+    private float cameraX;
+    private float cameraZ;
+    private float distance = 22f;
     private volatile long constructionStart;
     private volatile int constructionIndex = -1;
     private volatile long demolitionStart;
@@ -60,55 +79,55 @@ final class CityRenderer implements GLSurfaceView.Renderer {
 
     @Override
     public void onSurfaceCreated(GL10 unused, EGLConfig config) {
-        GLES20.glClearColor(0.72f, 0.88f, 0.96f, 1f);
+        GLES20.glClearColor(0.15f, 0.64f, 0.93f, 1f);
         GLES20.glEnable(GLES20.GL_DEPTH_TEST);
+        GLES20.glEnable(GLES20.GL_CULL_FACE);
+        GLES20.glCullFace(GLES20.GL_BACK);
+        GLES20.glEnable(GLES20.GL_BLEND);
+        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
         program = createProgram(
-                "uniform mat4 uMVP; attribute vec4 aPosition; void main(){ gl_Position=uMVP*aPosition; }",
-                "precision mediump float; uniform vec4 uColor; void main(){ gl_FragColor=uColor; }"
+                "uniform mat4 uMVP; attribute vec4 aPosition; void main(){gl_Position=uMVP*aPosition;}",
+                "precision mediump float; uniform vec4 uColor; void main(){gl_FragColor=uColor;}"
         );
         positionHandle = GLES20.glGetAttribLocation(program, "aPosition");
         matrixHandle = GLES20.glGetUniformLocation(program, "uMVP");
         colorHandle = GLES20.glGetUniformLocation(program, "uColor");
+        skyProgram = createProgram(
+                "attribute vec2 aPosition; attribute vec3 aColor; varying vec3 vColor; " +
+                        "void main(){vColor=aColor;gl_Position=vec4(aPosition,0.999,1.0);}",
+                "precision mediump float; varying vec3 vColor; void main(){gl_FragColor=vec4(vColor,1.0);}"
+        );
+        skyPositionHandle = GLES20.glGetAttribLocation(skyProgram, "aPosition");
+        skyColorHandle = GLES20.glGetAttribLocation(skyProgram, "aColor");
+        Matrix.setIdentityM(identity, 0);
     }
 
     @Override
     public void onSurfaceChanged(GL10 unused, int width, int height) {
         GLES20.glViewport(0, 0, width, height);
         float ratio = (float) width / Math.max(1, height);
-        Matrix.perspectiveM(projection, 0, 42f, ratio, 1f, 80f);
+        Matrix.perspectiveM(projection, 0, 39f, ratio, 0.8f, 120f);
     }
 
     @Override
     public void onDrawFrame(GL10 unused) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
+        drawSky();
+
+        cameraX += (desiredX - cameraX) * 0.28f;
+        cameraZ += (desiredZ - cameraZ) * 0.28f;
+        distance += (desiredDistance - distance) * 0.24f;
+        float yaw = (float) Math.toRadians(YAW);
+        float pitch = (float) Math.toRadians(47f);
+        float eyeX = cameraX + (float)(distance * Math.cos(pitch) * Math.sin(yaw));
+        float eyeY = (float)(distance * Math.sin(pitch));
+        float eyeZ = cameraZ + (float)(distance * Math.cos(pitch) * Math.cos(yaw));
+        Matrix.setLookAtM(view, 0, eyeX, eyeY, eyeZ, cameraX, 0f, cameraZ, 0f, 1f, 0f);
+
         GLES20.glUseProgram(program);
-
-        float yawRad = (float) Math.toRadians(yaw);
-        float pitchRad = (float) Math.toRadians(pitch);
-        float eyeX = (float) (distance * Math.cos(pitchRad) * Math.sin(yawRad));
-        float eyeY = (float) (distance * Math.sin(pitchRad));
-        float eyeZ = (float) (distance * Math.cos(pitchRad) * Math.cos(yawRad));
-        Matrix.setLookAtM(view, 0, eyeX, eyeY, eyeZ, 0f, 0f, 0f, 0f, 1f, 0f);
-
-        float[] ground = cityType == TaskItem.NORMAL
-                ? new float[]{0.30f, 0.66f, 0.44f, 1f}
-                : new float[]{0.55f, 0.43f, 0.32f, 1f};
-        drawCube(0, -0.2f, 0, 13f, 0.35f, 13f, ground);
-        drawCube(0, 0f, 0, 1.1f, 0.05f, 12f, new float[]{0.22f,0.26f,0.31f,1});
-        drawCube(0, 0.01f, 0, 12f, 0.05f, 1.1f, new float[]{0.22f,0.26f,0.31f,1});
-
-        long now = System.currentTimeMillis();
-        for (int i = 0; i < houseCount; i++) {
-            float growth = 1f;
-            if (i == constructionIndex && now - constructionStart < 1100L) {
-                growth = Math.max(0.08f, (now - constructionStart) / 1100f);
-            }
-            drawHouse(i, growth);
-        }
-
-        if (demolitionIndex >= 0 && now - demolitionStart < 1400L) {
-            drawDebris(demolitionIndex, (now - demolitionStart) / 1400f);
-        }
+        drawEnvironment();
+        drawBuildingPlots();
+        drawTaskFoundations();
     }
 
     void setCity(int type, int count) {
@@ -130,109 +149,236 @@ final class CityRenderer implements GLSurfaceView.Renderer {
         demolitionStart = System.currentTimeMillis();
     }
 
-    void rotate(float dx, float dy) {
-        yaw += dx;
-        pitch = Math.max(18f, Math.min(68f, pitch + dy));
+    void pan(float dx, float dy) {
+        float movement = desiredDistance * 0.0017f;
+        float yaw = (float)Math.toRadians(YAW);
+        float rightX = (float)Math.cos(yaw);
+        float rightZ = (float)-Math.sin(yaw);
+        float forwardX = (float)Math.sin(yaw);
+        float forwardZ = (float)Math.cos(yaw);
+        desiredX -= dx * movement * rightX + dy * movement * forwardX;
+        desiredZ -= dx * movement * rightZ + dy * movement * forwardZ;
+        desiredX = clamp(desiredX, -8.2f, 8.2f);
+        desiredZ = clamp(desiredZ, -8.2f, 8.2f);
     }
 
     void zoom(float scale) {
-        distance = Math.max(8f, Math.min(27f, distance / scale));
+        desiredDistance = clamp(desiredDistance / scale, 14.5f, 27f);
     }
 
-    private void drawHouse(int index, float growth) {
-        float[] position = positionFor(index);
-        float x = position[0];
-        float z = position[1];
-        float height = (1.25f + (index % 3) * 0.28f) * growth;
-        float width = 1.15f + (index % 2) * 0.22f;
-        float[] wall;
+    private void drawSky() {
+        GLES20.glDisable(GLES20.GL_DEPTH_TEST);
+        GLES20.glDisable(GLES20.GL_CULL_FACE);
+        GLES20.glUseProgram(skyProgram);
+        FloatBuffer sky = cityType == TaskItem.NORMAL ? skyDay : skyNight;
+        sky.position(0);
+        GLES20.glVertexAttribPointer(skyPositionHandle, 2, GLES20.GL_FLOAT, false, 20, sky);
+        GLES20.glEnableVertexAttribArray(skyPositionHandle);
+        sky.position(2);
+        GLES20.glVertexAttribPointer(skyColorHandle, 3, GLES20.GL_FLOAT, false, 20, sky);
+        GLES20.glEnableVertexAttribArray(skyColorHandle);
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 6);
+
+        GLES20.glUseProgram(program);
+        drawClipCircle(0.63f, 0.69f, 0.105f,
+                cityType == TaskItem.NORMAL ? rgba(1f,0.93f,0.58f,1f) : rgba(1f,0.82f,0.48f,1f));
         if (cityType == TaskItem.NORMAL) {
-            float[][] colors = {{0.92f,0.75f,0.45f,1},{0.35f,0.68f,0.78f,1},{0.89f,0.52f,0.43f,1}};
-            wall = colors[index % colors.length];
+            drawCloud(-0.68f, 0.50f, 0.18f);
+            drawCloud(0.54f, 0.34f, 0.22f);
         } else {
-            float[][] colors = {{0.84f,0.39f,0.26f,1},{0.98f,0.64f,0.25f,1},{0.67f,0.31f,0.36f,1}};
-            wall = colors[index % colors.length];
+            float[][] stars = {{-.78f,.78f},{-.48f,.61f},{-.12f,.82f},{.18f,.56f},{.83f,.84f},{.74f,.49f}};
+            for (float[] star : stars) drawClipCircle(star[0], star[1], 0.009f, rgba(1f,0.94f,0.70f,.9f));
         }
-        drawCube(x, height / 2f, z, width, height, 1.2f, wall);
-        drawCube(x, 0.52f * growth, z + 0.605f, 0.28f, 0.72f * growth, 0.04f,
-                new float[]{0.23f,0.16f,0.12f,1});
-        drawRoof(x, height, z, width, growth,
-                cityType == TaskItem.NORMAL
-                        ? new float[]{0.36f,0.18f,0.14f,1}
-                        : new float[]{0.42f,0.13f,0.10f,1});
+        GLES20.glEnable(GLES20.GL_DEPTH_TEST);
+        GLES20.glEnable(GLES20.GL_CULL_FACE);
     }
 
-    private void drawDebris(int index, float progress) {
-        float[] position = positionFor(index);
-        for (int i = 0; i < 7; i++) {
-            float angle = (float) (i * Math.PI * 2 / 7.0);
-            float spread = progress * 1.5f;
-            float y = Math.max(0.12f, 0.8f - progress * 0.75f + (i % 2) * 0.22f);
-            drawCube(position[0] + (float)Math.cos(angle) * spread, y,
-                    position[1] + (float)Math.sin(angle) * spread,
-                    0.28f, 0.26f, 0.28f, new float[]{0.52f,0.22f,0.16f,1});
+    private void drawCloud(float x, float y, float size) {
+        float[] white = rgba(1f,1f,1f,.86f);
+        drawClipCircle(x-size*.45f,y,size*.42f,white);
+        drawClipCircle(x,y+size*.10f,size*.56f,white);
+        drawClipCircle(x+size*.48f,y,size*.40f,white);
+        drawClipCircle(x+size*.12f,y-size*.13f,size*.55f,white);
+    }
+
+    private void drawEnvironment() {
+        float[] grass = cityType == TaskItem.NORMAL ? rgba(.38f,.72f,.28f,1f) : rgba(.24f,.48f,.32f,1f);
+        float[] farGrass = cityType == TaskItem.NORMAL ? rgba(.28f,.59f,.25f,1f) : rgba(.16f,.34f,.29f,1f);
+        drawCube(0,-.48f,0,78f,.9f,78f,farGrass);
+        drawCube(0,-.06f,0,38f,.18f,38f,grass);
+
+        drawDistantHills();
+        drawRoad(-9f, true); drawRoad(-3f, true); drawRoad(3f, true); drawRoad(9f, true);
+        drawRoad(-9f, false); drawRoad(-3f, false); drawRoad(3f, false); drawRoad(9f, false);
+
+        float[][] trees = {
+                {-15,-14},{-12,-15},{-7,-15},{-1,-15},{5,-15},{11,-15},{15,-13},
+                {-15,-8},{15,-7},{-15,-2},{15,0},{-15,5},{15,7},{-14,13},{-9,15},{-3,15},{4,15},{10,15},{15,13},
+                {-11,-6},{-11,6},{12,-5},{12,6},{-6,12},{6,-12}
+        };
+        for (int i=0;i<trees.length;i++) drawTree(trees[i][0], trees[i][1], .82f + (i%4)*.08f);
+    }
+
+    private void drawDistantHills() {
+        float[] hill = cityType == TaskItem.NORMAL ? rgba(.27f,.60f,.32f,1f) : rgba(.14f,.31f,.31f,1f);
+        float[][] points = {{-28,-28,10,4},{-12,-31,12,5},{6,-32,13,4},{24,-28,11,5},
+                {-31,-8,10,4},{-31,14,12,5},{-22,29,13,4},{0,32,14,5},{22,29,12,4},{31,12,11,5}};
+        for (float[] p:points) drawOcta(p[0],1.2f,p[1],p[2],p[3],p[2],hill);
+    }
+
+    private void drawRoad(float offset, boolean vertical) {
+        float[] asphalt = cityType == TaskItem.NORMAL ? rgba(.28f,.31f,.34f,1f) : rgba(.22f,.25f,.29f,1f);
+        float[] walk = cityType == TaskItem.NORMAL ? rgba(.81f,.78f,.69f,1f) : rgba(.53f,.52f,.48f,1f);
+        if (vertical) {
+            drawCube(offset-.95f,.055f,0,.28f,.10f,32f,walk);
+            drawCube(offset+.95f,.055f,0,.28f,.10f,32f,walk);
+            drawCube(offset,.065f,0,1.65f,.11f,32f,asphalt);
+        } else {
+            drawCube(0,.058f,offset-.95f,32f,.10f,.28f,walk);
+            drawCube(0,.058f,offset+.95f,32f,.10f,.28f,walk);
+            drawCube(0,.067f,offset,32f,.11f,1.65f,asphalt);
+        }
+    }
+
+    private void drawBuildingPlots() {
+        for (int row=0;row<5;row++) {
+            for (int col=0;col<5;col++) {
+                float x=-12f+col*6f;
+                float z=-12f+row*6f;
+                drawLot(x,z,(row+col)%2==0);
+            }
+        }
+    }
+
+    private void drawLot(float x, float z, boolean flowers) {
+        float[] lawn = cityType == TaskItem.NORMAL ? rgba(.47f,.77f,.31f,1f) : rgba(.29f,.52f,.34f,1f);
+        drawCube(x,.09f,z,3.7f,.12f,3.7f,lawn);
+        float[] hedge = cityType == TaskItem.NORMAL ? rgba(.18f,.53f,.22f,1f) : rgba(.12f,.37f,.25f,1f);
+        drawCube(x-1.72f,.32f,z,0.18f,.48f,3.5f,hedge);
+        drawCube(x+1.72f,.32f,z,0.18f,.48f,3.5f,hedge);
+        drawCube(x,.32f,z-1.72f,3.5f,.48f,.18f,hedge);
+        if (flowers) {
+            drawOcta(x-1.15f,.34f,z+1.25f,.16f,.25f,.16f,rgba(1f,.54f,.34f,1f));
+            drawOcta(x-.72f,.34f,z+1.28f,.14f,.22f,.14f,rgba(1f,.82f,.31f,1f));
+        }
+    }
+
+    private void drawTree(float x, float z, float scale) {
+        drawShadow(x+.38f,z+.33f,.75f*scale,1.15f*scale,.16f);
+        drawCube(x,.68f*scale,z,.28f*scale,1.36f*scale,.28f*scale,rgba(.34f,.20f,.10f,1f));
+        float[] leaf = cityType == TaskItem.NORMAL ? rgba(.24f,.62f,.20f,1f) : rgba(.14f,.42f,.27f,1f);
+        drawOcta(x,1.65f*scale,z,.92f*scale,.92f*scale,.92f*scale,leaf);
+        drawOcta(x-.34f*scale,1.48f*scale,z+.12f*scale,.64f*scale,.67f*scale,.64f*scale,leaf);
+        drawOcta(x+.33f*scale,1.49f*scale,z-.10f*scale,.62f*scale,.66f*scale,.62f*scale,leaf);
+    }
+
+    private void drawTaskFoundations() {
+        long now=System.currentTimeMillis();
+        for (int i=0;i<houseCount;i++) {
+            float[] p=positionFor(i);
+            float growth=1f;
+            if (i==constructionIndex && now-constructionStart<900L) growth=Math.max(.08f,(now-constructionStart)/900f);
+            drawShadow(p[0]+.45f,p[1]+.38f,1.25f,1.05f,.13f*growth);
+            drawCube(p[0],.16f*growth,p[1],2.3f,.28f*growth,2.1f,
+                    cityType==TaskItem.NORMAL?rgba(.86f,.78f,.62f,1f):rgba(.58f,.50f,.43f,1f));
+        }
+        if (demolitionIndex>=0 && now-demolitionStart<1200L) {
+            float[] p=positionFor(demolitionIndex);
+            float progress=(now-demolitionStart)/1200f;
+            for(int i=0;i<6;i++) {
+                float a=(float)(i*Math.PI/3.0);
+                drawCube(p[0]+(float)Math.cos(a)*progress,.18f+progress*.32f,
+                        p[1]+(float)Math.sin(a)*progress,.18f,.18f,.18f,rgba(.60f,.48f,.34f,1f));
+            }
         }
     }
 
     private float[] positionFor(int index) {
-        int ringIndex = index % 24;
-        int ring = index / 24;
-        int col = ringIndex % 6;
-        int row = ringIndex / 6;
-        float x = -5.0f + col * 2.0f;
-        float z = -3.0f + row * 2.0f;
-        if (ring > 0) {
-            x += (ring % 2 == 0 ? -0.35f : 0.35f) * ring;
-            z += 0.3f * ring;
-        }
-        if (Math.abs(x) < 0.9f) x += x >= 0 ? 1.15f : -1.15f;
-        if (Math.abs(z) < 0.9f) z += z >= 0 ? 1.15f : -1.15f;
-        return new float[]{x, z};
+        int col=index%5;
+        int row=(index/5)%5;
+        return new float[]{-12f+col*6f,-12f+row*6f};
     }
 
-    private void drawCube(float x, float y, float z, float sx, float sy, float sz, float[] color) {
-        draw(cubeBuffer, 36, x, y, z, sx, sy, sz, color);
+    private void drawShadow(float x,float z,float sx,float sz,float alpha) {
+        GLES20.glDisable(GLES20.GL_CULL_FACE);
+        draw(circleXZ,60,x,.145f,z,sx,.01f,sz,rgba(.08f,.16f,.12f,alpha));
+        GLES20.glEnable(GLES20.GL_CULL_FACE);
     }
 
-    private void drawRoof(float x, float y, float z, float width, float growth, float[] color) {
-        draw(roofBuffer, 18, x, y, z, width, growth * 0.75f, 1.15f, color);
-    }
-
-    private void draw(FloatBuffer vertices, int count, float x, float y, float z,
-                      float sx, float sy, float sz, float[] color) {
-        Matrix.setIdentityM(model, 0);
-        Matrix.translateM(model, 0, x, y, z);
-        Matrix.scaleM(model, 0, sx, sy, sz);
-        Matrix.multiplyMM(temp, 0, view, 0, model, 0);
-        Matrix.multiplyMM(mvp, 0, projection, 0, temp, 0);
-        vertices.position(0);
-        GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 12, vertices);
+    private void drawClipCircle(float x,float y,float scale,float[] color) {
+        GLES20.glDisable(GLES20.GL_CULL_FACE);
+        Matrix.setIdentityM(model,0);
+        Matrix.translateM(model,0,x,y,0f);
+        Matrix.scaleM(model,0,scale,scale,1f);
+        circleXY.position(0);
+        GLES20.glVertexAttribPointer(positionHandle,3,GLES20.GL_FLOAT,false,12,circleXY);
         GLES20.glEnableVertexAttribArray(positionHandle);
-        GLES20.glUniformMatrix4fv(matrixHandle, 1, false, mvp, 0);
-        GLES20.glUniform4fv(colorHandle, 1, color, 0);
-        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, count);
+        GLES20.glUniformMatrix4fv(matrixHandle,1,false,model,0);
+        GLES20.glUniform4fv(colorHandle,1,color,0);
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLES,0,84);
     }
 
+    private void drawCube(float x,float y,float z,float sx,float sy,float sz,float[] color) {
+        draw(cubeBuffer,36,x,y,z,sx,sy,sz,color);
+    }
+
+    private void drawOcta(float x,float y,float z,float sx,float sy,float sz,float[] color) {
+        draw(octaBuffer,24,x,y,z,sx,sy,sz,color);
+    }
+
+    private void draw(FloatBuffer vertices,int count,float x,float y,float z,float sx,float sy,float sz,float[] color) {
+        Matrix.setIdentityM(model,0);
+        Matrix.translateM(model,0,x,y,z);
+        Matrix.scaleM(model,0,sx,sy,sz);
+        Matrix.multiplyMM(temp,0,view,0,model,0);
+        Matrix.multiplyMM(mvp,0,projection,0,temp,0);
+        vertices.position(0);
+        GLES20.glVertexAttribPointer(positionHandle,3,GLES20.GL_FLOAT,false,12,vertices);
+        GLES20.glEnableVertexAttribArray(positionHandle);
+        GLES20.glUniformMatrix4fv(matrixHandle,1,false,mvp,0);
+        GLES20.glUniform4fv(colorHandle,1,color,0);
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLES,0,count);
+    }
+
+    private static float[] makeCircle(boolean xy,int segments) {
+        float[] data=new float[segments*9];
+        for(int i=0;i<segments;i++) {
+            double a=i*Math.PI*2/segments;
+            double b=(i+1)*Math.PI*2/segments;
+            int o=i*9;
+            data[o]=0; data[o+1]=0; data[o+2]=0;
+            if(xy) {
+                data[o+3]=(float)Math.cos(a); data[o+4]=(float)Math.sin(a); data[o+5]=0;
+                data[o+6]=(float)Math.cos(b); data[o+7]=(float)Math.sin(b); data[o+8]=0;
+            } else {
+                data[o+3]=(float)Math.cos(a); data[o+4]=0; data[o+5]=(float)Math.sin(a);
+                data[o+6]=(float)Math.cos(b); data[o+7]=0; data[o+8]=(float)Math.sin(b);
+            }
+        }
+        return data;
+    }
+
+    private static float[] rgba(float r,float g,float b,float a) { return new float[]{r,g,b,a}; }
+    private static float clamp(float v,float min,float max) { return Math.max(min,Math.min(max,v)); }
     private static FloatBuffer buffer(float[] data) {
-        FloatBuffer buffer = ByteBuffer.allocateDirect(data.length * 4)
-                .order(ByteOrder.nativeOrder()).asFloatBuffer();
-        buffer.put(data).position(0);
-        return buffer;
+        FloatBuffer out=ByteBuffer.allocateDirect(data.length*4).order(ByteOrder.nativeOrder()).asFloatBuffer();
+        out.put(data).position(0);
+        return out;
     }
 
-    private static int createProgram(String vertexSource, String fragmentSource) {
-        int vertex = compileShader(GLES20.GL_VERTEX_SHADER, vertexSource);
-        int fragment = compileShader(GLES20.GL_FRAGMENT_SHADER, fragmentSource);
-        int program = GLES20.glCreateProgram();
-        GLES20.glAttachShader(program, vertex);
-        GLES20.glAttachShader(program, fragment);
-        GLES20.glLinkProgram(program);
-        return program;
+    private static int createProgram(String vertexSource,String fragmentSource) {
+        int vertex=compileShader(GLES20.GL_VERTEX_SHADER,vertexSource);
+        int fragment=compileShader(GLES20.GL_FRAGMENT_SHADER,fragmentSource);
+        int result=GLES20.glCreateProgram();
+        GLES20.glAttachShader(result,vertex);
+        GLES20.glAttachShader(result,fragment);
+        GLES20.glLinkProgram(result);
+        return result;
     }
 
-    private static int compileShader(int type, String source) {
-        int shader = GLES20.glCreateShader(type);
-        GLES20.glShaderSource(shader, source);
+    private static int compileShader(int type,String source) {
+        int shader=GLES20.glCreateShader(type);
+        GLES20.glShaderSource(shader,source);
         GLES20.glCompileShader(shader);
         return shader;
     }
