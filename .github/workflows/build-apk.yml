@@ -52,12 +52,12 @@ jobs:
             if grep -q 'FATAL EXCEPTION: main' /tmp/taskcity-logcat.txt && grep -q 'Process: com.godnit.taskcity' /tmp/taskcity-logcat.txt; then cat /tmp/taskcity-logcat.txt; exit 1; fi
 
       - name: Prepare named APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk Task-City-v1.0.0-Android8.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Task-City-v1.1.0-Visual.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Task-City-v1.0.0-Android8
-          path: Task-City-v1.0.0-Android8.apk
+          name: Task-City-v1.1.0-Visual
+          path: Task-City-v1.1.0-Visual.apk
           if-no-files-found: error
           retention-days: 30
