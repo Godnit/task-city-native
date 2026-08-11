@@ -1,10 +1,8 @@
-name: Build Task City APK
+name: Build Task City Godot APK
 
 on:
   push:
-    branches: [main, task-city-real-v1]
-  pull_request:
-    branches: [main]
+    branches: [task-city-real-v1]
   workflow_dispatch:
 
 permissions:
@@ -13,27 +11,60 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.7'
+      - name: Install Godot 4.4.1 and export templates
+        shell: bash
+        run: |
+          set -euxo pipefail
+          GODOT_VERSION=4.4.1
+          wget -q "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip" -O /tmp/godot.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          mv /tmp/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64 /usr/local/bin/godot
+          chmod +x /usr/local/bin/godot
+          wget -q "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz" -O /tmp/templates.tpz
+          rm -rf /tmp/godot_templates
+          mkdir -p /tmp/godot_templates
+          unzip -q /tmp/templates.tpz -d /tmp/godot_templates
+          mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          cp -a /tmp/godot_templates/templates/. "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/"
+          godot --version
 
-      - name: Build debug APK
-        run: gradle --no-daemon assembleDebug
+      - name: Configure Godot Android paths
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p "$HOME/.config/godot"
+          cat > "$HOME/.config/godot/editor_settings-4.tres" <<EOF
+          [gd_resource format=3]
 
-      - name: Verify APK archive
-        run: unzip -t app/build/outputs/apk/debug/app-debug.apk
+          [resource]
+          export/android/android_sdk_path = "$ANDROID_HOME"
+          export/android/java_sdk_path = "$JAVA_HOME"
+          EOF
+
+      - name: Import project and validate GDScript
+        shell: bash
+        run: |
+          set -euxo pipefail
+          godot --headless --editor --path godot --quit
+
+      - name: Export Android APK
+        shell: bash
+        run: |
+          set -euxo pipefail
+          godot --headless --path godot --export-debug "Android" "$GITHUB_WORKSPACE/Task-City-v1.2.0-Godot.apk"
+          test -s Task-City-v1.2.0-Godot.apk
+          unzip -t Task-City-v1.2.0-Godot.apk
 
       - name: Smoke test on Android 8.1
         uses: reactivecircus/android-emulator-runner@v2
@@ -44,20 +75,17 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
           script: |
-            adb install -r app/build/outputs/apk/debug/app-debug.apk
-            adb shell am start -W -n com.godnit.taskcity/.MainActivity
-            sleep 4
-            adb shell dumpsys activity activities | grep -q 'com.godnit.taskcity/.MainActivity'
-            adb logcat -d -t 300 > /tmp/taskcity-logcat.txt
-            if grep -q 'FATAL EXCEPTION: main' /tmp/taskcity-logcat.txt && grep -q 'Process: com.godnit.taskcity' /tmp/taskcity-logcat.txt; then cat /tmp/taskcity-logcat.txt; exit 1; fi
+            adb install -r Task-City-v1.2.0-Godot.apk
+            adb shell monkey -p com.godnit.taskcity -c android.intent.category.LAUNCHER 1
+            sleep 8
+            adb shell pidof com.godnit.taskcity
+            adb logcat -d -t 500 > /tmp/taskcity-logcat.txt
+            if grep -q 'FATAL EXCEPTION' /tmp/taskcity-logcat.txt && grep -q 'com.godnit.taskcity' /tmp/taskcity-logcat.txt; then cat /tmp/taskcity-logcat.txt; exit 1; fi
 
-      - name: Prepare named APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk Task-City-v1.1.0-Visual.apk
-
-      - name: Upload APK
+      - name: Upload Godot APK
         uses: actions/upload-artifact@v4
         with:
-          name: Task-City-v1.1.0-Visual
-          path: Task-City-v1.1.0-Visual.apk
+          name: Task-City-v1.2.0-Godot
+          path: Task-City-v1.2.0-Godot.apk
           if-no-files-found: error
           retention-days: 30
