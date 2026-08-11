@@ -1,7 +1,7 @@
-name: Build Godot Academy APK
+name: Build Godot Academy v6 Visual APK
 on:
   push:
-    branches: [ godot-academy-v1 ]
+    branches: [ godot-academy-visual-v6 ]
     paths:
       - 'godot-academy/**'
       - '.github/workflows/build-godot-academy.yml'
@@ -10,6 +10,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -41,7 +42,7 @@ jobs:
             cp godot-academy/app/src/main/res/drawable/ic_launcher_v5.jpg "godot-academy/app/src/main/res/mipmap-${density}/ic_launcher_round.jpg"
           done
 
-      - name: Validate app
+      - name: Validate curriculum and visual code
         run: |
           node --check godot-academy/app/src/main/assets/app.js
           node --check godot-academy/app/src/main/assets/data.js
@@ -51,6 +52,8 @@ jobs:
           node --check godot-academy/app/src/main/assets/godot-core-v4b.js
           node --check godot-academy/app/src/main/assets/godot-labs-v4-hotfix.js
           node --check godot-academy/app/src/main/assets/godot-polish-v5.js
+          node --check godot-academy/app/src/main/assets/godot-visual-v6.js
+          node --check godot-academy/visual-smoke-v6.cjs
           node <<'NODE'
           const fs=require('fs'),vm=require('vm');
           const ctx={window:{},console}; ctx.window=ctx;
@@ -63,16 +66,39 @@ jobs:
           for(let s=1;s<=8;s++) if(ctx.DATA.lessons.filter(l=>l.stageId===s).length<12) throw new Error('Missing lessons stage '+s);
           for(let s=2;s<=8;s++) if(!ctx.GODOT_EXAMS_V4[s]||ctx.GODOT_EXAMS_V4[s].length!==5) throw new Error('Missing exam stage '+s);
           for(let s=2;s<=8;s++) if(!ctx.GODOT_PROJECTS_V4[s]) throw new Error('Missing project stage '+s);
-          console.log('Curriculum OK');
+          console.log('Curriculum OK: 8 stages / 97 lessons');
           NODE
           grep -q 'godot-polish-v5.css' godot-academy/app/src/main/assets/index.html
           grep -q 'godot-polish-v5.js' godot-academy/app/src/main/assets/index.html
+          grep -q 'godot-visual-v6.css' godot-academy/app/src/main/assets/index.html
+          grep -q 'godot-visual-v6.js' godot-academy/app/src/main/assets/index.html
           grep -q '@mipmap/ic_launcher' godot-academy/app/src/main/AndroidManifest.xml
           grep -q '@mipmap/ic_launcher_round' godot-academy/app/src/main/AndroidManifest.xml
           test -f godot-academy/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
           test -f godot-academy/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
-          grep -q "versionCode 6" godot-academy/app/build.gradle
-          grep -q "versionName '5.1'" godot-academy/app/build.gradle
+          grep -q "versionCode 7" godot-academy/app/build.gradle
+          grep -q "versionName '6.0'" godot-academy/app/build.gradle
+
+      - name: Visual overflow test on phone widths
+        run: |
+          npm install --no-save puppeteer-core@24.16.0
+          CHROME_BIN=$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser)
+          test -n "$CHROME_BIN"
+          export CHROME_BIN
+          python3 -m http.server 8123 --bind 127.0.0.1 --directory godot-academy/app/src/main/assets >/tmp/godot-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+          sleep 1
+          node godot-academy/visual-smoke-v6.cjs
+
+      - name: Upload visual verification shots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GodotAcademy-v6-Visual-Checks
+          path: /tmp/godot-v6-visual/*.png
+          if-no-files-found: ignore
+          retention-days: 7
 
       - uses: actions/setup-java@v4
         with:
@@ -85,15 +111,18 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Build debug APK
+      - name: Build APK
         working-directory: godot-academy
         run: gradle --no-daemon assembleDebug
 
-      - name: Verify exact launcher icon inside APK
+      - name: Verify APK contents and launcher icon
         run: |
           APK=godot-academy/app/build/outputs/apk/debug/app-debug.apk
+          unzip -t "$APK"
           unzip -l "$APK" | grep -q 'classes.dex'
           unzip -l "$APK" | grep -q 'assets/godot-polish-v5.js'
+          unzip -l "$APK" | grep -q 'assets/godot-visual-v6.css'
+          unzip -l "$APK" | grep -q 'assets/godot-visual-v6.js'
           unzip -l "$APK" | grep -q 'assets/godot_academy_icon_v5.jpg'
           ICON_PATH=$(unzip -Z1 "$APK" | grep -E '^res/mipmap-xxxhdpi[^/]*/ic_launcher\.jpg$' | head -1)
           test -n "$ICON_PATH"
@@ -103,10 +132,13 @@ jobs:
           "${ANDROID_HOME}/build-tools/35.0.0/aapt" dump badging "$APK" | tee /tmp/badging.txt
           grep -q "application: label='أكاديمية Godot'" /tmp/badging.txt
           grep -q 'application-icon-' /tmp/badging.txt
+          cp "$APK" Godot_Academy_v6_Visual.apk
+          sha256sum Godot_Academy_v6_Visual.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: GodotAcademy-Professional-v5.1-IconFix
-          path: godot-academy/app/build/outputs/apk/debug/app-debug.apk
+          name: GodotAcademy-v6-VisualOverhaul
+          path: Godot_Academy_v6_Visual.apk
           if-no-files-found: error
+          retention-days: 7
