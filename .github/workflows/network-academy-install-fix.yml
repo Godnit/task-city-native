@@ -1,8 +1,8 @@
-name: Build Network Academy v5 Theme Fix
+name: Build Network Academy Final Icon 7
 
 on:
   push:
-    branches: [network-academy-install-fix]
+    branches: [network-academy-final-icon7]
     paths:
       - 'network-fix/**'
       - '.github/workflows/network-academy-install-fix.yml'
@@ -12,9 +12,9 @@ permissions:
   contents: read
 
 jobs:
-  sign:
+  build:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,6 +24,24 @@ jobs:
 
       - name: Install Android build tools
         run: sdkmanager "build-tools;35.0.0"
+
+      - name: Download Apktool
+        run: |
+          python3 - <<'PY'
+          import json, urllib.request
+          req=urllib.request.Request(
+              'https://api.github.com/repos/iBotPeaches/Apktool/releases/latest',
+              headers={'User-Agent':'network-academy-build'}
+          )
+          with urllib.request.urlopen(req, timeout=30) as r:
+              release=json.load(r)
+          jars=[a for a in release.get('assets',[]) if a['name'].startswith('apktool_') and a['name'].endswith('.jar')]
+          assert jars, 'No Apktool jar asset found'
+          asset=jars[0]
+          urllib.request.urlretrieve(asset['browser_download_url'],'/tmp/apktool.jar')
+          print('Downloaded',release['tag_name'],asset['name'])
+          PY
+          java -jar /tmp/apktool.jar --version
 
       - name: Reconstruct base APK
         run: |
@@ -42,7 +60,7 @@ jobs:
           base64 -d /tmp/app.b64 > /tmp/app-base.apk
           unzip -t /tmp/app-base.apk
 
-      - name: Inject v5 UI fixes and launcher linkage
+      - name: Keep all v5 fixes and apply final package
         run: |
           python3 - <<'PY'
           import zipfile, os
@@ -50,11 +68,12 @@ jobs:
           old_activity='com.godnit.networkacadfix.MainActivity'.encode('utf-16le')
           real_activity='com.godnit.networkacademy.MainActivity'.encode('utf-16le')
           old_pkg='com.godnit.networkacadfix'.encode('utf-16le')
-          new_pkg='com.godnit.networkacadfi5'.encode('utf-16le')
+          new_pkg='com.godnit.networkacadfi7'.encode('utf-16le')
           assert len(old_activity)==len(real_activity)
           assert len(old_pkg)==len(new_pkg)
           css=open('network-fix/v5-fix.css','rb').read()
           js=open('network-fix/v5-fix.js','rb').read()
+          brand=open('network-fix/icon7/brand-icon.svg','rb').read()
           with zipfile.ZipFile(src,'r') as zin, zipfile.ZipFile(dst,'w') as zout:
               for info in zin.infolist():
                   if info.filename.startswith('META-INF/'):
@@ -70,6 +89,8 @@ jobs:
                       text=text.replace('</head>','  <link rel="stylesheet" href="v5-fix.css" />\n</head>')
                       text=text.replace('</body>','  <script src="v5-fix.js"></script>\n</body>')
                       data=text.encode('utf-8')
+                  elif info.filename=='assets/brand-icon.svg':
+                      data=brand
                   zout.writestr(info,data)
               zout.writestr('assets/v5-fix.css',css,compress_type=zipfile.ZIP_DEFLATED)
               zout.writestr('assets/v5-fix.js',js,compress_type=zipfile.ZIP_DEFLATED)
@@ -77,55 +98,65 @@ jobs:
               m=z.read('AndroidManifest.xml')
               assert m.count(new_pkg)==1
               assert m.count(real_activity)==1
-              assert b'v5-fix.css' in z.read('assets/index.html')
-              assert b'v5-fix.js' in z.read('assets/index.html')
-              assert 'assets/v5-fix.css' in z.namelist() and 'assets/v5-fix.js' in z.namelist()
+              html=z.read('assets/index.html')
+              assert b'v5-fix.css' in html and b'v5-fix.js' in html
+              assert z.read('assets/brand-icon.svg')==brand
               assert b'Lcom/godnit/networkacademy/MainActivity;' in z.read('classes2.dex')
-          print('v5 package, launcher, CSS and JS verified:',os.path.getsize(dst))
+          print('v5 UI fixes, final package and icon 7 brand verified:',os.path.getsize(dst))
           PY
           unzip -t /tmp/app-v5.apk
+
+      - name: Replace Android launcher with icon 7
+        run: |
+          java -jar /tmp/apktool.jar d -s -f /tmp/app-v5.apk -o /tmp/decoded
+          test -f /tmp/decoded/res/drawable/ic_launcher.xml
+          cp network-fix/icon7/ic_launcher.xml /tmp/decoded/res/drawable/ic_launcher.xml
+          cp network-fix/icon7/brand-icon.svg /tmp/decoded/assets/brand-icon.svg
+          grep -q 'M20,31L54,17L88,31L54,45Z' /tmp/decoded/res/drawable/ic_launcher.xml
+          java -jar /tmp/apktool.jar b /tmp/decoded -o /tmp/app-final-unsigned.apk
+          unzip -t /tmp/app-final-unsigned.apk
 
       - name: Align APK
         run: |
           ZIPALIGN="$ANDROID_HOME/build-tools/35.0.0/zipalign"
-          "$ZIPALIGN" -f -p 4 /tmp/app-v5.apk /tmp/app-aligned.apk
+          "$ZIPALIGN" -f -p 4 /tmp/app-final-unsigned.apk /tmp/app-aligned.apk
           "$ZIPALIGN" -c -v 4 /tmp/app-aligned.apk
 
       - name: Create signing key
         run: |
           keytool -genkeypair -v \
-            -keystore /tmp/network-v5.keystore \
+            -keystore /tmp/network-final.keystore \
             -storepass android \
             -keypass android \
-            -alias networkv5 \
+            -alias networkfinal \
             -keyalg RSA \
             -keysize 2048 \
             -validity 10000 \
-            -dname "CN=Network Academy v5,O=Godnit,C=US"
+            -dname "CN=Network Academy Final,O=Godnit,C=US"
 
-      - name: Sign and verify APK
+      - name: Sign and verify final APK
         run: |
           APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
           ZIPALIGN="$ANDROID_HOME/build-tools/35.0.0/zipalign"
           "$APKSIGNER" sign \
-            --ks /tmp/network-v5.keystore \
+            --ks /tmp/network-final.keystore \
             --ks-pass pass:android \
             --key-pass pass:android \
             --v1-signing-enabled true \
             --v2-signing-enabled true \
             --v3-signing-enabled true \
-            --out Network_Academy_v5_ThemeFix.apk \
+            --out Network_Academy_FINAL_Icon7.apk \
             /tmp/app-aligned.apk
-          "$APKSIGNER" verify --verbose --print-certs Network_Academy_v5_ThemeFix.apk
-          "$ZIPALIGN" -c -v 4 Network_Academy_v5_ThemeFix.apk
-          unzip -t Network_Academy_v5_ThemeFix.apk
-          file Network_Academy_v5_ThemeFix.apk
-          sha256sum Network_Academy_v5_ThemeFix.apk
+          "$APKSIGNER" verify --verbose --print-certs Network_Academy_FINAL_Icon7.apk
+          "$ZIPALIGN" -c -v 4 Network_Academy_FINAL_Icon7.apk
+          unzip -t Network_Academy_FINAL_Icon7.apk
+          file Network_Academy_FINAL_Icon7.apk
+          sha256sum Network_Academy_FINAL_Icon7.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Network-Academy-v5-ThemeFix
-          path: Network_Academy_v5_ThemeFix.apk
+          name: Network-Academy-FINAL-Icon7
+          path: Network_Academy_FINAL_Icon7.apk
           if-no-files-found: error
           retention-days: 7
