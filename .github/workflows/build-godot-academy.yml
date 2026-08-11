@@ -49,6 +49,7 @@ jobs:
           node --check godot-academy/app/src/main/assets/godot-ui-v2.js
           node --check godot-academy/app/src/main/assets/godot-fixes-v3.js
           node --check godot-academy/app/src/main/assets/godot-curriculum-v4.js
+          node --check godot-academy/app/src/main/assets/godot-data-hotfix-v6.js
           node --check godot-academy/app/src/main/assets/godot-core-v4b.js
           node --check godot-academy/app/src/main/assets/godot-labs-v4-hotfix.js
           node --check godot-academy/app/src/main/assets/godot-polish-v5.js
@@ -61,15 +62,19 @@ jobs:
           vm.runInContext(fs.readFileSync('godot-academy/app/src/main/assets/data.js','utf8'),ctx);
           ctx.DATA=ctx.GODOT_DATA;
           vm.runInContext(fs.readFileSync('godot-academy/app/src/main/assets/godot-curriculum-v4.js','utf8'),ctx);
+          vm.runInContext(fs.readFileSync('godot-academy/app/src/main/assets/godot-data-hotfix-v6.js','utf8'),ctx);
           if(ctx.DATA.stages.length!==8) throw new Error('Expected 8 stages');
           if(ctx.DATA.lessons.length!==97) throw new Error('Expected 97 lessons');
           for(let s=1;s<=8;s++) if(ctx.DATA.lessons.filter(l=>l.stageId===s).length<12) throw new Error('Missing lessons stage '+s);
           for(let s=2;s<=8;s++) if(!ctx.GODOT_EXAMS_V4[s]||ctx.GODOT_EXAMS_V4[s].length!==5) throw new Error('Missing exam stage '+s);
           for(let s=2;s<=8;s++) if(!ctx.GODOT_PROJECTS_V4[s]) throw new Error('Missing project stage '+s);
-          console.log('Curriculum OK: 8 stages / 97 lessons');
+          const invalid=ctx.DATA.lessons.map((l,i)=>({i,title:l.title,opts:l.opts,ans:l.ans,q:l.q})).filter(x=>!Array.isArray(x.opts)||typeof x.ans!=='number'||typeof x.q!=='string');
+          if(invalid.length) throw new Error('Malformed lessons: '+JSON.stringify(invalid));
+          console.log('Curriculum OK: 8 stages / 97 lessons / quiz shapes valid');
           NODE
           grep -q 'godot-polish-v5.css' godot-academy/app/src/main/assets/index.html
           grep -q 'godot-polish-v5.js' godot-academy/app/src/main/assets/index.html
+          grep -q 'godot-data-hotfix-v6.js' godot-academy/app/src/main/assets/index.html
           grep -q 'godot-visual-v6.css' godot-academy/app/src/main/assets/index.html
           grep -q 'godot-visual-v6.js' godot-academy/app/src/main/assets/index.html
           grep -q '@mipmap/ic_launcher' godot-academy/app/src/main/AndroidManifest.xml
@@ -121,6 +126,7 @@ jobs:
           unzip -t "$APK"
           unzip -l "$APK" | grep -q 'classes.dex'
           unzip -l "$APK" | grep -q 'assets/godot-polish-v5.js'
+          unzip -l "$APK" | grep -q 'assets/godot-data-hotfix-v6.js'
           unzip -l "$APK" | grep -q 'assets/godot-visual-v6.css'
           unzip -l "$APK" | grep -q 'assets/godot-visual-v6.js'
           unzip -l "$APK" | grep -q 'assets/godot_academy_icon_v5.jpg'
