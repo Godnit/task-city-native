@@ -1,6 +1,8 @@
 name: Build Task City v2.3 APK
 
 on:
+  push:
+    branches: [ agent/task-city-environment-v2 ]
   workflow_dispatch:
 
 permissions:
