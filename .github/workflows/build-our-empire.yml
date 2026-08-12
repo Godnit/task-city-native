@@ -11,10 +11,83 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+
+      - name: Bundle detailed offline map data
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p empireapp/src/main/assets .map-src
+          BASE="https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson"
+          FALLBACK="https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson"
+          fetch_map() {
+            local file="$1"
+            if ! curl -L --fail --retry 3 --retry-delay 2 "$BASE/$file" -o ".map-src/$file"; then
+              curl -L --fail --retry 3 --retry-delay 2 "$FALLBACK/$file" -o ".map-src/$file"
+            fi
+          }
+          fetch_map ne_50m_admin_0_countries.geojson
+          if ! curl -L --fail --retry 2 "$BASE/ne_10m_admin_1_states_provinces_lines.geojson" -o .map-src/admin1.geojson; then
+            curl -L --fail --retry 3 "$FALLBACK/ne_50m_admin_1_states_provinces_lakes.geojson" -o .map-src/admin1.geojson
+          fi
+          fetch_map ne_50m_populated_places_simple.geojson
+
+          python3 - <<'PY'
+          import json, pathlib
+          root=pathlib.Path('.map-src')
+          out=pathlib.Path('empireapp/src/main/assets')
+
+          def load(path):
+              return json.loads(path.read_text(encoding='utf-8'))
+
+          def rounded(x):
+              if isinstance(x, float): return round(x, 4)
+              if isinstance(x, list): return [rounded(v) for v in x]
+              if isinstance(x, dict): return {k: rounded(v) for k,v in x.items()}
+              return x
+
+          def write_js(name, var, obj):
+              text='window.%s=%s;'%(var,json.dumps(obj,ensure_ascii=False,separators=(',',':')))
+              (out/name).write_text(text,encoding='utf-8')
+              print(name, len(text), 'bytes')
+
+          countries=load(root/'ne_50m_admin_0_countries.geojson')
+          cpkeys=('ADM0_A3','ISO_A3','SOV_A3','GU_A3','BRK_A3','POSTAL','NAME_AR','ADMIN','NAME_EN','NAME')
+          cf=[]
+          for f in countries.get('features',[]):
+              p=f.get('properties') or {}
+              cf.append({'type':'Feature','properties':{k:p.get(k) for k in cpkeys if p.get(k) not in (None,'')},'geometry':rounded(f.get('geometry'))})
+          write_js('map_countries.js','NE_COUNTRIES',{'type':'FeatureCollection','features':cf})
+
+          admin=load(root/'admin1.geojson')
+          af=[]
+          for f in admin.get('features',[]):
+              g=f.get('geometry')
+              if g: af.append({'type':'Feature','properties':{},'geometry':rounded(g)})
+          write_js('map_admin1.js','NE_ADMIN1',{'type':'FeatureCollection','features':af})
+
+          cities=load(root/'ne_50m_populated_places_simple.geojson')
+          citykeys=('ADM0_A3','SOV_A3','ADM0NAME','SOV0NAME','NAME_AR','NAME','NAMEPAR','NAMEASCII','SCALERANK','MIN_ZOOM')
+          feats=[]
+          for f in cities.get('features',[]):
+              p=f.get('properties') or {}; g=f.get('geometry')
+              if not g or g.get('type')!='Point': continue
+              rank=p.get('SCALERANK',9)
+              try: rank=float(rank)
+              except: rank=9
+              if rank>8: continue
+              feats.append({'type':'Feature','properties':{k:p.get(k) for k in citykeys if p.get(k) not in (None,'')},'geometry':rounded(g)})
+          feats.sort(key=lambda f: float(f['properties'].get('SCALERANK',9)))
+          write_js('map_cities.js','NE_CITIES',{'type':'FeatureCollection','features':feats[:1400]})
+          PY
+
+          node --check empireapp/src/main/assets/phase2-map.js
+          test -s empireapp/src/main/assets/map_countries.js
+          test -s empireapp/src/main/assets/map_admin1.js
+          test -s empireapp/src/main/assets/map_cities.js
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -32,19 +105,23 @@ jobs:
           rm -rf empireapp/build .gradle
           gradle --no-daemon --no-build-cache :empireapp:assembleRelease
 
-      - name: Verify APK
+      - name: Verify APK and phase 2 map assets
         run: |
           test -f empireapp/build/outputs/apk/release/empireapp-release.apk
           unzip -t empireapp/build/outputs/apk/release/empireapp-release.apk
           $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose empireapp/build/outputs/apk/release/empireapp-release.apk
+          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/phase2-map.js'
+          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/map_countries.js'
+          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/map_admin1.js'
+          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/map_cities.js'
 
       - name: Prepare named APK
-        run: cp empireapp/build/outputs/apk/release/empireapp-release.apk Our-Empire-Arabic-v0.1.apk
+        run: cp empireapp/build/outputs/apk/release/empireapp-release.apk Our-Empire-Arabic-v0.2-Phase2.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Our-Empire-Arabic-v0.1
-          path: Our-Empire-Arabic-v0.1.apk
+          name: Our-Empire-Arabic-v0.2-Phase2
+          path: Our-Empire-Arabic-v0.2-Phase2.apk
           if-no-files-found: error
           retention-days: 30
