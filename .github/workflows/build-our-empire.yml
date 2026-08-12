@@ -28,7 +28,9 @@ jobs:
           gradle-version: '8.7'
 
       - name: Build release APK
-        run: gradle --no-daemon clean assembleRelease
+        run: |
+          rm -rf app/build .gradle
+          gradle --no-daemon --no-build-cache assembleRelease
 
       - name: Verify APK
         run: |
