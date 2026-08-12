@@ -24,54 +24,54 @@ jobs:
           grep -q 'data-theme="light"' psychology-academy/app/src/main/assets/app.css
           grep -q 'body\[data-theme="light"\]' psychology-academy/app/src/main/assets/final-v4.css
           grep -q 'body\[data-theme="light"\]' psychology-academy/app/src/main/assets/brand-v5.css
-          grep -q 'brand-v5.svg' psychology-academy/app/src/main/assets/brand-v5.js
+          grep -q 'psychology-icon-v6.webp' psychology-academy/app/src/main/assets/brand-v5.js
           grep -q 'brand-v5.js' psychology-academy/app/src/main/assets/index.html
           grep -q 'brand-v5.css' psychology-academy/app/src/main/assets/index.html
-          grep -q 'graduation' /dev/null || true
-          grep -q '<path d="M157 126' psychology-academy/app/src/main/assets/brand-v5.svg
           grep -q 'android:icon="@drawable/psychology_icon"' psychology-academy/app/src/main/AndroidManifest.xml
           ! grep -q 'teaching-v3.js' psychology-academy/app/src/main/assets/index.html
           ! grep -q 'تخيل أنني' psychology-academy/app/src/main/assets/final-v4.js
           grep -q 'أساسيات الصحة النفسية' psychology-academy/app/src/main/assets/data.js
           grep -q 'علم نفس اللغة والفصاحة' psychology-academy/app/src/main/assets/data.js
+          test $(find psychology-academy/app/src/main/assets -name 'psychology-icon-v6.part*' | wc -l) -eq 8
+      - name: Reconstruct exact selected icon
+        run: |
+          cat psychology-academy/app/src/main/assets/psychology-icon-v6.part* | base64 -d > psychology-academy/app/src/main/assets/psychology-icon-v6.webp
+          echo '731734843bdf750efd8fb187e45259a607d820514c81ffe67826740493d08e03  psychology-academy/app/src/main/assets/psychology-icon-v6.webp' | sha256sum -c -
+          file psychology-academy/app/src/main/assets/psychology-icon-v6.webp | grep -qi 'Web/P'
+          test $(stat -c%s psychology-academy/app/src/main/assets/psychology-icon-v6.webp) -eq 28790
+          mkdir -p psychology-academy/app/src/main/res/drawable
+          cp psychology-academy/app/src/main/assets/psychology-icon-v6.webp psychology-academy/app/src/main/res/drawable/psychology_icon.webp
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
-      - name: Install Android SDK and SVG renderer
+      - name: Install Android SDK
         run: |
           yes | sdkmanager --licenses >/dev/null
           sdkmanager "platforms;android-35" "build-tools;35.0.0"
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq librsvg2-bin
-      - name: Generate Android launcher icon
-        run: |
-          mkdir -p psychology-academy/app/src/main/res/drawable
-          rsvg-convert -w 512 -h 512 psychology-academy/app/src/main/assets/brand-v5.svg -o psychology-academy/app/src/main/res/drawable/psychology_icon.png
-          file psychology-academy/app/src/main/res/drawable/psychology_icon.png | grep -q 'PNG image data, 512 x 512'
-          test $(stat -c%s psychology-academy/app/src/main/res/drawable/psychology_icon.png) -gt 10000
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
       - name: Build debug APK
         working-directory: psychology-academy
         run: gradle --no-daemon assembleDebug
-      - name: Verify APK contents and launcher icon
+      - name: Verify APK and exact launcher icon
         run: |
           APK=psychology-academy/app/build/outputs/apk/debug/app-debug.apk
           unzip -l "$APK" | grep -q 'assets/index.html'
           unzip -l "$APK" | grep -q 'assets/data.js'
-          unzip -l "$APK" | grep -q 'assets/brand-v5.svg'
+          unzip -l "$APK" | grep -q 'assets/psychology-icon-v6.webp'
           unzip -l "$APK" | grep -q 'assets/brand-v5.js'
           unzip -l "$APK" | grep -q 'assets/brand-v5.css'
           unzip -l "$APK" | grep -q 'assets/final-v4.js'
           unzip -l "$APK" | grep -q 'classes.dex'
+          unzip -p "$APK" assets/psychology-icon-v6.webp | sha256sum | grep -q '^731734843bdf750efd8fb187e45259a607d820514c81ffe67826740493d08e03'
           $ANDROID_HOME/build-tools/35.0.0/aapt dump badging "$APK" | grep -q 'application-icon'
           $ANDROID_HOME/build-tools/35.0.0/aapt dump badging "$APK" | grep -q 'أكاديمية علم النفس'
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PsychologyAcademy-v5-BrandFinal
+          name: PsychologyAcademy-v6-ExactIcon
           path: psychology-academy/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
