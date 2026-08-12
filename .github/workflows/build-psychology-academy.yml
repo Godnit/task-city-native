@@ -1,0 +1,50 @@
+name: Build Psychology Academy APK
+on:
+  push:
+    branches: [ psychology-academy-v1 ]
+    paths:
+      - 'psychology-academy/**'
+      - '.github/workflows/build-psychology-academy.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate academy
+        run: |
+          node --check psychology-academy/app/src/main/assets/data.js
+          node --check psychology-academy/app/src/main/assets/app.js
+          grep -q '19 قسم' psychology-academy/app/src/main/assets/app.js
+          grep -q 'مختبر العقل' psychology-academy/app/src/main/assets/app.js
+          grep -q 'data-theme="light"' psychology-academy/app/src/main/assets/app.css
+          grep -q 'أساسيات الصحة النفسية' psychology-academy/app/src/main/assets/data.js
+          grep -q 'علم نفس اللغة والفصاحة' psychology-academy/app/src/main/assets/data.js
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: yes | sdkmanager --licenses >/dev/null && sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Build debug APK
+        working-directory: psychology-academy
+        run: gradle --no-daemon assembleDebug
+      - name: Verify APK contents
+        run: |
+          APK=psychology-academy/app/build/outputs/apk/debug/app-debug.apk
+          unzip -l "$APK" | grep -q 'assets/index.html'
+          unzip -l "$APK" | grep -q 'assets/data.js'
+          unzip -l "$APK" | grep -q 'assets/app.js'
+          unzip -l "$APK" | grep -q 'assets/app.css'
+          unzip -l "$APK" | grep -q 'classes.dex'
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PsychologyAcademy-v1
+          path: psychology-academy/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
