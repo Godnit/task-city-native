@@ -1,0 +1,55 @@
+name: Build Society Village APK
+
+on:
+  push:
+    paths:
+      - 'society-village-custom/**'
+      - '.github/workflows/build-society-apk.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+
+      - name: Rebuild bundled HTML
+        working-directory: society-village-custom
+        run: |
+          mkdir -p app/src/main/assets
+          cat app/src/main/assets/index.html.b64.part* | base64 -d > app/src/main/assets/index.html
+          test -s app/src/main/assets/index.html
+          grep -q '<canvas id="game"></canvas>' app/src/main/assets/index.html
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build debug APK
+        working-directory: society-village-custom
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Prepare APK
+        run: cp society-village-custom/app/build/outputs/apk/debug/app-debug.apk SocietyVillage.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SocietyVillage-APK
+          path: SocietyVillage.apk
+          if-no-files-found: error
+          retention-days: 30
