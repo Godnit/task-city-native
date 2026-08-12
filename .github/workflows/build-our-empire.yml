@@ -137,8 +137,7 @@ jobs:
           PY
 
           node --check empireapp/src/main/assets/phase2-map.js
-          node --check empireapp/src/main/assets/phase3-fixes.js
-          node --check empireapp/src/main/assets/phase4-camera.js
+          node --check empireapp/src/main/assets/phase5-camera.js
           test -s empireapp/src/main/assets/map_countries.js
           test -s empireapp/src/main/assets/map_admin1.js
           test -s empireapp/src/main/assets/map_cities.js
@@ -166,18 +165,18 @@ jobs:
           test -f empireapp/build/outputs/apk/release/empireapp-release.apk
           unzip -t empireapp/build/outputs/apk/release/empireapp-release.apk
           $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose empireapp/build/outputs/apk/release/empireapp-release.apk
-          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/phase4-camera.js'
+          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/phase5-camera.js'
           unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/map_countries.js'
           unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/map_admin1.js'
           unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/map_cities.js'
 
       - name: Prepare named APK
-        run: cp empireapp/build/outputs/apk/release/empireapp-release.apk Our-Empire-Arabic-v0.4-SmoothMap.apk
+        run: cp empireapp/build/outputs/apk/release/empireapp-release.apk Our-Empire-Arabic-v0.5-MapRecovery.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Our-Empire-Arabic-v0.4-SmoothMap
-          path: Our-Empire-Arabic-v0.4-SmoothMap.apk
+          name: Our-Empire-Arabic-v0.5-MapRecovery
+          path: Our-Empire-Arabic-v0.5-MapRecovery.apk
           if-no-files-found: error
           retention-days: 30
