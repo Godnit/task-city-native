@@ -16,7 +16,7 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Bundle detailed offline map data
+      - name: Bundle optimized offline map data
         shell: bash
         run: |
           set -euo pipefail
@@ -36,7 +36,7 @@ jobs:
           fetch_map ne_50m_populated_places_simple.geojson
 
           python3 - <<'PY'
-          import json, pathlib
+          import json, pathlib, math
           root=pathlib.Path('.map-src')
           out=pathlib.Path('empireapp/src/main/assets')
 
@@ -48,6 +48,47 @@ jobs:
               if isinstance(x, list): return [rounded(v) for v in x]
               if isinstance(x, dict): return {k: rounded(v) for k,v in x.items()}
               return x
+
+          def point_line_distance(p,a,b):
+              ax,ay=a[:2]; bx,by=b[:2]; px,py=p[:2]
+              dx=bx-ax; dy=by-ay
+              if dx==0 and dy==0:
+                  return math.hypot(px-ax,py-ay)
+              t=((px-ax)*dx+(py-ay)*dy)/(dx*dx+dy*dy)
+              t=max(0.0,min(1.0,t))
+              qx=ax+t*dx; qy=ay+t*dy
+              return math.hypot(px-qx,py-qy)
+
+          def rdp(points,eps):
+              if len(points)<=2: return points
+              a,b=points[0],points[-1]
+              idx=-1; maxd=-1.0
+              for i in range(1,len(points)-1):
+                  d=point_line_distance(points[i],a,b)
+                  if d>maxd: idx=i; maxd=d
+              if maxd>eps and idx>0:
+                  left=rdp(points[:idx+1],eps)
+                  right=rdp(points[idx:],eps)
+                  return left[:-1]+right
+              return [a,b]
+
+          def simplify_ring(ring,eps):
+              if len(ring)<5:return ring
+              closed=ring[0][:2]==ring[-1][:2]
+              core=ring[:-1] if closed else ring
+              simp=rdp(core,eps)
+              if len(simp)<3:simp=core[:3]
+              if closed:simp=simp+[simp[0]]
+              return simp
+
+          def simplify_geom(g,eps=0.04):
+              if not g:return g
+              t=g.get('type'); c=g.get('coordinates')
+              if t=='LineString': return {'type':t,'coordinates':rdp(c,eps)}
+              if t=='MultiLineString': return {'type':t,'coordinates':[rdp(x,eps) for x in c if len(x)>=2]}
+              if t=='Polygon': return {'type':t,'coordinates':[simplify_ring(r,eps) for r in c if len(r)>=4]}
+              if t=='MultiPolygon': return {'type':t,'coordinates':[[simplify_ring(r,eps) for r in p if len(r)>=4] for p in c]}
+              return g
 
           def write_js(name, var, obj):
               text='window.%s=%s;'%(var,json.dumps(obj,ensure_ascii=False,separators=(',',':')))
@@ -66,46 +107,43 @@ jobs:
           af=[]
           for f in admin.get('features',[]):
               g=f.get('geometry')
-              if g: af.append({'type':'Feature','properties':{},'geometry':rounded(g)})
+              if g:
+                  sg=simplify_geom(g,0.04)
+                  af.append({'type':'Feature','properties':{},'geometry':rounded(sg)})
           write_js('map_admin1.js','NE_ADMIN1',{'type':'FeatureCollection','features':af})
 
           cities=load(root/'ne_50m_populated_places_simple.geojson')
           feats=[]
           for f in cities.get('features',[]):
               p=f.get('properties') or {}; g=f.get('geometry')
-              if not g or g.get('type')!='Point':
-                  continue
+              if not g or g.get('type')!='Point': continue
               raw_rank=p.get('SCALERANK',p.get('scalerank',9))
-              try:
-                  rank=float(raw_rank)
-              except Exception:
-                  rank=9
-              if rank>8:
-                  continue
+              try: rank=float(raw_rank)
+              except Exception: rank=9
+              if rank>8: continue
               props={
                   'ADM0_A3':p.get('ADM0_A3') or p.get('adm0_a3'),
                   'SOV_A3':p.get('SOV_A3') or p.get('sov_a3'),
-                  'ADM0NAME':p.get('ADM0NAME') or p.get('adm0name'),
-                  'SOV0NAME':p.get('SOV0NAME') or p.get('sov0name'),
                   'NAME_AR':p.get('NAME_AR') or p.get('name_ar'),
                   'NAME':p.get('NAME') or p.get('name'),
                   'NAMEPAR':p.get('NAMEPAR') or p.get('namepar'),
                   'NAMEASCII':p.get('NAMEASCII') or p.get('nameascii'),
-                  'SCALERANK':raw_rank,
-                  'MIN_ZOOM':p.get('MIN_ZOOM') if p.get('MIN_ZOOM') is not None else p.get('min_zoom')
+                  'SCALERANK':raw_rank
               }
               props={k:v for k,v in props.items() if v not in (None,'')}
               feats.append({'type':'Feature','properties':props,'geometry':rounded(g)})
           feats.sort(key=lambda f: float(f['properties'].get('SCALERANK',9)))
-          write_js('map_cities.js','NE_CITIES',{'type':'FeatureCollection','features':feats[:1400]})
+          write_js('map_cities.js','NE_CITIES',{'type':'FeatureCollection','features':feats[:1200]})
           PY
 
           node --check empireapp/src/main/assets/phase2-map.js
           node --check empireapp/src/main/assets/phase3-fixes.js
+          node --check empireapp/src/main/assets/phase4-camera.js
           test -s empireapp/src/main/assets/map_countries.js
           test -s empireapp/src/main/assets/map_admin1.js
           test -s empireapp/src/main/assets/map_cities.js
           test "$(stat -c%s empireapp/src/main/assets/map_cities.js)" -gt 50000
+          test "$(stat -c%s empireapp/src/main/assets/map_admin1.js)" -lt 5000000
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -128,19 +166,18 @@ jobs:
           test -f empireapp/build/outputs/apk/release/empireapp-release.apk
           unzip -t empireapp/build/outputs/apk/release/empireapp-release.apk
           $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose empireapp/build/outputs/apk/release/empireapp-release.apk
-          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/phase2-map.js'
-          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/phase3-fixes.js'
+          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/phase4-camera.js'
           unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/map_countries.js'
           unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/map_admin1.js'
           unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/map_cities.js'
 
       - name: Prepare named APK
-        run: cp empireapp/build/outputs/apk/release/empireapp-release.apk Our-Empire-Arabic-v0.3-MapFix.apk
+        run: cp empireapp/build/outputs/apk/release/empireapp-release.apk Our-Empire-Arabic-v0.4-SmoothMap.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Our-Empire-Arabic-v0.3-MapFix
-          path: Our-Empire-Arabic-v0.3-MapFix.apk
+          name: Our-Empire-Arabic-v0.4-SmoothMap
+          path: Our-Empire-Arabic-v0.4-SmoothMap.apk
           if-no-files-found: error
           retention-days: 30
