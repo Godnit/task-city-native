@@ -70,16 +70,32 @@ jobs:
           write_js('map_admin1.js','NE_ADMIN1',{'type':'FeatureCollection','features':af})
 
           cities=load(root/'ne_50m_populated_places_simple.geojson')
-          citykeys=('ADM0_A3','SOV_A3','ADM0NAME','SOV0NAME','NAME_AR','NAME','NAMEPAR','NAMEASCII','SCALERANK','MIN_ZOOM')
           feats=[]
           for f in cities.get('features',[]):
               p=f.get('properties') or {}; g=f.get('geometry')
-              if not g or g.get('type')!='Point': continue
-              rank=p.get('SCALERANK',9)
-              try: rank=float(rank)
-              except: rank=9
-              if rank>8: continue
-              feats.append({'type':'Feature','properties':{k:p.get(k) for k in citykeys if p.get(k) not in (None,'')},'geometry':rounded(g)})
+              if not g or g.get('type')!='Point':
+                  continue
+              raw_rank=p.get('SCALERANK',p.get('scalerank',9))
+              try:
+                  rank=float(raw_rank)
+              except Exception:
+                  rank=9
+              if rank>8:
+                  continue
+              props={
+                  'ADM0_A3':p.get('ADM0_A3') or p.get('adm0_a3'),
+                  'SOV_A3':p.get('SOV_A3') or p.get('sov_a3'),
+                  'ADM0NAME':p.get('ADM0NAME') or p.get('adm0name'),
+                  'SOV0NAME':p.get('SOV0NAME') or p.get('sov0name'),
+                  'NAME_AR':p.get('NAME_AR') or p.get('name_ar'),
+                  'NAME':p.get('NAME') or p.get('name'),
+                  'NAMEPAR':p.get('NAMEPAR') or p.get('namepar'),
+                  'NAMEASCII':p.get('NAMEASCII') or p.get('nameascii'),
+                  'SCALERANK':raw_rank,
+                  'MIN_ZOOM':p.get('MIN_ZOOM') if p.get('MIN_ZOOM') is not None else p.get('min_zoom')
+              }
+              props={k:v for k,v in props.items() if v not in (None,'')}
+              feats.append({'type':'Feature','properties':props,'geometry':rounded(g)})
           feats.sort(key=lambda f: float(f['properties'].get('SCALERANK',9)))
           write_js('map_cities.js','NE_CITIES',{'type':'FeatureCollection','features':feats[:1400]})
           PY
@@ -88,6 +104,7 @@ jobs:
           test -s empireapp/src/main/assets/map_countries.js
           test -s empireapp/src/main/assets/map_admin1.js
           test -s empireapp/src/main/assets/map_cities.js
+          test "$(stat -c%s empireapp/src/main/assets/map_cities.js)" -gt 50000
 
       - name: Set up Java
         uses: actions/setup-java@v4
