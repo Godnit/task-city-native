@@ -29,16 +29,15 @@ public class MainActivity extends Activity {
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
-        settings.setMediaPlaybackRequiresUserGesture(false);
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 String js = "(function(){" +
-                        "var files=['map_countries.js','map_admin1.js','map_cities.js','phase2-map.js','phase3-fixes.js','phase4-camera.js'];" +
+                        "var files=['map_countries.js','map_admin1.js','map_cities.js','phase2-map.js','phase5-camera.js'];" +
                         "function next(i){if(i>=files.length)return;var s=document.createElement('script');" +
-                        "s.src=files[i]+'?v=4';s.onload=function(){next(i+1)};" +
+                        "s.src=files[i]+'?v=5';s.onload=function(){next(i+1)};" +
                         "s.onerror=function(){next(i+1)};document.body.appendChild(s);}next(0);" +
                         "})()";
                 view.evaluateJavascript(js, null);
