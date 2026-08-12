@@ -1,0 +1,25 @@
+/* Psychology Academy v5 visual identity */
+:root{--brand-cyan:#70f2ee;--brand-blue:#65b8ff;--brand-violet:#8b7dff;--brand-gold:#f4c45f;--brand-deep:#071522}
+.brandMarkUnified{padding:0!important;overflow:hidden!important;border:1px solid color-mix(in srgb,var(--brand-cyan) 45%,transparent)!important;background:#071522!important;box-shadow:0 0 24px rgba(101,184,255,.18),inset 0 0 18px rgba(112,242,238,.08)!important}
+.brandMarkV5{width:100%;height:100%;display:block;object-fit:cover;border-radius:inherit}
+.brandHeroV5{position:relative;width:min(72vw,330px);aspect-ratio:1;margin:4px auto 18px;display:grid;place-items:center;isolation:isolate}
+.brandHeroV5 img{width:100%;height:100%;object-fit:contain;display:block;filter:drop-shadow(0 0 22px rgba(101,184,255,.2));position:relative;z-index:2}
+.brandGlowV5{position:absolute;inset:14%;border-radius:50%;background:radial-gradient(circle,rgba(112,242,238,.18),rgba(139,125,255,.08) 42%,transparent 70%);filter:blur(16px);z-index:0}
+.finalHero{overflow:hidden;background:linear-gradient(160deg,color-mix(in srgb,var(--surface) 94%,#0a1b2b),color-mix(in srgb,var(--surface2) 94%,#071522))!important}
+.finalHero:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 72% 22%,rgba(112,242,238,.09),transparent 28%),radial-gradient(circle at 26% 18%,rgba(139,125,255,.08),transparent 24%);pointer-events:none}
+.finalHero>*{position:relative;z-index:1}
+.tileVisual{background:linear-gradient(145deg,rgba(7,21,34,.98),rgba(11,31,48,.97))!important;border:1px solid rgba(112,242,238,.2)!important;border-radius:22px!important;box-shadow:inset 0 0 20px rgba(101,184,255,.05),0 10px 26px rgba(0,0,0,.12)}
+.tileVisual svg{width:100%;height:100%;max-height:96px;display:block}
+.unifiedNeonIcon{background:linear-gradient(145deg,#071522,#0a1d2e)!important;border:1px solid rgba(112,242,238,.24)!important;box-shadow:inset 0 0 18px rgba(112,242,238,.06),0 8px 22px rgba(0,0,0,.12)!important}
+.unifiedNeonIcon svg{filter:drop-shadow(0 0 7px rgba(101,184,255,.24))}
+.finalStageCard{border-color:color-mix(in srgb,var(--primary) 22%,var(--line))!important;background:linear-gradient(150deg,color-mix(in srgb,var(--surface) 96%,#0b2334),color-mix(in srgb,var(--surface2) 97%,#071522))!important}
+.finalStageCard:hover,.finalStageCard:active{border-color:color-mix(in srgb,var(--brand-cyan) 55%,var(--line))!important}
+#topbar{background:linear-gradient(180deg,color-mix(in srgb,var(--bg) 96%,#071522),color-mix(in srgb,var(--bg) 92%,#0a1c2b))!important;border-bottom-color:color-mix(in srgb,var(--brand-cyan) 22%,var(--line))!important}
+.navBtn.active{color:var(--brand-cyan)!important}.navBtn.active .navSvg{filter:drop-shadow(0 0 6px rgba(112,242,238,.35))}
+.primary{background:linear-gradient(120deg,var(--brand-cyan),var(--brand-blue))!important;color:#04111b!important;box-shadow:0 8px 24px rgba(101,184,255,.16)!important}
+.heroBadge,.stageNo,.lessonStage{border-color:rgba(112,242,238,.28)!important;color:var(--brand-cyan)!important;background:rgba(112,242,238,.055)!important}
+body[data-theme="light"] .brandMarkUnified,body[data-theme="light"] .tileVisual,body[data-theme="light"] .unifiedNeonIcon{background:linear-gradient(145deg,#092032,#0d2940)!important}
+body[data-theme="light"] .finalHero{background:linear-gradient(160deg,#f7fbfd,#edf7fa)!important}
+body[data-theme="light"] #topbar{background:linear-gradient(180deg,#fbfdfe,#f0f8fb)!important}
+body[data-theme="light"] .finalStageCard{background:linear-gradient(150deg,#fff,#f5fbfd)!important}
+@media(max-width:420px){.brandHeroV5{width:min(76vw,295px)}.brandMarkUnified{width:58px!important;height:58px!important}.tileVisual{min-height:76px}}
