@@ -1,7 +1,7 @@
 (function(){
 'use strict';
 const W=1440,H=720;
-let vp=null,wrap=null,svg=null,pinch=null,drag=false,lx=0,ly=0,labelRAF=0;
+let vp=null,wrap=null,svg=null,pinch=null,drag=false,lx=0,ly=0,labelRAF=0,tapTarget=null,tapStartX=0,tapStartY=0,tapMoved=false;
 let countries=[],cities=[];
 
 function ar(a,e){return typeof game!=='undefined'&&game.lang==='ar'?a:e}
@@ -30,13 +30,13 @@ function apply(){
  clamp();
  wrap.style.transform=`translate3d(${px}px,${py}px,0) scale(${z})`;
  svg.style.setProperty('--p3inv',(1/Math.max(z,.001)).toFixed(5));
- if(window.zoomText)zoomText.textContent=Math.round(z*100)+'%';
+ const zt=document.getElementById('zoomText');if(zt)zt.textContent=Math.round(z*100)+'%';
  const b=document.getElementById('p3layer');if(b){let l=level();b.textContent=l<2?ar('الدول','Countries'):l<4?ar('الأقاليم','Provinces'):ar('المدن','Cities')}
  scheduleLabels();
 }
 function reset(){
  z=fitWidth();px=(vp.clientWidth-W*z)/2;py=(vp.clientHeight-H*z)/2;apply();
- if(window.regionCard)regionCard.classList.remove('show');
+ const rc=document.getElementById('regionCard');if(rc)rc.classList.remove('show');
 }
 function zoomAt(f,cx,cy){
  const old=z,min=fitWidth(),nz=Math.max(min,Math.min(7.8,z*f));
@@ -54,7 +54,7 @@ function occupy(grid,x,y,w,h){
  for(let gx=x0;gx<=x1;gx++)for(let gy=y0;gy<=y1;gy++)grid.add(gx+':'+gy);return true;
 }
 function countryThreshold(l){return [35000,14000,5000,1500,350,80][l]||80}
-function cityRankLimit(l){return [-1,-1,1,2,4,7][l]??7}
+function cityRankLimit(l){return [-1,-1,-1,1,2,4][l]??4}
 function updateLabels(){
  if(!vp)return;const vw=vp.clientWidth,vh=vp.clientHeight,l=level(),occ=new Set(),ct=countryThreshold(l);
  countries.forEach(o=>{
@@ -80,9 +80,9 @@ function buildIndexes(){
  scheduleLabels();
 }
 function installInput(){
- vp.addEventListener('touchstart',e=>{e.preventDefault();e.stopImmediatePropagation();if(e.touches.length===1){drag=true;const p=loc(e.touches[0]);lx=p.x;ly=p.y;pinch=null}else if(e.touches.length===2){drag=false;const a=loc(e.touches[0]),b=loc(e.touches[1]),cx=(a.x+b.x)/2,cy=(a.y+b.y)/2;pinch={dist:Math.hypot(a.x-b.x,a.y-b.y),startZ:z,wx:(cx-px)/z,wy:(cy-py)/z}}},{capture:true,passive:false});
- vp.addEventListener('touchmove',e=>{e.preventDefault();e.stopImmediatePropagation();if(e.touches.length===1&&drag){const p=loc(e.touches[0]);px+=p.x-lx;py+=p.y-ly;lx=p.x;ly=p.y;apply()}else if(e.touches.length===2&&pinch){const a=loc(e.touches[0]),b=loc(e.touches[1]),cx=(a.x+b.x)/2,cy=(a.y+b.y)/2,d=Math.hypot(a.x-b.x,a.y-b.y),nz=Math.max(fitWidth(),Math.min(7.8,pinch.startZ*d/pinch.dist));z=nz;px=cx-pinch.wx*nz;py=cy-pinch.wy*nz;apply()}},{capture:true,passive:false});
- vp.addEventListener('touchend',e=>{e.stopImmediatePropagation();if(e.touches.length===0){drag=false;pinch=null}else if(e.touches.length===1){drag=true;const p=loc(e.touches[0]);lx=p.x;ly=p.y;pinch=null}},{capture:true,passive:false});
+ vp.addEventListener('touchstart',e=>{e.stopImmediatePropagation();if(e.touches.length===1){drag=true;const p=loc(e.touches[0]);lx=p.x;ly=p.y;tapStartX=p.x;tapStartY=p.y;tapMoved=false;tapTarget=e.target;pinch=null}else if(e.touches.length===2){drag=false;tapMoved=true;tapTarget=null;const a=loc(e.touches[0]),b=loc(e.touches[1]),cx=(a.x+b.x)/2,cy=(a.y+b.y)/2;pinch={dist:Math.hypot(a.x-b.x,a.y-b.y),startZ:z,wx:(cx-px)/z,wy:(cy-py)/z}}},{capture:true,passive:false});
+ vp.addEventListener('touchmove',e=>{e.preventDefault();e.stopImmediatePropagation();if(e.touches.length===1&&drag){const p=loc(e.touches[0]);if(Math.hypot(p.x-tapStartX,p.y-tapStartY)>7)tapMoved=true;px+=p.x-lx;py+=p.y-ly;lx=p.x;ly=p.y;apply()}else if(e.touches.length===2&&pinch){tapMoved=true;const a=loc(e.touches[0]),b=loc(e.touches[1]),cx=(a.x+b.x)/2,cy=(a.y+b.y)/2,d=Math.hypot(a.x-b.x,a.y-b.y),nz=Math.max(fitWidth(),Math.min(7.8,pinch.startZ*d/pinch.dist));z=nz;px=cx-pinch.wx*nz;py=cy-pinch.wy*nz;apply()}},{capture:true,passive:false});
+ vp.addEventListener('touchend',e=>{e.stopImmediatePropagation();if(e.touches.length===0){if(!tapMoved&&tapTarget){const path=tapTarget.closest?tapTarget.closest('.p2country'):null;if(path&&window.p2SelectCountry)window.p2SelectCountry(path.dataset.code)}drag=false;pinch=null;tapTarget=null}else if(e.touches.length===1){drag=true;const p=loc(e.touches[0]);lx=p.x;ly=p.y;tapMoved=true;tapTarget=null;pinch=null}},{capture:true,passive:false});
  vp.addEventListener('wheel',e=>{e.preventDefault();e.stopImmediatePropagation();const r=vp.getBoundingClientRect();zoomAt(e.deltaY<0?1.13:.885,e.clientX-r.left,e.clientY-r.top)},{capture:true,passive:false});
  vp.addEventListener('dblclick',e=>{e.preventDefault();e.stopImmediatePropagation();const r=vp.getBoundingClientRect();zoomAt(1.55,e.clientX-r.left,e.clientY-r.top)},{capture:true});
 }
