@@ -6,6 +6,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.webkit.WebViewClient;
 
 public class MainActivity extends Activity {
     private WebView webView;
@@ -18,6 +19,7 @@ public class MainActivity extends Activity {
                 View.SYSTEM_UI_FLAG_FULLSCREEN |
                 View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
                 View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+
         webView = new WebView(this);
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -25,6 +27,23 @@ public class MainActivity extends Activity {
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
         settings.setAllowFileAccess(true);
+        settings.setAllowContentAccess(true);
+        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                String js = "(function(){" +
+                        "var files=['map_countries.js','map_admin1.js','map_cities.js','phase2-map.js'];" +
+                        "function next(i){if(i>=files.length)return;var s=document.createElement('script');" +
+                        "s.src=files[i]+'?v=2';s.onload=function(){next(i+1)};" +
+                        "s.onerror=function(){next(i+1)};document.body.appendChild(s);}next(0);" +
+                        "})()";
+                view.evaluateJavascript(js, null);
+            }
+        });
+
         webView.setBackgroundColor(0xff142021);
         setContentView(webView);
         webView.loadUrl("file:///android_asset/index.html");
