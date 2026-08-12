@@ -1,0 +1,61 @@
+name: Build Society Village APK
+
+on:
+  push:
+    branches: [society-village-apk]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Rebuild game assets and signing key
+        shell: bash
+        run: |
+          cat societyapp/src/main/assets/app.js.b64.{1,2,3,4,5} | base64 -d > societyapp/src/main/assets/app.js
+          rm societyapp/src/main/assets/app.js.b64.{1,2,3,4,5}
+          base64 -d society-release-key.b64 > society-village-release.jks
+          echo "e504aa524d32a9edff8c89ef09bc7823d7701fb233c767c7f4604b6f80337284  societyapp/src/main/assets/app.js" | sha256sum -c -
+          echo "1edc9b62bed1be2cbfc49d8920ff759de9f8a55062ed6eebeedb40465133eacc  society-village-release.jks" | sha256sum -c -
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build release APK
+        run: gradle --no-daemon :societyapp:assembleRelease
+
+      - name: Verify APK
+        shell: bash
+        run: |
+          APK=societyapp/build/outputs/apk/release/societyapp-release.apk
+          test -f "$APK"
+          unzip -t "$APK"
+          unzip -l "$APK" | grep 'assets/index.html'
+          unzip -l "$APK" | grep 'assets/app.js'
+          $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose "$APK"
+
+      - name: Prepare named APK
+        run: cp societyapp/build/outputs/apk/release/societyapp-release.apk Society-Village-v2.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Society-Village-v2
+          path: Society-Village-v2.apk
+          if-no-files-found: error
+          retention-days: 30
