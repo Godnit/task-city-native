@@ -26,13 +26,26 @@ jobs:
       - name: Install Android SDK packages
         run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
 
-      - name: Rebuild bundled HTML
+      - name: Rebuild and validate bundled HTML
         working-directory: society-village-custom
         run: |
           mkdir -p app/src/main/assets
           cat app/src/main/assets/index.html.b64.part* | base64 -d > app/src/main/assets/index.html
           test -s app/src/main/assets/index.html
           grep -q '<canvas id="game"></canvas>' app/src/main/assets/index.html
+          grep -q 'function drawCitizen' app/src/main/assets/index.html
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          html = Path('app/src/main/assets/index.html').read_text(encoding='utf-8')
+          match = re.search(r'<script>([\s\S]*?)</script>', html)
+          if not match:
+              raise SystemExit('No inline game script found')
+          Path('/tmp/society-game.js').write_text(match.group(1), encoding='utf-8')
+          print('HTML bytes:', len(html.encode('utf-8')))
+          print('JS bytes:', len(match.group(1).encode('utf-8')))
+          PY
+          node --check /tmp/society-game.js
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
