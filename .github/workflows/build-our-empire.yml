@@ -65,7 +65,7 @@ jobs:
               closed=r[0][:2]==r[-1][:2]; core=r[:-1] if closed else r; s=rdp(core,eps)
               if len(s)<3:s=core[:3]
               return s+[s[0]] if closed else s
-          def simplify_geom(g,eps=.014):
+          def simplify_geom(g,eps=.01):
               if not g:return g
               t=g.get('type'); c=g.get('coordinates')
               if t=='LineString':return {'type':t,'coordinates':rdp(c,eps)}
@@ -88,7 +88,7 @@ jobs:
           admin=load(root/'admin1.geojson'); af=[]
           for f in admin.get('features',[]):
               g=f.get('geometry')
-              if g:af.append({'type':'Feature','properties':{},'geometry':rounded(simplify_geom(g,.014))})
+              if g:af.append({'type':'Feature','properties':{},'geometry':rounded(simplify_geom(g,.01))})
           write_js('map_admin1.js','NE_ADMIN1',{'type':'FeatureCollection','features':af})
 
           raw=load(root/'ne_50m_populated_places_simple.geojson'); feats=[]
@@ -107,15 +107,14 @@ jobs:
           PY
 
           node --check empireapp/src/main/assets/phase2-map.js
-          node --check empireapp/src/main/assets/phase6-camera.js
-          node --check empireapp/src/main/assets/phase8-map-perf-ui.js
-          grep -q "p8AdminMerged" empireapp/src/main/assets/phase8-map-perf-ui.js
-          grep -q "direction:ltr!important" empireapp/src/main/assets/phase8-map-perf-ui.js
+          node --check empireapp/src/main/assets/phase9-vector-camera-ui.js
+          grep -q "viewBox" empireapp/src/main/assets/phase9-vector-camera-ui.js
+          grep -q "p9AdminMerged" empireapp/src/main/assets/phase9-vector-camera-ui.js
           test -s empireapp/src/main/assets/map_countries.js
           test -s empireapp/src/main/assets/map_admin1.js
           test -s empireapp/src/main/assets/map_cities.js
           test "$(stat -c%s empireapp/src/main/assets/map_cities.js)" -gt 50000
-          test "$(stat -c%s empireapp/src/main/assets/map_admin1.js)" -lt 9000000
+          test "$(stat -c%s empireapp/src/main/assets/map_admin1.js)" -lt 10000000
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -138,19 +137,18 @@ jobs:
           test -f empireapp/build/outputs/apk/release/empireapp-release.apk
           unzip -t empireapp/build/outputs/apk/release/empireapp-release.apk
           $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose empireapp/build/outputs/apk/release/empireapp-release.apk
-          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/phase8-map-perf-ui.js'
-          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/phase6-camera.js'
+          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/phase9-vector-camera-ui.js'
           unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/map_countries.js'
           unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/map_admin1.js'
           unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/map_cities.js'
 
       - name: Prepare named APK
-        run: cp empireapp/build/outputs/apk/release/empireapp-release.apk Our-Empire-Arabic-v0.8-MapPerfPolish.apk
+        run: cp empireapp/build/outputs/apk/release/empireapp-release.apk Our-Empire-Arabic-v0.9-VectorMap.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Our-Empire-Arabic-v0.8-MapPerfPolish
-          path: Our-Empire-Arabic-v0.8-MapPerfPolish.apk
+          name: Our-Empire-Arabic-v0.9-VectorMap
+          path: Our-Empire-Arabic-v0.9-VectorMap.apk
           if-no-files-found: error
           retention-days: 30
