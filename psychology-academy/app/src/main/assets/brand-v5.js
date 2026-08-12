@@ -1,6 +1,7 @@
-/* Psychology Academy v5 — brand unification */
+/* Psychology Academy v6 — exact selected brand image + unified identity */
 (function(){
 'use strict';
+const BRAND_IMAGE='psychology-icon-v6.webp';
 const oldHome=window.home;
 function mini(kind){
  const paths={
@@ -11,13 +12,13 @@ function mini(kind){
  };
  return `<svg viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="mg${kind}" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#6ff5ef"/><stop offset=".55" stop-color="#65b8ff"/><stop offset=".8" stop-color="#8b7dff"/><stop offset="1" stop-color="#f4c45f"/></linearGradient><filter id="mf${kind}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><g fill="none" stroke="url(#mg${kind})" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" filter="url(#mf${kind})">${paths[kind]||paths.paths}</g></svg>`;
 }
-window.brainArt=function(){return `<div class="brandHeroV5"><div class="brandGlowV5"></div><img src="brand-v5.svg" alt="" draggable="false"></div>`};
+window.brainArt=function(){return `<div class="brandHeroV5 exactBrandV6"><div class="brandGlowV5"></div><img src="${BRAND_IMAGE}" alt="" draggable="false"></div>`};
 function applyBrand(){
  const m=document.querySelector('.brandMark');
- if(m){m.innerHTML='<img src="brand-v5.svg" alt="" class="brandMarkV5" draggable="false">';m.classList.add('brandMarkUnified')}
+ if(m){m.innerHTML=`<img src="${BRAND_IMAGE}" alt="" class="brandMarkV5 exactBrandImageV6" draggable="false">`;m.classList.add('brandMarkUnified')}
  const tiles=[['#qPaths','paths'],['#qLab','lab'],['#qCases','cases'],['#qReview','review']];
  tiles.forEach(([sel,k])=>{const t=document.querySelector(sel);const v=t&&t.querySelector('.tileVisual');if(v)v.innerHTML=mini(k)});
- document.querySelectorAll('.finalStageIcon,.stageVisual').forEach((el,i)=>el.classList.add('unifiedNeonIcon'));
+ document.querySelectorAll('.finalStageIcon,.stageVisual').forEach((el)=>el.classList.add('unifiedNeonIcon'));
 }
 if(typeof oldHome==='function')window.home=function(s){oldHome(s);applyBrand()};
 const oldNav=window.nav;if(typeof oldNav==='function')window.nav=function(){oldNav();applyBrand()};
