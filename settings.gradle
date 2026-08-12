@@ -14,5 +14,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "HandGestureCube"
+rootProject.name = "GodnitProjects"
 include ':app'
+include ':empireapp'
