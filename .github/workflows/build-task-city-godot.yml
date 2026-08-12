@@ -40,15 +40,17 @@ jobs:
           godot_export_templates_download_url: https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_export_templates.tpz
           relative_project_path: ./task_city
           archive_output: false
+          use_preset_export_path: true
+          export_debug: true
 
       - name: Collect APK
         shell: bash
         run: |
           mkdir -p dist
-          APK="$(find . -type f -name '*.apk' | head -n 1)"
+          APK="$(find task_city -type f -name '*.apk' | head -n 1)"
           if [ -z "$APK" ]; then
             echo "APK not found"
-            find . -maxdepth 5 -type f | sort | tail -n 200
+            find task_city -maxdepth 5 -type f | sort
             exit 1
           fi
           cp "$APK" dist/TaskCity.apk
