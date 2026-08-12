@@ -1,0 +1,33 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.godnit.societyvillage'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.godnit.societyvillage'
+        minSdk 23
+        targetSdk 35
+        versionCode 2
+        versionName '2.0'
+    }
+
+    signingConfigs {
+        release {
+            storeFile file('../society-village-release.jks')
+            storePassword 'society123'
+            keyAlias 'societyvillage'
+            keyPassword 'society123'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            shrinkResources false
+            signingConfig signingConfigs.release
+        }
+    }
+}
