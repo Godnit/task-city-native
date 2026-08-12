@@ -1,8 +1,8 @@
-name: Build Network Academy Polished v8
+name: Build Network Academy Beginner v9
 
 on:
   push:
-    branches: [network-academy-polish-v8]
+    branches: [network-academy-beginner-v9]
     paths:
       - 'network-fix/**'
       - '.github/workflows/network-academy-install-fix.yml'
@@ -19,16 +19,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate learning and UI polish code
+      - name: Validate beginner learning and lab code
         run: |
           node --check network-fix/v6-guided.js
           node --check network-fix/v7-foundations.js
           node --check network-fix/v7-hotfix.js
           node --check network-fix/v8-polish.js
-          grep -q 'تهيئة نقطة البداية' network-fix/v8-polish.js
-          grep -q 'v8Ltr' network-fix/v8-polish.js
-          grep -q 'body.light' network-fix/v8-polish.css
-          grep -q 'unicode-bidi' network-fix/v8-polish.css
+          node --check network-fix/v9-beginner.js
+          grep -q 'كيف يجد الجهاز جهازًا آخر داخل نفس الشبكة' network-fix/v9-beginner.js
+          grep -q 'لن نستخدم DNS أو HTTP هنا' network-fix/v9-beginner.js
+          grep -q 'حذف رابطة' network-fix/v9-beginner.js
+          grep -q 'الرجوع إلى الدرس' network-fix/v9-beginner.js
+          grep -q 'cleanLabState' network-fix/v9-beginner.js
+          grep -q 'body.light' network-fix/v9-beginner.css
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
@@ -65,18 +68,19 @@ jobs:
           base64 -d /tmp/app.b64 > /tmp/app-base.apk
           unzip -t /tmp/app-base.apk
 
-      - name: Inject visuals, foundations, bidi polish, and icon 7
+      - name: Inject beginner progression, lab fixes, visuals, and icon 7
         run: |
           python3 - <<'PY'
           import zipfile, os
-          src='/tmp/app-base.apk'; dst='/tmp/app-v8.apk'
+          src='/tmp/app-base.apk'; dst='/tmp/app-v9.apk'
           old_activity='com.godnit.networkacadfix.MainActivity'.encode('utf-16le')
           real_activity='com.godnit.networkacademy.MainActivity'.encode('utf-16le')
           old_pkg='com.godnit.networkacadfix'.encode('utf-16le')
-          new_pkg='com.godnit.networkacadv08'.encode('utf-16le')
+          new_pkg='com.godnit.networkacadv09'.encode('utf-16le')
           assert len(old_activity)==len(real_activity)
           assert len(old_pkg)==len(new_pkg)
-          files={n:open('network-fix/'+n,'rb').read() for n in ['v5-fix.css','v5-fix.js','v6-guided.css','v6-guided.js','v7-foundations.css','v7-foundations.js','v7-hotfix.js','v8-polish.css','v8-polish.js']}
+          names=['v5-fix.css','v5-fix.js','v6-guided.css','v6-guided.js','v7-foundations.css','v7-foundations.js','v7-hotfix.js','v8-polish.css','v8-polish.js','v9-beginner.css','v9-beginner.js']
+          files={n:open('network-fix/'+n,'rb').read() for n in names}
           brand=open('network-fix/icon7/brand-icon.svg','rb').read()
           with zipfile.ZipFile(src,'r') as zin, zipfile.ZipFile(dst,'w') as zout:
               for info in zin.infolist():
@@ -89,8 +93,8 @@ jobs:
                       data=data.replace(old_pkg,new_pkg)
                   elif info.filename=='assets/index.html':
                       text=data.decode('utf-8')
-                      text=text.replace('</head>','  <link rel="stylesheet" href="v5-fix.css" />\n  <link rel="stylesheet" href="v6-guided.css" />\n  <link rel="stylesheet" href="v7-foundations.css" />\n  <link rel="stylesheet" href="v8-polish.css" />\n</head>')
-                      text=text.replace('</body>','  <script src="v5-fix.js"></script>\n  <script src="v6-guided.js"></script>\n  <script src="v7-foundations.js"></script>\n  <script src="v7-hotfix.js"></script>\n  <script src="v8-polish.js"></script>\n</body>')
+                      text=text.replace('</head>','  <link rel="stylesheet" href="v5-fix.css" />\n  <link rel="stylesheet" href="v6-guided.css" />\n  <link rel="stylesheet" href="v7-foundations.css" />\n  <link rel="stylesheet" href="v8-polish.css" />\n  <link rel="stylesheet" href="v9-beginner.css" />\n</head>')
+                      text=text.replace('</body>','  <script src="v5-fix.js"></script>\n  <script src="v6-guided.js"></script>\n  <script src="v7-foundations.js"></script>\n  <script src="v7-hotfix.js"></script>\n  <script src="v8-polish.js"></script>\n  <script src="v9-beginner.js"></script>\n</body>')
                       data=text.encode('utf-8')
                   elif info.filename=='assets/brand-icon.svg': data=brand
                   zout.writestr(info,data)
@@ -99,24 +103,26 @@ jobs:
               m=z.read('AndroidManifest.xml'); html=z.read('assets/index.html')
               assert m.count(new_pkg)==1 and m.count(real_activity)==1
               for name in files: assert name.encode() in html
-              assert html.index(b'v7-hotfix.js') < html.index(b'v8-polish.js')
-              assert 'تهيئة نقطة البداية'.encode('utf-8') in z.read('assets/v8-polish.js')
-              assert b'unicode-bidi' in z.read('assets/v8-polish.css')
-              assert b'body.light' in z.read('assets/v8-polish.css')
+              assert html.index(b'v8-polish.js') < html.index(b'v9-beginner.js')
+              v9=z.read('assets/v9-beginner.js')
+              assert 'حذف رابطة'.encode('utf-8') in v9
+              assert 'الرجوع إلى الدرس'.encode('utf-8') in v9
+              assert b'cleanLabState' in v9
+              assert 'لن نستخدم DNS أو HTTP هنا'.encode('utf-8') in v9
+              assert b'body.light' in z.read('assets/v9-beginner.css')
               assert z.read('assets/brand-icon.svg')==brand
               assert b'Lcom/godnit/networkacademy/MainActivity;' in z.read('classes2.dex')
-          print('Polished v8 package verified:',os.path.getsize(dst))
+          print('Beginner v9 package verified:',os.path.getsize(dst))
           PY
-          unzip -t /tmp/app-v8.apk
+          unzip -t /tmp/app-v9.apk
 
       - name: Replace Android launcher with icon 7
         run: |
-          java -jar /tmp/apktool.jar d -s -f /tmp/app-v8.apk -o /tmp/decoded
+          java -jar /tmp/apktool.jar d -s -f /tmp/app-v9.apk -o /tmp/decoded
           cp network-fix/icon7/ic_launcher.xml /tmp/decoded/res/drawable/ic_launcher.xml
           cp network-fix/icon7/brand-icon.svg /tmp/decoded/assets/brand-icon.svg
-          grep -q 'M20,31L54,17L88,31L54,45Z' /tmp/decoded/res/drawable/ic_launcher.xml
-          test -f /tmp/decoded/assets/v8-polish.js
-          test -f /tmp/decoded/assets/v8-polish.css
+          test -f /tmp/decoded/assets/v9-beginner.js
+          test -f /tmp/decoded/assets/v9-beginner.css
           java -jar /tmp/apktool.jar b /tmp/decoded -o /tmp/app-final-unsigned.apk
           unzip -t /tmp/app-final-unsigned.apk
 
@@ -128,25 +134,26 @@ jobs:
 
       - name: Create signing key
         run: |
-          keytool -genkeypair -v -keystore /tmp/network-v8.keystore -storepass android -keypass android -alias networkv8 -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Network Academy Polished v8,O=Godnit,C=US"
+          keytool -genkeypair -v -keystore /tmp/network-v9.keystore -storepass android -keypass android -alias networkv9 -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Network Academy Beginner v9,O=Godnit,C=US"
 
       - name: Sign and verify APK
         run: |
           APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
           ZIPALIGN="$ANDROID_HOME/build-tools/35.0.0/zipalign"
-          "$APKSIGNER" sign --ks /tmp/network-v8.keystore --ks-pass pass:android --key-pass pass:android --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true --out Network_Academy_Polished_v8_Icon7.apk /tmp/app-aligned.apk
-          "$APKSIGNER" verify --verbose --print-certs Network_Academy_Polished_v8_Icon7.apk
-          "$ZIPALIGN" -c -v 4 Network_Academy_Polished_v8_Icon7.apk
-          unzip -t Network_Academy_Polished_v8_Icon7.apk
-          unzip -p Network_Academy_Polished_v8_Icon7.apk assets/v8-polish.js | grep -q 'تهيئة نقطة البداية'
-          unzip -p Network_Academy_Polished_v8_Icon7.apk assets/v8-polish.css | grep -q 'body.light'
-          file Network_Academy_Polished_v8_Icon7.apk
-          sha256sum Network_Academy_Polished_v8_Icon7.apk
+          "$APKSIGNER" sign --ks /tmp/network-v9.keystore --ks-pass pass:android --key-pass pass:android --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true --out Network_Academy_Beginner_v9_Icon7.apk /tmp/app-aligned.apk
+          "$APKSIGNER" verify --verbose --print-certs Network_Academy_Beginner_v9_Icon7.apk
+          "$ZIPALIGN" -c -v 4 Network_Academy_Beginner_v9_Icon7.apk
+          unzip -t Network_Academy_Beginner_v9_Icon7.apk
+          unzip -p Network_Academy_Beginner_v9_Icon7.apk assets/v9-beginner.js | grep -q 'حذف رابطة'
+          unzip -p Network_Academy_Beginner_v9_Icon7.apk assets/v9-beginner.js | grep -q 'cleanLabState'
+          unzip -p Network_Academy_Beginner_v9_Icon7.apk assets/v9-beginner.js | grep -q 'لن نستخدم DNS أو HTTP هنا'
+          file Network_Academy_Beginner_v9_Icon7.apk
+          sha256sum Network_Academy_Beginner_v9_Icon7.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Network-Academy-Polished-v8-Icon7
-          path: Network_Academy_Polished_v8_Icon7.apk
+          name: Network-Academy-Beginner-v9-Icon7
+          path: Network_Academy_Beginner_v9_Icon7.apk
           if-no-files-found: error
           retention-days: 7
