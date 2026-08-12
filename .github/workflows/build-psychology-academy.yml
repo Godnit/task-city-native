@@ -16,9 +16,13 @@ jobs:
         run: |
           node --check psychology-academy/app/src/main/assets/data.js
           node --check psychology-academy/app/src/main/assets/app.js
+          node --check psychology-academy/app/src/main/assets/visual-v2.js
           grep -q '19 قسم' psychology-academy/app/src/main/assets/app.js
           grep -q 'مختبر العقل' psychology-academy/app/src/main/assets/app.js
           grep -q 'data-theme="light"' psychology-academy/app/src/main/assets/app.css
+          grep -q 'data-theme="light"' psychology-academy/app/src/main/assets/visual-v2.css
+          grep -q 'mindArtPremium' psychology-academy/app/src/main/assets/visual-v2.js
+          grep -q 'stageSvg' psychology-academy/app/src/main/assets/visual-v2.js
           grep -q 'أساسيات الصحة النفسية' psychology-academy/app/src/main/assets/data.js
           grep -q 'علم نفس اللغة والفصاحة' psychology-academy/app/src/main/assets/data.js
       - uses: actions/setup-java@v4
@@ -41,10 +45,12 @@ jobs:
           unzip -l "$APK" | grep -q 'assets/data.js'
           unzip -l "$APK" | grep -q 'assets/app.js'
           unzip -l "$APK" | grep -q 'assets/app.css'
+          unzip -l "$APK" | grep -q 'assets/visual-v2.js'
+          unzip -l "$APK" | grep -q 'assets/visual-v2.css'
           unzip -l "$APK" | grep -q 'classes.dex'
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PsychologyAcademy-v1
+          name: PsychologyAcademy-v2-Visual
           path: psychology-academy/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
