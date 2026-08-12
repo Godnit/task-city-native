@@ -107,7 +107,10 @@ jobs:
           PY
 
           node --check empireapp/src/main/assets/phase2-map.js
+          node --check empireapp/src/main/assets/phase7-rtl-map-fix.js
           node --check empireapp/src/main/assets/phase6-camera.js
+          grep -q "left:0!important" empireapp/src/main/assets/phase7-rtl-map-fix.js
+          grep -q "direction:ltr!important" empireapp/src/main/assets/phase7-rtl-map-fix.js
           test -s empireapp/src/main/assets/map_countries.js
           test -s empireapp/src/main/assets/map_admin1.js
           test -s empireapp/src/main/assets/map_cities.js
@@ -135,18 +138,19 @@ jobs:
           test -f empireapp/build/outputs/apk/release/empireapp-release.apk
           unzip -t empireapp/build/outputs/apk/release/empireapp-release.apk
           $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose empireapp/build/outputs/apk/release/empireapp-release.apk
+          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/phase7-rtl-map-fix.js'
           unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/phase6-camera.js'
           unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/map_countries.js'
           unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/map_admin1.js'
           unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/map_cities.js'
 
       - name: Prepare named APK
-        run: cp empireapp/build/outputs/apk/release/empireapp-release.apk Our-Empire-Arabic-v0.6-CachedMap.apk
+        run: cp empireapp/build/outputs/apk/release/empireapp-release.apk Our-Empire-Arabic-v0.7-WorldBoundsFix.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Our-Empire-Arabic-v0.6-CachedMap
-          path: Our-Empire-Arabic-v0.6-CachedMap.apk
+          name: Our-Empire-Arabic-v0.7-WorldBoundsFix
+          path: Our-Empire-Arabic-v0.7-WorldBoundsFix.apk
           if-no-files-found: error
           retention-days: 30
