@@ -19,17 +19,11 @@ jobs:
       - name: Rebuild game assets and signing key
         shell: bash
         run: |
-          echo 'Chunk hashes:'
-          sha256sum societyapp/src/main/assets/app.js.b64.{1,2,3,4,5}
-          echo 'Key payload hash:'
-          sha256sum society-release-key.b64
-          cat societyapp/src/main/assets/app.js.b64.{1,2,3,4,5} | base64 -d > societyapp/src/main/assets/app.js
+          cat societyapp/src/main/assets/app.js.gz.b64.{1,2,3,4,5,6,7} | base64 -d | gzip -d > societyapp/src/main/assets/app.js
           base64 -d society-release-key.b64 > society-village-release.jks
-          echo 'Assembled hashes:'
-          sha256sum societyapp/src/main/assets/app.js society-village-release.jks
-          echo "e504aa524d32a9edff8c89ef09bc7823d7701fb233c767c7f4604b6f80337284  societyapp/src/main/assets/app.js" | sha256sum -c -
+          echo "b55b1fa71d18dd177f67326ea31b73b1803bdad34af92b5ebaebd091f3c602a3  societyapp/src/main/assets/app.js" | sha256sum -c -
           echo "1edc9b62bed1be2cbfc49d8920ff759de9f8a55062ed6eebeedb40465133eacc  society-village-release.jks" | sha256sum -c -
-          rm societyapp/src/main/assets/app.js.b64.{1,2,3,4,5}
+          rm societyapp/src/main/assets/app.js.gz.b64.{1,2,3,4,5,6,7}
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -56,12 +50,12 @@ jobs:
           $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose "$APK"
 
       - name: Prepare named APK
-        run: cp societyapp/build/outputs/apk/release/societyapp-release.apk Society-Village-v2.apk
+        run: cp societyapp/build/outputs/apk/release/societyapp-release.apk Society-Village-v4.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Society-Village-v2
-          path: Society-Village-v2.apk
+          name: Society-Village-v4
+          path: Society-Village-v4.apk
           if-no-files-found: error
           retention-days: 30
