@@ -35,6 +35,13 @@ jobs:
           fi
           fetch_map ne_50m_populated_places_simple.geojson
 
+          # Detailed Yemen governorate (ADM1) and district (ADM2) borders from geoBoundaries.
+          for LEVEL in ADM1 ADM2; do
+            curl -L --fail --retry 3 --retry-delay 2 "https://www.geoboundaries.org/api/current/gbOpen/YEM/$LEVEL/" -o ".map-src/yem_${LEVEL}_meta.json"
+            URL=$(python3 -c "import json;print(json.load(open('.map-src/yem_${LEVEL}_meta.json'))['gjDownloadURL'])")
+            curl -L --fail --retry 3 --retry-delay 2 "$URL" -o ".map-src/yem_${LEVEL}.geojson"
+          done
+
           python3 - <<'PY'
           import json, pathlib, math
           root=pathlib.Path('.map-src')
@@ -42,7 +49,7 @@ jobs:
 
           def load(path): return json.loads(path.read_text(encoding='utf-8'))
           def rounded(x):
-              if isinstance(x,float): return round(x,4)
+              if isinstance(x,float): return round(x,5)
               if isinstance(x,list): return [rounded(v) for v in x]
               if isinstance(x,dict): return {k:rounded(v) for k,v in x.items()}
               return x
@@ -104,17 +111,34 @@ jobs:
               feats.append({'type':'Feature','properties':props,'geometry':rounded(g)})
           feats.sort(key=lambda f:float(f['properties'].get('SCALERANK',9)))
           write_js('map_cities.js','NE_CITIES',{'type':'FeatureCollection','features':feats[:1200]})
+
+          def clean_yemen(path, eps, keep_props):
+              data=load(path); outfs=[]
+              for f in data.get('features',[]):
+                  g=f.get('geometry')
+                  if not g: continue
+                  p=f.get('properties') or {}
+                  props={k:p.get(k) for k in keep_props if p.get(k) not in (None,'')}
+                  outfs.append({'type':'Feature','properties':props,'geometry':rounded(simplify_geom(g,eps))})
+              return {'type':'FeatureCollection','features':outfs}
+          yem1=clean_yemen(root/'yem_ADM1.geojson',.0018,('shapeName','shapeISO','shapeID'))
+          yem2=clean_yemen(root/'yem_ADM2.geojson',.0032,('shapeName','shapeISO','shapeID'))
+          write_js('map_yemen_admin.js','YEM_ADMIN',{'adm1':yem1,'adm2':yem2})
+          print('Yemen ADM1',len(yem1['features']),'ADM2',len(yem2['features']))
           PY
 
           node --check empireapp/src/main/assets/phase2-map.js
           node --check empireapp/src/main/assets/phase9-vector-camera-ui.js
+          node --check empireapp/src/main/assets/phase10-yemen-tutorial.js
           grep -q "viewBox" empireapp/src/main/assets/phase9-vector-camera-ui.js
-          grep -q "p9AdminMerged" empireapp/src/main/assets/phase9-vector-camera-ui.js
+          grep -q "p10YemAdm2" empireapp/src/main/assets/phase10-yemen-tutorial.js
+          grep -q "كيفية اللعب" empireapp/src/main/assets/phase10-yemen-tutorial.js
           test -s empireapp/src/main/assets/map_countries.js
           test -s empireapp/src/main/assets/map_admin1.js
           test -s empireapp/src/main/assets/map_cities.js
+          test -s empireapp/src/main/assets/map_yemen_admin.js
           test "$(stat -c%s empireapp/src/main/assets/map_cities.js)" -gt 50000
-          test "$(stat -c%s empireapp/src/main/assets/map_admin1.js)" -lt 10000000
+          test "$(stat -c%s empireapp/src/main/assets/map_yemen_admin.js)" -gt 30000
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -138,17 +162,17 @@ jobs:
           unzip -t empireapp/build/outputs/apk/release/empireapp-release.apk
           $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose empireapp/build/outputs/apk/release/empireapp-release.apk
           unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/phase9-vector-camera-ui.js'
-          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/map_countries.js'
-          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/map_admin1.js'
+          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/phase10-yemen-tutorial.js'
+          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/map_yemen_admin.js'
           unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/map_cities.js'
 
       - name: Prepare named APK
-        run: cp empireapp/build/outputs/apk/release/empireapp-release.apk Our-Empire-Arabic-v0.9-VectorMap.apk
+        run: cp empireapp/build/outputs/apk/release/empireapp-release.apk Our-Empire-Arabic-v0.10-YemenTutorial.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Our-Empire-Arabic-v0.9-VectorMap
-          path: Our-Empire-Arabic-v0.9-VectorMap.apk
+          name: Our-Empire-Arabic-v0.10-YemenTutorial
+          path: Our-Empire-Arabic-v0.10-YemenTutorial.apk
           if-no-files-found: error
           retention-days: 30
