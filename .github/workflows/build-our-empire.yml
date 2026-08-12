@@ -101,6 +101,7 @@ jobs:
           PY
 
           node --check empireapp/src/main/assets/phase2-map.js
+          node --check empireapp/src/main/assets/phase3-fixes.js
           test -s empireapp/src/main/assets/map_countries.js
           test -s empireapp/src/main/assets/map_admin1.js
           test -s empireapp/src/main/assets/map_cities.js
@@ -122,23 +123,24 @@ jobs:
           rm -rf empireapp/build .gradle
           gradle --no-daemon --no-build-cache :empireapp:assembleRelease
 
-      - name: Verify APK and phase 2 map assets
+      - name: Verify APK and map assets
         run: |
           test -f empireapp/build/outputs/apk/release/empireapp-release.apk
           unzip -t empireapp/build/outputs/apk/release/empireapp-release.apk
           $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose empireapp/build/outputs/apk/release/empireapp-release.apk
           unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/phase2-map.js'
+          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/phase3-fixes.js'
           unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/map_countries.js'
           unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/map_admin1.js'
           unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/map_cities.js'
 
       - name: Prepare named APK
-        run: cp empireapp/build/outputs/apk/release/empireapp-release.apk Our-Empire-Arabic-v0.2-Phase2.apk
+        run: cp empireapp/build/outputs/apk/release/empireapp-release.apk Our-Empire-Arabic-v0.3-MapFix.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Our-Empire-Arabic-v0.2-Phase2
-          path: Our-Empire-Arabic-v0.2-Phase2.apk
+          name: Our-Empire-Arabic-v0.3-MapFix
+          path: Our-Empire-Arabic-v0.3-MapFix.apk
           if-no-files-found: error
           retention-days: 30
