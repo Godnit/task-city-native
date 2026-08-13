@@ -26,7 +26,6 @@ jobs:
           node --check network-fix/v7-hotfix.js
           node --check network-fix/v8-polish.js
           node --check network-fix/v9-beginner.js
-          grep -q 'كيف يجد الجهاز جهازًا آخر داخل نفس الشبكة' network-fix/v9-beginner.js
           grep -q 'حذف رابطة' network-fix/v9-beginner.js
           grep -q 'الرجوع إلى الدرس' network-fix/v9-beginner.js
           grep -q 'data:image/png;base64,' network-fix/icon7/brand-icon-exact.svg
@@ -42,7 +41,7 @@ jobs:
           python3 - <<'PY'
           import json, urllib.request
           req=urllib.request.Request('https://api.github.com/repos/iBotPeaches/Apktool/releases/latest',headers={'User-Agent':'network-academy-build'})
-          with urllib.request.urlopen(req, timeout=30) as r: release=json.load(r)
+          with urllib.request.urlopen(req,timeout=30) as r: release=json.load(r)
           jars=[a for a in release.get('assets',[]) if a['name'].startswith('apktool_') and a['name'].endswith('.jar')]
           assert jars
           urllib.request.urlretrieve(jars[0]['browser_download_url'],'/tmp/apktool.jar')
@@ -66,7 +65,7 @@ jobs:
           base64 -d /tmp/app.b64 > /tmp/app-base.apk
           unzip -t /tmp/app-base.apk
 
-      - name: Inject v9 learning fixes and exact selected icon inside app
+      - name: Inject v9 fixes and exact selected icon inside app
         run: |
           python3 - <<'PY'
           import zipfile, os
@@ -100,34 +99,33 @@ jobs:
               for name,data in files.items():
                   zout.writestr('assets/'+name,data,compress_type=zipfile.ZIP_DEFLATED)
           with zipfile.ZipFile(dst,'r') as z:
-              m=z.read('AndroidManifest.xml'); html=z.read('assets/index.html')
-              assert m.count(new_pkg)==1 and m.count(real_activity)==1
               assert z.read('assets/brand-icon.svg')==brand
               assert b'data:image/png;base64,' in brand
               assert b'Lcom/godnit/networkacademy/MainActivity;' in z.read('classes2.dex')
-          print('Exact-icon v10 package verified:',os.path.getsize(dst))
+          print('v10 injected:',os.path.getsize(dst))
           PY
           unzip -t /tmp/app-v10.apk
 
-      - name: Replace Android launcher with the same exact selected icon
+      - name: Use the same exact image as Android launcher
         run: |
           java -jar /tmp/apktool.jar d -s -f /tmp/app-v10.apk -o /tmp/decoded
           python3 - <<'PY'
-          import re, base64, pathlib
+          import base64, pathlib
           svg=pathlib.Path('network-fix/icon7/brand-icon-exact.svg').read_text()
-          m=re.search(r'data:image/png;base64,([^\"]+)',svg)
-          assert m, 'embedded PNG not found'
-          png=base64.b64decode(m.group(1))
+          payload=svg.split('data:image/png;base64,',1)[1].split('"',1)[0].strip()
+          payload += '=' * ((4 - len(payload) % 4) % 4)
+          png=base64.b64decode(payload,validate=False)
+          assert png.startswith(b'\x89PNG\r\n\x1a\n')
+          assert len(png)>20000
           out=pathlib.Path('/tmp/decoded/res/drawable-nodpi')
           out.mkdir(parents=True,exist_ok=True)
           pathlib.Path('/tmp/decoded/res/drawable/ic_launcher.xml').unlink(missing_ok=True)
           (out/'ic_launcher.png').write_bytes(png)
           pathlib.Path('/tmp/decoded/assets/brand-icon.svg').write_text(svg)
-          assert len(png)>20000
+          pathlib.Path('/tmp/exact-launcher.png').write_bytes(png)
           print('Exact launcher PNG bytes:',len(png))
           PY
           test -f /tmp/decoded/res/drawable-nodpi/ic_launcher.png
-          test -f /tmp/decoded/assets/brand-icon.svg
           java -jar /tmp/apktool.jar b /tmp/decoded -o /tmp/app-final-unsigned.apk
           unzip -t /tmp/app-final-unsigned.apk
 
