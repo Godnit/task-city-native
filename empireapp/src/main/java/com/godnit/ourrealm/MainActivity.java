@@ -15,10 +15,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        getWindow().getDecorView().setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_FULLSCREEN |
-                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
-                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
 
         webView = new WebView(this);
         WebSettings settings = webView.getSettings();
@@ -35,9 +32,9 @@ public class MainActivity extends Activity {
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 String js = "(function(){" +
-                        "var files=['map_countries.js','map_admin1.js','map_cities.js','map_yemen_admin.js','phase2-map.js','phase9-vector-camera-ui.js','phase11-fast-labels-tour.js','phase11b-ui-fix.js','phase12-ultrazoom-arabic-cities.js','phase15-group-camera.js','phase16-tutorial-visibility-fix.js'];" +
+                        "var files=['map_countries.js','map_admin1.js','map_cities.js','map_yemen_admin.js','phase2-map.js','phase19-map-recovery.js'];" +
                         "function next(i){if(i>=files.length)return;var s=document.createElement('script');" +
-                        "s.src=files[i]+'?v=18';s.onload=function(){next(i+1)};" +
+                        "s.src=files[i]+'?v=19';s.onload=function(){next(i+1)};" +
                         "s.onerror=function(){next(i+1)};document.body.appendChild(s);}next(0);" +
                         "})()";
                 view.evaluateJavascript(js, null);
@@ -46,7 +43,7 @@ public class MainActivity extends Activity {
 
         webView.setBackgroundColor(0xff142021);
         setContentView(webView);
-        webView.loadUrl("file:///android_asset/index.html?v=18");
+        webView.loadUrl("file:///android_asset/index.html?v=19");
     }
 
     @Override
