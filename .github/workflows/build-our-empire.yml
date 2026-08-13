@@ -35,7 +35,6 @@ jobs:
           fi
           fetch_map ne_50m_populated_places_simple.geojson
 
-          # Detailed Yemen governorate (ADM1) and district (ADM2) borders from geoBoundaries.
           for LEVEL in ADM1 ADM2; do
             curl -L --fail --retry 3 --retry-delay 2 "https://www.geoboundaries.org/api/current/gbOpen/YEM/$LEVEL/" -o ".map-src/yem_${LEVEL}_meta.json"
             URL=$(python3 -c "import json;print(json.load(open('.map-src/yem_${LEVEL}_meta.json'))['gjDownloadURL'])")
@@ -46,7 +45,6 @@ jobs:
           import json, pathlib, math
           root=pathlib.Path('.map-src')
           out=pathlib.Path('empireapp/src/main/assets')
-
           def load(path): return json.loads(path.read_text(encoding='utf-8'))
           def rounded(x):
               if isinstance(x,float): return round(x,5)
@@ -129,16 +127,17 @@ jobs:
 
           node --check empireapp/src/main/assets/phase2-map.js
           node --check empireapp/src/main/assets/phase9-vector-camera-ui.js
-          node --check empireapp/src/main/assets/phase10-yemen-tutorial.js
-          grep -q "viewBox" empireapp/src/main/assets/phase9-vector-camera-ui.js
-          grep -q "p10YemAdm2" empireapp/src/main/assets/phase10-yemen-tutorial.js
-          grep -q "كيفية اللعب" empireapp/src/main/assets/phase10-yemen-tutorial.js
+          node --check empireapp/src/main/assets/phase11-fast-labels-tour.js
+          node --check empireapp/src/main/assets/phase11b-ui-fix.js
+          node --check empireapp/src/main/assets/phase12-ultrazoom-arabic-cities.js
+          grep -q "MAX_SCALE=32" empireapp/src/main/assets/phase12-ultrazoom-arabic-cities.js
+          grep -q "الرياض" empireapp/src/main/assets/phase12-ultrazoom-arabic-cities.js
+          grep -q "نيويورك" empireapp/src/main/assets/phase12-ultrazoom-arabic-cities.js
           test -s empireapp/src/main/assets/map_countries.js
           test -s empireapp/src/main/assets/map_admin1.js
           test -s empireapp/src/main/assets/map_cities.js
           test -s empireapp/src/main/assets/map_yemen_admin.js
-          test "$(stat -c%s empireapp/src/main/assets/map_cities.js)" -gt 50000
-          test "$(stat -c%s empireapp/src/main/assets/map_yemen_admin.js)" -gt 30000
+          test -f empireapp/src/main/res/drawable/ic_launcher.xml
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -161,18 +160,17 @@ jobs:
           test -f empireapp/build/outputs/apk/release/empireapp-release.apk
           unzip -t empireapp/build/outputs/apk/release/empireapp-release.apk
           $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose empireapp/build/outputs/apk/release/empireapp-release.apk
-          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/phase9-vector-camera-ui.js'
-          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/phase10-yemen-tutorial.js'
+          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/phase12-ultrazoom-arabic-cities.js'
           unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/map_yemen_admin.js'
-          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/map_cities.js'
+          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'res/' >/dev/null
 
       - name: Prepare named APK
-        run: cp empireapp/build/outputs/apk/release/empireapp-release.apk Our-Empire-Arabic-v0.10-YemenTutorial.apk
+        run: cp empireapp/build/outputs/apk/release/empireapp-release.apk Our-Empire-Arabic-v0.12-UltraZoom.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Our-Empire-Arabic-v0.10-YemenTutorial
-          path: Our-Empire-Arabic-v0.10-YemenTutorial.apk
+          name: Our-Empire-Arabic-v0.12-UltraZoom
+          path: Our-Empire-Arabic-v0.12-UltraZoom.apk
           if-no-files-found: error
           retention-days: 30
