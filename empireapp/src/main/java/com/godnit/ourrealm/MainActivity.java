@@ -35,9 +35,9 @@ public class MainActivity extends Activity {
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 String js = "(function(){" +
-                        "var files=['map_countries.js','map_admin1.js','map_cities.js','map_yemen_admin.js','phase2-map.js','phase9-vector-camera-ui.js','phase11-fast-labels-tour.js'];" +
+                        "var files=['map_countries.js','map_admin1.js','map_cities.js','map_yemen_admin.js','phase2-map.js','phase9-vector-camera-ui.js','phase11-fast-labels-tour.js','phase11b-ui-fix.js'];" +
                         "function next(i){if(i>=files.length)return;var s=document.createElement('script');" +
-                        "s.src=files[i]+'?v=11';s.onload=function(){next(i+1)};" +
+                        "s.src=files[i]+'?v=11b';s.onload=function(){next(i+1)};" +
                         "s.onerror=function(){next(i+1)};document.body.appendChild(s);}next(0);" +
                         "})()";
                 view.evaluateJavascript(js, null);
