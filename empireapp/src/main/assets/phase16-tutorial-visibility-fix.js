@@ -13,7 +13,7 @@ s.textContent=`
   backdrop-filter:none!important;
   pointer-events:none!important;
 }
-/* Remove the spotlight completely. The arrow + tutorial card still indicate the target. */
+/* Keep the spotlight node for tutorial positioning logic, but make it completely non-rendering. */
 .p11Spot{
   display:none!important;
   visibility:hidden!important;
@@ -23,6 +23,7 @@ s.textContent=`
   border:0!important;
   filter:none!important;
   backdrop-filter:none!important;
+  pointer-events:none!important;
 }
 .p11Tip{
   z-index:302!important;
@@ -45,7 +46,14 @@ s.textContent=`
 (document.head||document.documentElement).appendChild(s);
 
 function forceSafeTutorial(){
-  document.querySelectorAll('.p11Spot').forEach(el=>el.remove());
+  document.querySelectorAll('.p11Spot').forEach(el=>{
+    el.style.setProperty('display','none','important');
+    el.style.setProperty('visibility','hidden','important');
+    el.style.setProperty('opacity','0','important');
+    el.style.setProperty('box-shadow','none','important');
+    el.style.setProperty('background','none','important');
+    el.style.setProperty('border','0','important');
+  });
   ['viewport','worldWrap','world','p15Camera'].forEach(id=>{
     const el=document.getElementById(id);
     if(!el)return;
