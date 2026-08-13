@@ -1,0 +1,21 @@
+(function(){'use strict';
+const W=1440,H=720;let vp,svg,sh,b=1,z=1,cx=720,cy=360,drag=null,pinch=null,raf=0,vb='0 0 1440 720';
+const clamp=(v,a,d)=>Math.max(a,Math.min(d,v));
+function calc(){if(!vp||vp.clientWidth<100)return false;b=Math.max(vp.clientWidth/W,vp.clientHeight/H);return true}
+function bounds(){let ww=vp.clientWidth/z,hh=vp.clientHeight/z;cx=ww>=W?W/2:clamp(cx,ww/2,W-ww/2);cy=hh>=H?H/2:clamp(cy,hh/2,H-hh/2)}
+function draw(){raf=0;if(!calc())return;bounds();let ww=vp.clientWidth/z,hh=vp.clientHeight/z,x=cx-ww/2,y=cy-hh/2;vb=x.toFixed(3)+' '+y.toFixed(3)+' '+ww.toFixed(3)+' '+hh.toFixed(3);svg.setAttribute('viewBox',vb);svg.setAttribute('preserveAspectRatio','none');let q=document.getElementById('zoomText');if(q)q.textContent=Math.round(z/b*100)+'%';styleLabels()}
+function frame(){if(!raf)raf=requestAnimationFrame(draw)}
+function fit(){calc();z=b;cx=W/2;cy=H/2;draw();let c=document.getElementById('regionCard');if(c)c.classList.remove('show')}
+function world(x,y){let ww=vp.clientWidth/z,hh=vp.clientHeight/z;return{x:cx-ww/2+x/z,y:cy-hh/2+y/z}}
+function zoom(f,x,y){let a=world(x,y);z=clamp(z*f,b,b*48);cx=a.x+(vp.clientWidth/2-x)/z;cy=a.y+(vp.clientHeight/2-y)/z;draw()}
+function p(t){let r=vp.getBoundingClientRect();return{x:t.clientX-r.left,y:t.clientY-r.top,cx:t.clientX,cy:t.clientY}}
+function styleLabels(){let r=z/b,t=r<2?0:r<4?1:r<8?2:3;svg.querySelectorAll('.p2label').forEach(e=>{e.style.opacity=t===3?'0':'.95';e.style.fontSize=((t===0?9:t===1?7:5.8)/z)+'px';e.style.strokeWidth=(.65/z)+'px'});let g=document.getElementById('p12MajorCities');if(g){g.style.display=t===0?'none':'block';g.querySelectorAll('text').forEach(e=>{e.style.fontSize=((t===3?7.5:6.7)/z)+'px';e.style.strokeWidth=(.5/z)+'px'})}svg.querySelectorAll('.p2country').forEach(e=>{e.style.strokeWidth='.55px';e.style.vectorEffect='non-scaling-stroke'})}
+function install(){let old=document.getElementById('viewport');if(!old||old.clientWidth<100||!old.querySelector('#world'))return setTimeout(install,200);let n=old.cloneNode(true);old.parentNode.replaceChild(n,old);vp=n;svg=vp.querySelector('#world');svg.removeAttribute('width');svg.removeAttribute('height');vp.querySelectorAll('.p9shield,#p13shield,#p14shield').forEach(e=>e.remove());sh=document.createElement('div');sh.id='p14shield';vp.appendChild(sh);
+let s=document.createElement('style');s.textContent='#viewport>#worldWrap{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;transform:none!important}#world{width:100%!important;height:100%!important;background:#2b7681!important}#p14shield{position:absolute;inset:0;z-index:11;touch-action:none}.p2tools{z-index:20!important}';document.head.appendChild(s);
+sh.addEventListener('touchstart',e=>{e.preventDefault();if(e.touches.length===1){let a=p(e.touches[0]);drag=a;pinch=null}else if(e.touches.length===2){let a=p(e.touches[0]),d=p(e.touches[1]),mx=(a.x+d.x)/2,my=(a.y+d.y)/2;pinch={dist:Math.hypot(a.x-d.x,a.y-d.y),start:z,a:world(mx,my)};drag=null}},{passive:false});
+sh.addEventListener('touchmove',e=>{e.preventDefault();if(e.touches.length===1&&drag){let a=p(e.touches[0]);cx-=(a.x-drag.x)/z;cy-=(a.y-drag.y)/z;drag=a;frame()}else if(e.touches.length===2&&pinch){let a=p(e.touches[0]),d=p(e.touches[1]),mx=(a.x+d.x)/2,my=(a.y+d.y)/2,di=Math.hypot(a.x-d.x,a.y-d.y);z=clamp(pinch.start*di/pinch.dist,b,b*48);cx=pinch.a.x+(vp.clientWidth/2-mx)/z;cy=pinch.a.y+(vp.clientHeight/2-my)/z;frame()}},{passive:false});
+sh.addEventListener('touchend',e=>{if(!e.touches.length){drag=null;pinch=null;draw()}},{passive:false});
+let bs=[...document.querySelectorAll('.p2tool')];if(bs.length>=4){bs=bs.slice(0,4).map(x=>{let n=x.cloneNode(true);x.replaceWith(n);return n});bs[0].onclick=()=>zoom(1.4,vp.clientWidth/2,vp.clientHeight/2);bs[1].onclick=()=>zoom(1/1.4,vp.clientWidth/2,vp.clientHeight/2);bs[2].onclick=fit;bs[3].onclick=fit}
+new MutationObserver(()=>{if(svg.getAttribute('viewBox')!==vb)svg.setAttribute('viewBox',vb)}).observe(svg,{attributes:true,attributeFilter:['viewBox']});let m=document.getElementById('map');if(m)new MutationObserver(()=>{if(m.classList.contains('active')){setTimeout(fit,30);setTimeout(fit,180)}}).observe(m,{attributes:true,attributeFilter:['class']});calc();z=b;draw()}
+setTimeout(install,1600);
+})();
