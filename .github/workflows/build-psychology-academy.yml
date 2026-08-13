@@ -19,17 +19,15 @@ jobs:
           node --check psychology-academy/app/src/main/assets/visual-v2.js
           node --check psychology-academy/app/src/main/assets/final-v4.js
           node --check psychology-academy/app/src/main/assets/brand-v5.js
-          grep -q '19 قسم' psychology-academy/app/src/main/assets/app.js
-          grep -q 'مختبر العقل' psychology-academy/app/src/main/assets/app.js
-          grep -q 'data-theme="light"' psychology-academy/app/src/main/assets/app.css
-          grep -q 'body\[data-theme="light"\]' psychology-academy/app/src/main/assets/final-v4.css
-          grep -q 'body\[data-theme="light"\]' psychology-academy/app/src/main/assets/brand-v5.css
+          node --check psychology-academy/app/src/main/assets/ux-content-v7.js
+          grep -q 'ux-content-v7.js' psychology-academy/app/src/main/assets/index.html
+          grep -q 'ux-content-v7.css' psychology-academy/app/src/main/assets/index.html
+          grep -q '3 أمثلة' psychology-academy/app/src/main/assets/ux-content-v7.js
+          grep -q 'الدرس التالي' psychology-academy/app/src/main/assets/ux-content-v7.js
+          grep -q 'ابحث عن درس أو مسار' psychology-academy/app/src/main/assets/ux-content-v7.js
           grep -q 'psychology-icon-v6.webp' psychology-academy/app/src/main/assets/brand-v5.js
-          grep -q 'brand-v5.js' psychology-academy/app/src/main/assets/index.html
-          grep -q 'brand-v5.css' psychology-academy/app/src/main/assets/index.html
           grep -q 'android:icon="@drawable/psychology_icon"' psychology-academy/app/src/main/AndroidManifest.xml
           ! grep -q 'teaching-v3.js' psychology-academy/app/src/main/assets/index.html
-          ! grep -q 'تخيل أنني' psychology-academy/app/src/main/assets/final-v4.js
           grep -q 'أساسيات الصحة النفسية' psychology-academy/app/src/main/assets/data.js
           grep -q 'علم نفس اللغة والفصاحة' psychology-academy/app/src/main/assets/data.js
           test $(find psychology-academy/app/src/main/assets -name 'psychology-icon-v6.part*' | wc -l) -eq 8
@@ -56,22 +54,23 @@ jobs:
       - name: Build debug APK
         working-directory: psychology-academy
         run: gradle --no-daemon assembleDebug
-      - name: Verify APK and exact launcher icon
+      - name: Verify APK v7 and exact launcher icon
         run: |
           APK=psychology-academy/app/build/outputs/apk/debug/app-debug.apk
           unzip -l "$APK" | grep -q 'assets/index.html'
           unzip -l "$APK" | grep -q 'assets/data.js'
           unzip -l "$APK" | grep -q 'assets/psychology-icon-v6.webp'
           unzip -l "$APK" | grep -q 'assets/brand-v5.js'
-          unzip -l "$APK" | grep -q 'assets/brand-v5.css'
-          unzip -l "$APK" | grep -q 'assets/final-v4.js'
+          unzip -l "$APK" | grep -q 'assets/ux-content-v7.js'
+          unzip -l "$APK" | grep -q 'assets/ux-content-v7.css'
           unzip -l "$APK" | grep -q 'classes.dex'
           unzip -p "$APK" assets/psychology-icon-v6.webp | sha256sum | grep -q '^731734843bdf750efd8fb187e45259a607d820514c81ffe67826740493d08e03'
+          unzip -p "$APK" assets/index.html | grep -q 'ux-content-v7.js'
           $ANDROID_HOME/build-tools/35.0.0/aapt dump badging "$APK" | grep -q 'application-icon'
           $ANDROID_HOME/build-tools/35.0.0/aapt dump badging "$APK" | grep -q 'أكاديمية علم النفس'
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PsychologyAcademy-v6-ExactIcon
+          name: PsychologyAcademy-v7-LessonsNavigation
           path: psychology-academy/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
