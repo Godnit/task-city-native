@@ -1,0 +1,1 @@
+Exact icon 7 source is brand-icon-exact.svg. It embeds the selected raster artwork cropped from the original icon-choice image and is the single source for both launcher and in-app branding.
