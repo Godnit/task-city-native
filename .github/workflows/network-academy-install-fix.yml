@@ -19,7 +19,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate learning code and exact icon source
+      - name: Validate v9 learning code and exact icon file
         run: |
           node --check network-fix/v6-guided.js
           node --check network-fix/v7-foundations.js
@@ -28,7 +28,8 @@ jobs:
           node --check network-fix/v9-beginner.js
           grep -q 'حذف رابطة' network-fix/v9-beginner.js
           grep -q 'الرجوع إلى الدرس' network-fix/v9-beginner.js
-          grep -q 'data:image/png;base64,' network-fix/icon7/brand-icon-exact.svg
+          test -s network-fix/icon7/icon7_exact.webp
+          file network-fix/icon7/icon7_exact.webp | grep -qi 'Web/P'
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
@@ -65,7 +66,7 @@ jobs:
           base64 -d /tmp/app.b64 > /tmp/app-base.apk
           unzip -t /tmp/app-base.apk
 
-      - name: Inject v9 fixes and exact selected icon inside app
+      - name: Inject v9 learning fixes and exact icon inside app
         run: |
           python3 - <<'PY'
           import zipfile, os
@@ -78,7 +79,8 @@ jobs:
           assert len(old_pkg)==len(new_pkg)
           names=['v5-fix.css','v5-fix.js','v6-guided.css','v6-guided.js','v7-foundations.css','v7-foundations.js','v7-hotfix.js','v8-polish.css','v8-polish.js','v9-beginner.css','v9-beginner.js']
           files={n:open('network-fix/'+n,'rb').read() for n in names}
-          brand=open('network-fix/icon7/brand-icon-exact.svg','rb').read()
+          exact=open('network-fix/icon7/icon7_exact.webp','rb').read()
+          wrapper=b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><image href="icon7_exact.webp" width="96" height="96"/></svg>'
           with zipfile.ZipFile(src,'r') as zin, zipfile.ZipFile(dst,'w') as zout:
               for info in zin.infolist():
                   if info.filename.startswith('META-INF/'): continue
@@ -88,44 +90,41 @@ jobs:
                       data=data.replace(old_activity,real_activity)
                       assert data.count(old_pkg)==1
                       data=data.replace(old_pkg,new_pkg)
-                  elif info.filename=='assets/index.html':
-                      text=data.decode('utf-8')
-                      text=text.replace('</head>','  <link rel="stylesheet" href="v5-fix.css" />\n  <link rel="stylesheet" href="v6-guided.css" />\n  <link rel="stylesheet" href="v7-foundations.css" />\n  <link rel="stylesheet" href="v8-polish.css" />\n  <link rel="stylesheet" href="v9-beginner.css" />\n</head>')
-                      text=text.replace('</body>','  <script src="v5-fix.js"></script>\n  <script src="v6-guided.js"></script>\n  <script src="v7-foundations.js"></script>\n  <script src="v7-hotfix.js"></script>\n  <script src="v8-polish.js"></script>\n  <script src="v9-beginner.js"></script>\n</body>')
-                      data=text.encode('utf-8')
                   elif info.filename=='assets/brand-icon.svg':
-                      data=brand
+                      data=wrapper
+                  elif info.filename.startswith('assets/') and info.filename.rsplit('.',1)[-1] in ('html','js','css'):
+                      text=data.decode('utf-8')
+                      if info.filename=='assets/index.html':
+                          text=text.replace('</head>','  <link rel="stylesheet" href="v5-fix.css" />\n  <link rel="stylesheet" href="v6-guided.css" />\n  <link rel="stylesheet" href="v7-foundations.css" />\n  <link rel="stylesheet" href="v8-polish.css" />\n  <link rel="stylesheet" href="v9-beginner.css" />\n</head>')
+                          text=text.replace('</body>','  <script src="v5-fix.js"></script>\n  <script src="v6-guided.js"></script>\n  <script src="v7-foundations.js"></script>\n  <script src="v7-hotfix.js"></script>\n  <script src="v8-polish.js"></script>\n  <script src="v9-beginner.js"></script>\n</body>')
+                      text=text.replace('brand-icon.svg','icon7_exact.webp')
+                      data=text.encode('utf-8')
                   zout.writestr(info,data)
               for name,data in files.items():
+                  if name.endswith(('.js','.css')):
+                      data=data.replace(b'brand-icon.svg',b'icon7_exact.webp')
                   zout.writestr('assets/'+name,data,compress_type=zipfile.ZIP_DEFLATED)
+              zout.writestr('assets/icon7_exact.webp',exact,compress_type=zipfile.ZIP_STORED)
           with zipfile.ZipFile(dst,'r') as z:
-              assert z.read('assets/brand-icon.svg')==brand
-              assert b'data:image/png;base64,' in brand
+              assert z.read('assets/icon7_exact.webp')==exact
+              assert b'icon7_exact.webp' in z.read('assets/index.html') or b'icon7_exact.webp' in z.read('assets/brand-v3.js') or z.read('assets/brand-icon.svg')==wrapper
               assert b'Lcom/godnit/networkacademy/MainActivity;' in z.read('classes2.dex')
-          print('v10 injected:',os.path.getsize(dst))
+          print('Exact in-app icon bytes:',len(exact),'APK:',os.path.getsize(dst))
           PY
           unzip -t /tmp/app-v10.apk
 
-      - name: Use the same exact image as Android launcher
+      - name: Use identical exact icon as Android launcher
         run: |
           java -jar /tmp/apktool.jar d -s -f /tmp/app-v10.apk -o /tmp/decoded
-          python3 - <<'PY'
-          import base64, pathlib
-          svg=pathlib.Path('network-fix/icon7/brand-icon-exact.svg').read_text()
-          payload=svg.split('data:image/png;base64,',1)[1].split('"',1)[0].strip()
-          payload += '=' * ((4 - len(payload) % 4) % 4)
-          png=base64.b64decode(payload,validate=False)
-          assert png.startswith(b'\x89PNG\r\n\x1a\n')
-          assert len(png)>20000
-          out=pathlib.Path('/tmp/decoded/res/drawable-nodpi')
-          out.mkdir(parents=True,exist_ok=True)
-          pathlib.Path('/tmp/decoded/res/drawable/ic_launcher.xml').unlink(missing_ok=True)
-          (out/'ic_launcher.png').write_bytes(png)
-          pathlib.Path('/tmp/decoded/assets/brand-icon.svg').write_text(svg)
-          pathlib.Path('/tmp/exact-launcher.png').write_bytes(png)
-          print('Exact launcher PNG bytes:',len(png))
-          PY
-          test -f /tmp/decoded/res/drawable-nodpi/ic_launcher.png
+          mkdir -p /tmp/decoded/res/drawable-nodpi
+          rm -f /tmp/decoded/res/drawable/ic_launcher.xml
+          cp network-fix/icon7/icon7_exact.webp /tmp/decoded/res/drawable-nodpi/ic_launcher.webp
+          cp network-fix/icon7/icon7_exact.webp /tmp/decoded/assets/icon7_exact.webp
+          cat > /tmp/decoded/assets/brand-icon.svg <<'EOF'
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><image href="icon7_exact.webp" width="96" height="96"/></svg>
+          EOF
+          cmp network-fix/icon7/icon7_exact.webp /tmp/decoded/res/drawable-nodpi/ic_launcher.webp
+          cmp network-fix/icon7/icon7_exact.webp /tmp/decoded/assets/icon7_exact.webp
           java -jar /tmp/apktool.jar b /tmp/decoded -o /tmp/app-final-unsigned.apk
           unzip -t /tmp/app-final-unsigned.apk
 
@@ -139,7 +138,7 @@ jobs:
         run: |
           keytool -genkeypair -v -keystore /tmp/network-v10.keystore -storepass android -keypass android -alias networkv10 -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Network Academy Exact Icon v10,O=Godnit,C=US"
 
-      - name: Sign and verify APK
+      - name: Sign and verify APK and exact icon equality
         run: |
           APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
           ZIPALIGN="$ANDROID_HOME/build-tools/35.0.0/zipalign"
@@ -147,8 +146,11 @@ jobs:
           "$APKSIGNER" verify --verbose --print-certs Network_Academy_Exact_Icon_v10.apk
           "$ZIPALIGN" -c -v 4 Network_Academy_Exact_Icon_v10.apk
           unzip -t Network_Academy_Exact_Icon_v10.apk
-          unzip -l Network_Academy_Exact_Icon_v10.apk | grep -q 'res/drawable-nodpi/ic_launcher.png'
-          unzip -p Network_Academy_Exact_Icon_v10.apk assets/brand-icon.svg | grep -q 'data:image/png;base64,'
+          unzip -p Network_Academy_Exact_Icon_v10.apk res/drawable-nodpi/ic_launcher.webp > /tmp/launcher.webp
+          unzip -p Network_Academy_Exact_Icon_v10.apk assets/icon7_exact.webp > /tmp/inapp.webp
+          cmp network-fix/icon7/icon7_exact.webp /tmp/launcher.webp
+          cmp network-fix/icon7/icon7_exact.webp /tmp/inapp.webp
+          sha256sum network-fix/icon7/icon7_exact.webp /tmp/launcher.webp /tmp/inapp.webp
           file Network_Academy_Exact_Icon_v10.apk
           sha256sum Network_Academy_Exact_Icon_v10.apk
 
