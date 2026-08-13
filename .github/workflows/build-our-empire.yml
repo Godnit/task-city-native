@@ -130,8 +130,9 @@ jobs:
           node --check empireapp/src/main/assets/phase11-fast-labels-tour.js
           node --check empireapp/src/main/assets/phase11b-ui-fix.js
           node --check empireapp/src/main/assets/phase12-ultrazoom-arabic-cities.js
-          grep -q "MAX_SCALE=32" empireapp/src/main/assets/phase12-ultrazoom-arabic-cities.js
-          grep -q "الرياض" empireapp/src/main/assets/phase12-ultrazoom-arabic-cities.js
+          node --check empireapp/src/main/assets/phase13-camera-fix.js
+          grep -q "maxScale=50" empireapp/src/main/assets/phase13-camera-fix.js
+          grep -q "translate3d" empireapp/src/main/assets/phase13-camera-fix.js
           grep -q "نيويورك" empireapp/src/main/assets/phase12-ultrazoom-arabic-cities.js
           test -s empireapp/src/main/assets/map_countries.js
           test -s empireapp/src/main/assets/map_admin1.js
@@ -160,17 +161,18 @@ jobs:
           test -f empireapp/build/outputs/apk/release/empireapp-release.apk
           unzip -t empireapp/build/outputs/apk/release/empireapp-release.apk
           $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose empireapp/build/outputs/apk/release/empireapp-release.apk
+          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/phase13-camera-fix.js'
           unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/phase12-ultrazoom-arabic-cities.js'
           unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/map_yemen_admin.js'
           unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'res/' >/dev/null
 
       - name: Prepare named APK
-        run: cp empireapp/build/outputs/apk/release/empireapp-release.apk Our-Empire-Arabic-v0.12-UltraZoom.apk
+        run: cp empireapp/build/outputs/apk/release/empireapp-release.apk Our-Empire-Arabic-v0.13-CameraFix.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Our-Empire-Arabic-v0.12-UltraZoom
-          path: Our-Empire-Arabic-v0.12-UltraZoom.apk
+          name: Our-Empire-Arabic-v0.13-CameraFix
+          path: Our-Empire-Arabic-v0.13-CameraFix.apk
           if-no-files-found: error
           retention-days: 30
