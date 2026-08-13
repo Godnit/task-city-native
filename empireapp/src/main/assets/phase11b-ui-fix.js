@@ -1,0 +1,1 @@
+(function(){const s=document.createElement('style');s.textContent='.p11Help{right:10px!important;top:258px!important;left:auto!important}.ltr .p11Help{right:10px!important;left:auto!important}@media(max-height:480px){.p11Help{top:238px!important}}';document.head.appendChild(s);})();
