@@ -32,9 +32,9 @@ public class MainActivity extends Activity {
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 String js = "(function(){" +
-                        "var files=['map_countries.js','map_admin1.js','map_cities.js','map_yemen_admin.js','phase2-map.js','phase19-map-recovery.js'];" +
+                        "var files=['map_countries.js','map_admin1.js','map_cities.js','map_yemen_admin.js','phase2-map.js','phase20-final-map.js'];" +
                         "function next(i){if(i>=files.length)return;var s=document.createElement('script');" +
-                        "s.src=files[i]+'?v=19';s.onload=function(){next(i+1)};" +
+                        "s.src=files[i]+'?v=20';s.onload=function(){next(i+1)};" +
                         "s.onerror=function(){next(i+1)};document.body.appendChild(s);}next(0);" +
                         "})()";
                 view.evaluateJavascript(js, null);
@@ -43,7 +43,7 @@ public class MainActivity extends Activity {
 
         webView.setBackgroundColor(0xff142021);
         setContentView(webView);
-        webView.loadUrl("file:///android_asset/index.html?v=19");
+        webView.loadUrl("file:///android_asset/index.html?v=20");
     }
 
     @Override
