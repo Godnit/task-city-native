@@ -126,14 +126,17 @@ jobs:
           PY
 
           node --check empireapp/src/main/assets/phase2-map.js
-          node --check empireapp/src/main/assets/phase9-vector-camera-ui.js
-          node --check empireapp/src/main/assets/phase11-fast-labels-tour.js
-          node --check empireapp/src/main/assets/phase11b-ui-fix.js
-          node --check empireapp/src/main/assets/phase12-ultrazoom-arabic-cities.js
-          node --check empireapp/src/main/assets/phase13-camera-fix.js
-          grep -q "maxScale=50" empireapp/src/main/assets/phase13-camera-fix.js
-          grep -q "translate3d" empireapp/src/main/assets/phase13-camera-fix.js
-          grep -q "نيويورك" empireapp/src/main/assets/phase12-ultrazoom-arabic-cities.js
+          node --check empireapp/src/main/assets/phase20-optimize.js
+          node --check empireapp/src/main/assets/phase20-context.js
+          node --check empireapp/src/main/assets/phase20-final-map.js
+          grep -q "MAX_ZOOM=32" empireapp/src/main/assets/phase20-final-map.js
+          grep -q "preserveAspectRatio','none" empireapp/src/main/assets/phase20-final-map.js
+          grep -q "المحيط الأطلسي" empireapp/src/main/assets/phase20-final-map.js
+          grep -q "p20AdminMerged" empireapp/src/main/assets/phase20-optimize.js
+          grep -q "phase20-final-map.js" empireapp/src/main/java/com/godnit/ourrealm/MainActivity.java
+          ! grep -q "phase9-vector-camera-ui.js" empireapp/src/main/java/com/godnit/ourrealm/MainActivity.java
+          ! grep -q "phase12-ultrazoom-arabic-cities.js" empireapp/src/main/java/com/godnit/ourrealm/MainActivity.java
+          ! grep -q "phase15-group-camera.js" empireapp/src/main/java/com/godnit/ourrealm/MainActivity.java
           test -s empireapp/src/main/assets/map_countries.js
           test -s empireapp/src/main/assets/map_admin1.js
           test -s empireapp/src/main/assets/map_cities.js
@@ -156,23 +159,24 @@ jobs:
           rm -rf empireapp/build .gradle
           gradle --no-daemon --no-build-cache :empireapp:assembleRelease
 
-      - name: Verify APK and map assets
+      - name: Verify APK and final map assets
         run: |
           test -f empireapp/build/outputs/apk/release/empireapp-release.apk
           unzip -t empireapp/build/outputs/apk/release/empireapp-release.apk
           $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose empireapp/build/outputs/apk/release/empireapp-release.apk
-          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/phase13-camera-fix.js'
-          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/phase12-ultrazoom-arabic-cities.js'
+          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/phase20-final-map.js'
+          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/phase20-optimize.js'
+          unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/phase20-context.js'
           unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'assets/map_yemen_admin.js'
           unzip -l empireapp/build/outputs/apk/release/empireapp-release.apk | grep 'res/' >/dev/null
 
       - name: Prepare named APK
-        run: cp empireapp/build/outputs/apk/release/empireapp-release.apk Our-Empire-Arabic-v0.13-CameraFix.apk
+        run: cp empireapp/build/outputs/apk/release/empireapp-release.apk Our-Empire-Arabic-v0.20-FinalMap.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Our-Empire-Arabic-v0.13-CameraFix
-          path: Our-Empire-Arabic-v0.13-CameraFix.apk
+          name: Our-Empire-Arabic-v0.20-FinalMap
+          path: Our-Empire-Arabic-v0.20-FinalMap.apk
           if-no-files-found: error
           retention-days: 30
