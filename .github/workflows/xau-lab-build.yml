@@ -1,4 +1,4 @@
-name: Build XAU Lab 1.16.0
+name: Build XAU Lab 1.16.0 unsigned
 
 on:
   push:
@@ -9,7 +9,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout temporary build branch
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Java 17
@@ -18,34 +18,58 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
 
-      - name: Unpack XAU Lab source
+      - name: Reconstruct XAU source
+        shell: bash
         run: |
-          rm -rf xau-build
-          mkdir -p xau-build
-          unzip -q xau-android-build.zip -d xau-build
-          test -f xau-build/app/src/main/AndroidManifest.xml
-          test -f xau-build/app/src/main/assets/app.js
+          set -euo pipefail
+          cat xau-src-parts/* > /tmp/xau-source.b64
+          base64 -d /tmp/xau-source.b64 > /tmp/xau-source.tar.xz
+          echo 'ef98eb889a43a7110add831c92ec96556af0ec4e302976dfd208d03ab48f4ead  /tmp/xau-source.tar.xz' | sha256sum -c -
+          rm -rf xau-build-src
+          mkdir -p xau-build-src
+          tar -xJf /tmp/xau-source.tar.xz -C xau-build-src
+          test -f xau-build-src/app/src/main/assets/app.js
+          test -f xau-build-src/app/src/main/java/com/maimon/xaulab/MainActivity.java
 
-      - name: Validate JavaScript
-        run: node --check xau-build/app/src/main/assets/app.js
-
-      - name: Build debug APK
-        working-directory: xau-build
-        run: gradle :app:assembleDebug --stacktrace
-
-      - name: Verify APK
+      - name: Build vendor bundle
+        working-directory: xau-build-src
         run: |
-          test -s xau-build/app/build/outputs/apk/debug/app-debug.apk
-          ls -lh xau-build/app/build/outputs/apk/debug/app-debug.apk
+          npm ci
+          npm run build:vendor
+          test -s app/src/main/assets/vendor-data.min.js
+          node --check app/src/main/assets/app.js
 
-      - name: Upload APK
+      - name: Build unsigned release APK
+        working-directory: xau-build-src
+        run: |
+          gradle :app:assembleRelease --stacktrace
+          test -s app/build/outputs/apk/release/app-release-unsigned.apk
+
+      - name: Collect APK and apksig tool
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifact
+          cp xau-build-src/app/build/outputs/apk/release/app-release-unsigned.apk artifact/XAU-Lab-v1.16.0-unsigned.apk
+          BT="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          echo "Using build tools: $BT"
+          test -s "$BT/lib/apksigner.jar"
+          cp "$BT/lib/apksigner.jar" artifact/apksigner.jar
+          sha256sum artifact/* > artifact/SHA256SUMS.txt
+
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: XAU-Lab-v1.16.0-APK
-          path: xau-build/app/build/outputs/apk/debug/app-debug.apk
+          name: XAU-Lab-v1.16.0-unsigned-and-apksigner
+          path: artifact/
           if-no-files-found: error
