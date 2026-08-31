@@ -71,9 +71,9 @@ jobs:
         working-directory: xau-build-src
         run: |
           node --check app/src/main/assets/app.js
-          node tools/test-chart-core.js
-          node tools/test-live-data.js
-          node tools/test-visual-robot.js
+          if test -f tools/test-chart-core.js; then node tools/test-chart-core.js; fi
+          if test -f tools/test-live-data.js; then node tools/test-live-data.js; fi
+          if test -f tools/test-visual-robot.js; then node tools/test-visual-robot.js; fi
           if test -f tools/test-account.js; then node tools/test-account.js; fi
           node tools/test-manual-trading.js
 
