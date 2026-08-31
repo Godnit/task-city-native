@@ -78,7 +78,7 @@ jobs:
           echo '561744124dd5b1fd56f9fa03d3baaa55f2f4c29bf84f8505c014b8c7ad1d10fd  /tmp/xau-v123.patch.xz' | sha256sum -c -
           xz -dc /tmp/xau-v123.patch.xz > /tmp/xau-v123.patch
           cd xau-build-src
-          patch --batch -p3 < /tmp/xau-v123.patch
+          patch --batch -p4 < /tmp/xau-v123.patch
           test ! -s app/src/main/assets/app.js.rej
           test ! -s app/build.gradle.rej
           grep -q "versionName '1.23.0'" app/build.gradle
