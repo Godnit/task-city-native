@@ -87,13 +87,16 @@ js=js.replace("var pnlLabel = (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + ' USD';",
 js=js.replace("                if (!plainLabel) {\n                    ctx.fillStyle = 'rgba(7,17,31,.90)';","                if (!plainLabel && kind !== 'entry') {\n                    ctx.fillStyle = 'rgba(7,17,31,.90)';")
 js=js.replace("ctx.font = plainLabel ? 'bold 9px sans-serif' : 'bold 7px sans-serif';","ctx.font = (plainLabel || kind === 'entry') ? 'bold 11px sans-serif' : 'bold 7px sans-serif';")
 
-# Keep P/L label anchored beside the entry line without changing the chart scale.
-js=js.replace("ctx.fillText(text, margin.left + width - 3, y);","ctx.fillText(text, margin.left + width - 3, y);")
-
 # Update legacy tests to the new version when present.
 for p in [root/'tools/test-manual-trading.js',root/'tools/test-meta-ui-v118.js',root/'tools/test-v120.js']:
     if p.exists():
-        t=p.read_text().replace("versionName '1.20.0'","versionName '1.21.0'").replace('versionCode 21','versionCode 22').replace("version:'1.20.0'","version:'1.21.0'")
+        t=p.read_text()
+        for old in ["versionName '1.18.0'","versionName '1.19.0'","versionName '1.20.0'"]:
+            t=t.replace(old,"versionName '1.21.0'")
+        for old in ['versionCode 19','versionCode 20','versionCode 21']:
+            t=t.replace(old,'versionCode 22')
+        for old in ["version:'1.18.0'","version:'1.19.0'","version:'1.20.0'"]:
+            t=t.replace(old,"version:'1.21.0'")
         p.write_text(t)
 
 # New regression test: no auto Stop Out, live SL/TP requires crossing, P/L label is plain.
