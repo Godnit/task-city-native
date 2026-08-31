@@ -79,6 +79,12 @@ jobs:
           grep -q 'v1.19 multi-account manager' app/src/main/assets/app.js
           grep -q 'saveQuickLotV119' app/src/main/assets/app.js
           grep -q 'new-order-button hidden' app/src/main/assets/index.html
+          if test -f tools/test-manual-trading.js; then
+            sed -i "s/versionName '1.18.0'/versionName '1.19.0'/g; s/versionCode 19/versionCode 20/g" tools/test-manual-trading.js
+          fi
+          if test -f tools/test-meta-ui-v118.js; then
+            sed -i "s/versionName '1.18.0'/versionName '1.19.0'/g; s/versionCode 19/versionCode 20/g" tools/test-meta-ui-v118.js
+          fi
 
       - name: Install and build vendor bundle
         working-directory: xau-build-src
