@@ -1,0 +1,26 @@
+name: Check XAU signing secret availability
+
+on:
+  push:
+    branches: [ xau-lab-build-1-21 ]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check encrypted signing inputs without exposing secrets
+        shell: bash
+        env:
+          KS64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KSPASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KSALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEYPASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$KS64" || -z "$KSPASS" || -z "$KSALIAS" || -z "$KEYPASS" ]]; then
+            echo "SIGNING_SECRETS_AVAILABLE=false"
+            exit 0
+          fi
+          echo "SIGNING_SECRETS_AVAILABLE=true"
+          echo "$KS64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          keytool -list -v -keystore "$RUNNER_TEMP/release.jks" -storepass "$KSPASS" -alias "$KSALIAS" | grep -E 'Alias name:|Owner:|SHA256:' || true
