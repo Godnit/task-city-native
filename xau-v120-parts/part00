@@ -1,0 +1,50 @@
+from pathlib import Path
+import re
+root=Path('.')
+js=(root/'app/src/main/assets/app.js').read_text()
+html=(root/'app/src/main/assets/index.html').read_text()
+css=(root/'app/src/main/assets/app.css').read_text()
+grad=(root/'app/build.gradle').read_text()
+
+# version
+grad=grad.replace('versionCode 20','versionCode 21').replace("versionName '1.19.0'","versionName '1.20.0'")
+
+# state additions
+js=js.replace("        selectedManualTicket: null,\n        settings:", "        selectedManualTicket: null,\n        manualDraft: null,\n        lastManualLiveKey: '',\n        settings:")
+
+# Reorder toolbar: timeframe, pending, indicators, scissors, spacer, account far right.
+old='''                            <button id="quickPendingButton" class="meta-tool pending-tool" type="button" aria-label="إضافة أمر معلق" title="أمر معلق"><span>⇅</span></button>\n                            <button id="indicatorMenuButton" class="meta-tool indicator-menu-button" type="button" aria-label="Indicators" title="Indicators"><span>ƒ</span></button>\n                            <button id="accountMenuButton" class="meta-tool account-tool" type="button" aria-label="Accounts" title="Accounts"><span>☰</span></button>\n                            <div id="accountPopover" class="account-popover hidden"><div class="account-popover-head"><strong>Accounts</strong><button id="addAccountFromMenu" type="button">+ Add</button></div><div id="accountMenuList"></div></div>\n                            <button id="replayStartPicker" class="meta-tool cut-button" type="button" aria-label="اختيار بداية الإعادة من الشارت" title="حدد البداية بالمقص">'''
+new='''                            <button id="quickPendingButton" class="meta-tool pending-tool" type="button" aria-label="Pending orders" title="Pending orders"><span>⇅</span></button>\n                            <button id="indicatorMenuButton" class="meta-tool indicator-menu-button" type="button" aria-label="Indicators" title="Indicators"><span>ƒ</span></button>\n                            <button id="replayStartPicker" class="meta-tool cut-button" type="button" aria-label="Replay start" title="Replay start">'''
+assert old in html
+html=html.replace(old,new)
+# insert account after replay button closing
+needle='''                            </button>\n                        </div>\n                        <div id="quickTradeBar"'''
+replacement='''                            </button>\n                            <span class="toolbar-spacer" aria-hidden="true"></span>\n                            <span class="account-tool-wrap">\n                                <button id="accountMenuButton" class="meta-tool account-tool" type="button" aria-label="Accounts" title="Accounts"><span>☰</span></button>\n                                <span class="account-separator" aria-hidden="true"></span>\n                            </span>\n                            <div id="accountPopover" class="account-popover hidden"><div class="account-popover-head"><strong>Accounts</strong><button id="addAccountFromMenu" type="button">+ Add</button></div><div id="accountMenuList"></div></div>\n                        </div>\n                        <div id="quickTradeBar"'''
+assert needle in html
+html=html.replace(needle,replacement,1)
+
+# Add ids/classes for edit-only hiding and pnl display
+html=html.replace('<label class="field full"><span>نوع الأمر</span><select id="manualOrderType">','<label id="manualOrderTypeField" class="field full"><span>نوع الأمر</span><select id="manualOrderType">')
+html=html.replace('<label class="field"><span>الحجم (Lot)</span><input id="manualLot"','<label id="manualLotField" class="field"><span>الحجم (Lot)</span><input id="manualLot"')
+html=html.replace('''                                <div class="position-panel-main">\n                                    <strong id="positionPanelTitle" dir="ltr">XAUUSD</strong>\n                                    <small id="positionPanelHint">اسحب خط TP أو SL مباشرة على الشارت</small>\n                                </div>''','''                                <div class="position-panel-main">\n                                    <strong id="positionPanelPnl" dir="ltr">0.00 USD</strong>\n                                    <span id="positionPanelTitle" class="hidden" dir="ltr">XAUUSD</span>\n                                    <small id="positionPanelHint" class="hidden">Drag SL / TP, then press the arrow</small>\n                                </div>''')
+
+# shouldKeepLiveQuotes helper after stopLiveFeed
+needle='''    function stopLiveFeed() {\n        stopLiveQuoteTimer();\n        clearTimeout(state.liveHistoryRequestTimer);\n        state.liveHistoryRequestTimer = null;\n        state.liveHistoryUpdating = false;\n    }\n'''
+insert=needle+'''\n    function shouldKeepLiveQuotes() {\n        if (document.hidden || state.chartMode !== 'market') return false;\n        if (state.page === 'chart') return true;\n        if (!state.account) return false;\n        return (state.account.manualPositions || []).length > 0 || (state.account.pendingOrders || []).length > 0;\n    }\n'''
+assert needle in js
+js=js.replace(needle,insert,1)
+
+# goPage live logic
+old='''        var needsLiveTerminal = (page === 'trades' || page === 'history') && state.account &&\n            (((state.account.manualPositions || []).length > 0) || ((state.account.pendingOrders || []).length > 0));\n        if (page === 'chart' && liveChart) {\n            setTimeout(function () { liveChart.resize(); }, 30);\n            if (state.chartMode === 'market') scheduleLiveRefresh(30);\n        } else if (needsLiveTerminal) {\n            stopLiveQuoteTimer();\n            scheduleLiveRefresh(30);\n        } else stopLiveFeed();'''
+new='''        if (page === 'chart' && liveChart) setTimeout(function () { liveChart.resize(); }, 30);\n        if (shouldKeepLiveQuotes()) {\n            stopLiveQuoteTimer();\n            scheduleLiveRefresh(30);\n        } else stopLiveFeed();'''
+assert old in js
+js=js.replace(old,new,1)
+
+# refreshLivePrice page guard and history only on chart
+js=js.replace("        if (state.page !== 'chart' || state.chartMode !== 'market' || document.hidden) return;", "        if (!shouldKeepLiveQuotes()) return;", 1) # first occurrence in refreshLiveHistory? careful
+# first replacement likely refreshLiveHistory; restore there because history only chart
+js=js.replace("    function refreshLiveHistory(force) {\n        if (state.liveHistoryUpdating || window.__XAU_TEST_MODE__) return;\n        if (!shouldKeepLiveQuotes()) return;", "    function refreshLiveHistory(force) {\n        if (state.liveHistoryUpdating || window.__XAU_TEST_MODE__) return;\n        if (state.page !== 'chart' || state.chartMode !== 'market' || document.hidden) return;")
+# Replace guard in refreshLivePrice specifically
+js=js.replace("    function refreshLivePrice(manual) {\n        if (state.liveUpdating || window.__XAU_TEST_MODE__) return;\n        if (state.page !== 'chart' || state.chartMode !== 'market' || document.hidden) return;", "    function refreshLivePrice(manual) {\n        if (state.liveUpdating || window.__XAU_TEST_MODE__) return;\n        if (!shouldKeepLiveQuotes()) return;")
+
+# updatePriceUi must not execute SL/TP on UI redraw/cached quote; only recalc + live terminal render
