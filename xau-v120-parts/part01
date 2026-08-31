@@ -1,0 +1,27 @@
+old="""        updateQuickTradeBar(currentManualQuote());\n        if (state.account) processManualTrading(currentManualQuote());\n        if (series.length > 1) {"""
+new="""        updateQuickTradeBar(currentManualQuote());\n        if (state.account) {\n            var uiQuote = currentManualQuote();\n            if (uiQuote) recalculateManualAccount(uiQuote);\n            if (state.page === 'trades' || state.page === 'history') renderRobotTerminal();\n        }\n        if (series.length > 1) {"""
+assert old in js
+js=js.replace(old,new,1)
+
+# applyLiveQuote: process only fresh changed provider tick, always recalc and terminal refresh
+needle="""        state.lastLiveQuote = { bid: price, ask: ask, t: timestamp, provider: 'Swissquote' };\n        if (!cached) {"""
+rep="""        state.lastLiveQuote = { bid: price, ask: ask, t: timestamp, provider: 'Swissquote' };\n        if (state.account) {\n            var liveKey = String(state.account.id || '') + '|' + timestamp + '|' + price + '|' + ask;\n            if (!cached && liveKey !== state.lastManualLiveKey) {\n                state.lastManualLiveKey = liveKey;\n                processManualTrading({ bid: price, ask: ask, t: timestamp, provider: 'Swissquote', source: 'live', index: Infinity }, null, { freshLive: true });\n            } else {\n                recalculateManualAccount(state.lastLiveQuote);\n                refreshManualOverlay(false);\n                if (state.page === 'trades' || state.page === 'history') renderRobotTerminal();\n            }\n        }\n        if (!cached) {"""
+assert needle in js
+js=js.replace(needle,rep,1)
+
+# finishLiveRequest only reschedule if live still needed
+js=js.replace("        scheduleLiveRefresh(retryDelay);\n    }\n\n    function receiveLivePayload", "        if (shouldKeepLiveQuotes()) scheduleLiveRefresh(retryDelay); else stopLiveQuoteTimer();\n    }\n\n    function receiveLivePayload",1)
+# market closed scheduling in finishLiveRequest/refreshLivePrice should respect ongoing positions; current 60s fine via should call on next timer; leave
+
+# visibility resume all needed pages
+js=js.replace("            } else if (state.page === 'chart' && state.chartMode === 'market') scheduleLiveRefresh(50);", "            } else if (shouldKeepLiveQuotes()) scheduleLiveRefresh(50);")
+
+# Enrich overlay with draft + pnl; replace function
+pat=re.compile(r"    function refreshManualOverlay\(redraw\) \{.*?\n    \}\n\n    function manualPositionByTicket", re.S)
+m=pat.search(js); assert m
+newfunc='''    function refreshManualOverlay(redraw) {\n        if (!state.account) return;\n        var quote = currentManualQuote();\n        var draft = state.manualDraft;\n        var overlay = {\n            positions: (state.account.manualPositions || []).map(function (position) {\n                var copy = Object.assign({}, position);\n                if (draft && Number(draft.ticket) === Number(copy.ticket) && draft.type === 'position') {\n                    copy.stop = draft.stop; copy.target = draft.target; copy.preview = true;\n                }\n                copy.floating = quote ? manualPositionFloating(copy, quote) : 0;\n                return copy;\n            }),\n            pending: (state.account.pendingOrders || []).map(function (order) {\n                var copy = Object.assign({}, order);\n                if (draft && Number(draft.ticket) === Number(copy.ticket) && draft.type === 'pending') { copy.price = draft.price; copy.preview = true; }\n                return copy;\n            }),\n            selectedTicket: state.selectedManualTicket\n        };\n        if (liveChart) liveChart.setManualOverlay(overlay, redraw !== false);\n        if (replayChart) replayChart.setManualOverlay(overlay, redraw !== false);\n    }\n\n    function manualPositionByTicket'''
+js=js[:m.start()]+newfunc+js[m.end():]
+
+# Insert draft helpers before hidePositionQuickPanel
+needle="""    function hidePositionQuickPanel() {\n        state.selectedManualTicket = null;\n        var panel = byId('positionQuickPanel');\n        if (panel) panel.classList.add('hidden');\n        refreshManualOverlay(true);\n    }\n"""
+assert needle in js
