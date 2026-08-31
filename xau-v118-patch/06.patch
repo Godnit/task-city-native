@@ -1,0 +1,100 @@
++                                <button id="closePositionQuickPanel" class="position-back" type="button" aria-label="إغلاق">←</button>
++                                <div class="position-panel-main">
++                                    <strong id="positionPanelTitle" dir="ltr">XAUUSD</strong>
++                                    <small id="positionPanelHint">اسحب خط TP أو SL مباشرة على الصارت</small>
++                                </div>
++                                <button id="positionAddTp" class="position-tp" type="button">TP</button>
++                                <button id="positionAddSl" class="position-sl" type="button">SL</button>
++                                <button id="positionEditButton" class="position-edit" type="button">تعديل</button>
++                            </div>
+                             <div class="chart-zoom-tools" aria-label="أدوات تكبير الشارت">
+                                 <button id="chartZoomIn" type="button" aria-label="تكبير الصموع">+</button>
+                                 <button id="chartZoomOut" type="button" aria-label="تصغير الشموع">−</button>
+@@ -347,10 +375,10 @@
+                         <div><span>الربح العائم:</span><i></i><strong id="robotCapitalFloating" dir="ltr">0.00 USD</strong></div>
+                         <div><span>الحالة:</span><i></i><strong id="manualMarginStatus">بدون مراكز</strong></div>
+                     </div>
+-                    <div class="meta-list-title"><strong>المراكز المفتوحة</strong><span id="robotOpenCount" dir="ltr">0</span></div>
+-                    <div id="robotOpenTradesBody" class="meta-position-list"><div class="meta-empty">لا توجد مراكز مفتوحة</div></div>
+-                    <div class="meta-list-title pending-title"><strong>الأوامر المعلقة</strong><span id="manualPendingCount" dir="ltr">0</span></div>
+-                    <div id="manualPendingOrdersBody" class="meta-position-list pending-list"><div class="meta-empty">لا توجد أوامر معلقة</div></div>
++                    <div class="meta-list-title"><strong>المراكز والأوامر</strong><span id="robotOpenCount" dir="ltr">0</span></div>
++                    <div id="robotOpenTradesBody" class="meta-position-list"><div class="meta-empty">لا توجد مراكز أو أوامر</div></div>
++                    <span id="manualPendingCount" class="hidden" dir="ltr">0</span>
++                    <div id="manualPendingOrdersBody" class="hidden"></div>
+                 </div>
+             </section>
+ 
+@@ -405,7 +433,7 @@
+ 
+                 <div class="card about-card">
+                     <div class="about-logo"><div class="brand-mark"><i></i><i></i><i></i></div></div>
+-                    <div><strong>XAU Lab — مختبر الذهب</strong><span>الإصدار <b id="appVersion">1.17.0</b></span></div>
++                    <div><strong>XAU Lab — مختبر الذهب</strong><span>الإصدار <b id="appVersion">1.18.0</b></span></div>
+                     <p>أداة تعليم ومحاكاة واختبار فقط. لا تفتح صفقات ولا تتصل بحساب تداول، ونتائج الماضي لا تضمن نتائج مستقبلية.</p>
+                 </div>
+ 
+diff -ruN '--exclude=vendor-data.min.js' '--exclude=manual-build' xau118_src/app/src/main/java/com/maimon/xaulab/MainActivity.java xau118_work/app/src/main/java/com/maimon/xaulab/MainActivity.java
+--- xau118_src/app/src/main/java/com/maimon/xaulab/MainActivity.java	2026-08-30 20:34:33.000000000 +0000
++++ xau118_work/app/src/main/java/com/maimon/xaulab/MainActivity.java	2026-08-31 09:31:21.702054141 +0000
+@@ -146,7 +146,7 @@
+ 
+         @JavascriptInterface
+         public String getVersion() {
+-            return "1.16.0";
++            return "1.18.0";
+         }
+ 
+         @JavascriptInterface
+@@ -160,7 +160,7 @@
+                     connection.setReadTimeout(3500);
+                     connection.setUseCaches(false);
+                     connection.setRequestProperty("Accept", "application/json");
+-                    connection.setRequestProperty("User-Agent", "XAU-Lab/1.9 Android");
++                    connection.setRequestProperty("User-Agent", "XAU-Lab/1.18 Android");
+                     int status = connection.getResponseCode();
+                     if (status < 200 || status >= 300) throw new IllegalStateException("HTTP " + status);
+                     StringBuilder body = new StringBuilder(2048);
+@@ -190,7 +190,7 @@
+                     connection.setReadTimeout(8000);
+                     connection.setUseCaches(false);
+                     connection.setRequestProperty("Accept", "application/json");
+-                    connection.setRequestProperty("User-Agent", "XAU-Lab/1.9 Android");
++                    connection.setRequestProperty("User-Agent", "XAU-Lab/1.18 Android");
+                     int status = connection.getResponseCode();
+                     if (status < 200 || status >= 300) throw new IllegalStateException("HTTP " + status);
+                     StringBuilder body = new StringBuilder(65536);
+diff -ruN '--exclude=vendor-data.min.js' '--exclude=manual-build' xau118_src/tools/test-account.js xau118_work/tools/test-account.js
+--- xau118_src/tools/test-account.js	2026-08-31 08:05:22.000000000 +0000
++++ xau118_work/tools/test-account.js	2026-08-31 09:36:41.719124648 +0000
+@@ -15,5 +15,5 @@
+ if (!balanceTag.includes('disabled') || !leverageTag.includes('disabled')) throw new Error('Robot can still edit account capital/leverage');
+ if (!source.includes("initialBalance: state.account ?") || !source.includes("leverage: state.account ?")) throw new Error('Robot is not sourced from persistent account');
+ if (!source.includes("toEnglishDigits")) throw new Error('English digit normalization missing');
+-if (!gradle.includes("versionName '1.17.0'")) throw new Error('Version was not bumped');
+-process.stdout.write(JSON.stringify({firstRunAccount:true,persistentAccount:true,robotAccountSeparated:true,persistentTerminal:true,englishDigits:true,version:'1.17.0'})+'\n');
++if (!gradle.includes("versionName '1.18.0'")) throw new Error('Version was not bumped');
++process.stdout.write(JSON.stringify({firstRunAccount:true,persistentAccount:true,robotAccountSeparated:true,persistentTerminal:true,englishDigits:true,version:'1.18.0'})+'\n');
+diff -ruN '--exclude=vendor-data.min.js' '--exclude=manual-build' xau118_src/tools/test-live-data.js xau118_work/tools/test-live-data.js
+--- xau118_src/tools/test-live-data.js	2026-08-30 17:37:28.000000000 +0000
++++ xau118_work/tools/test-live-data.js	2026-08-31 09:36:28.421404279 +0000
+@@ -71,7 +71,7 @@
+ if (!source.includes('liveChart.setData(state.liveCandles')) throw new Error('Market chart is not isolated from replay data');
+ if (!source.includes('state.rawCandles = state.liveRawCandles.slice()')) throw new Error('Market replay does not preserve its exact candle timeline');
+ if (!source.includes('Dukascopy M1')) throw new Error('Live candle source is not disclosed');
+-if (!source.includes('var LIVE_POLL_MS = 1200')) throw new Error('Live quote polling was not accelerated');
++if (!source.includes('var LIVE_POLL_MS = 350')) throw new Error('Live quote polling is not near real-time');
+ if (!source.includes('animateLatestLivePrice')) throw new Error('Smooth live-price animation is missing');
+ 
+ if (!sandbox.isMetaGoldSessionOpen(at('2026-08-28T19:59:00Z'))) throw new Error('Friday session closed too early');
+diff -ruN '--exclude=vendor-data.min.js' '--exclude=manual-build' xau118_src/tools/test-manual-trading.js xau118_work/tools/test-manual-trading.js
+--- xau118_src/tools/test-manual-trading.js	2026-08-31 08:05:22.000000000 +0000
++++ xau118_work/tools/test-manual-trading.js	2026-08-31 09:36:28.421680916 +0000
+@@ -11,6 +11,6 @@
+ for (const id of ['newOrderButton','manualOrderModal','manualOrderType','manualLot','manualOrderPrice','manualStopLoss','manualTakeProfit','placeManualOrder','manualPendingOrdersBody','manualPendingCount','manualMarginStatus']) {
+   if (!html.includes(`id="${id}"`)) throw new Error('Missing manual trading UI: ' + id);
+ }
+-if (!gradle.includes("versionName '1.17.0'") || !gradle.includes('versionCode 18')) throw new Error('Version mismatch');
++if (!gradle.includes("versionName '1.18.0'") || !gradle.includes('versionCode 19')) throw new Error('Version mismatch');
+ if (!source.includes('ctx.fillRect(centerX - candleWidth / 2, bodyTop, candleWidth, bodyHeight);')) throw new Error('Solid candle fill missing');
+-process.stdout.write(JSON.stringify({manualMarketOrders:true,pendingOrders:true,slTp:true,margin:true,chartLevels:true,solidBullCandles:true,version:'1.17.0'})+'\n');

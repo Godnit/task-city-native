@@ -1,0 +1,115 @@
++                goPage('chart');
++                setChartMode('market', false);
++            }
+         });
+         byId('manualPendingOrdersBody').addEventListener('click', function (event) {
+             var button = event.target.closest('[data-cancel-pending]');
+@@ -3613,7 +3887,12 @@
+         byId('chartFullscreen').addEventListener('click', function () {
+             setChartFullscreen(!document.body.classList.contains('chart-fullscreer'));
+         });
+-        all('#timeframes button').forEach(function (button) { button.addEventListener('click', function () { selectInterval(button.getAttribute('data-interval')); }); });
++        all('#timeframes button').forEach(function (button) { button.addEventListener('click', function (event) {
++            selectInterval(button.getAttribute('data-interval'));
++            byId('timeframes').classList.add('hidden');
++            byId('timeframeMenuButton').setAttribute('aria-expanded', 'false');
++            event.stopPropagation();
++        }); });
+         all('.indicator-chip').forEach(function (button) {
+             button.addEventListener('click', function () {
+                 var indicator = button.getAttribute('data-indicator');
+@@ -3627,7 +3906,11 @@
+             byId('indicatorPopover').classList.toggle('hidden');
+         });
+         byId('closeIndicatorPopover').addEventListener('click', function () { byId('indicatorPopover').classList.add('hidden'); });
+-        byId('liveChartWrap').addEventListener('pointerdown', function () { byId('indicatorPopover').classList.add('hidden'); });
++        byId('liveChartWrap').addEventListener('pointerdown', function () {
++            byId('indicatorPopover').classList.add('hidden');
++            byId('timeframes').classList.add('hidden');
++            byId('timeframeMenuButton').setAttribute('aria-expanded', 'false');
++        });
+         byId('chartZoomIn').addEventListener('click', function () { liveChart.zoomBy(-1); });
+         byId('chartZoomOut').addEventListener('click', function () { liveChart.zoomBy(1); });
+         byId('chartGoLatest').addEventListener('click', function () { liveChart.goLatest(); });
+@@ -3717,8 +4000,14 @@
+         state.liveProviderMigrated = localStorage.getItem(STORAGE.liveProvider) === 'swissquote-bidask-v1';
+         liveChart = new CandleChart(byId('liveChart'));
+         replayChart = new CandleChart(byId('replayChart'));
++        liveChart.onManualLevelTap = selectManualTicket;
++        replayChart.onManualLevelTap = selectManualTicket;
++        liveChart.onManualLevelDrag = updateManualLevel;
++        replayChart.onManualLevelDrag = updateManualLevel;
+         liveChart.setIndicators(state.indicators);
+         replayChart.setIndicators(state.indicators);
++        refreshManualOverlay(false);
++        updateQuickTradeBar(currentManualQuote());
+         loadPersistedDataset();
+         loadCachedLiveCandles();
+         loadCachedLiveQuote();
+diff -ruN '--exclude=vendor-data.min.js' '--exclude=manual-build' xau118_src/app/src/main/assets/index.html xau118_work/app/src/main/assets/index.html
+--- xau118_src/app/src/main/assets/index.html	2026-08-31 08:05:22.000000000 +0000
++++ xau118_work/app/src/main/assets/index.html	2026-08-31 09:31:21.702544319 +0000
+@@ -72,6 +72,20 @@
+                     </div>
+                 </div>
+ 
++                <div id="quickTradeBar" class="quick-trade-bar" aria-label="التداول السريع">
++                    <button id="quickSell" class="quick-side quick-sell" type="button">
++                        <span>SELL</span><strong id="quickSellPrice" dir="ltr">—</strong>
++                    </button>
++                    <div class="quick-lot">
++                        <button id="quickLotDown" type="button" aria-label="تقليل اللوت">⌄</button>
++                        <input id="quickLot" type="number" min="0.01" max="100" step="0.01" value="0.10" inputmode="decimal" aria-label="حجم اللوت" dir="ltr">
++                        <button id="quickLotUp" type="button" aria-label="زيادة اللوت">⌃</button>
++                    </div>
++                    <button id="quickBuy" class="quick-side quick-buy" type="button">
++                        <span>BUY</span><strong id="quickBuyPrice" dir="ltr">—</strong>
++                    </button>
++                </div>
++
+                 <div class="terminal-stage">
+                     <div id="marketChartCard" class="terminal-pane market-pane hidden">
+                         <div id="tradingviewHost" class="tradingview-host">
+@@ -84,21 +98,25 @@
+                     </div>
+ 
+                     <div id="labChartCard" class="terminal-pane lab-pane">
+-                        <div class="chart-toolbar">
+-                            <div id="timeframes" class="segmented compact" aria-label="الفاصل الزمني">
+-                                <button type="button" data-interval="1min" class="active">M1</button>
+-                                <button type="button" data-interval="5min">M5</button>
+-                                <button type="button" data-interval="15min">M15</button>
+-                                <button type="button" data-interval="1h">H1</button>
+-                                <button type="button" data-interval="4h">H4</button>
+-                                <button type="button" data-interval="1day">D1</button>
++                        <div class="chart-toolbar meta-compact-toolbar">
++                            <div class="timeframe-compact">
++                                <button id="timeframeMenuButton" class="meta-tool timeframe-current" type="button" aria-expanded="false">
++                                    <strong id="timeframeCurrent">M1</strong><span>⌄</span>
++                                </button>
++                                <div id="timeframes" class="timeframe-popover hidden" aria-label="الفاصل الزمني">
++                                    <button type="button" data-interval="1min" class="active">M1</button>
++                                    <button type="button" data-interval="5min">M5</button>
++                                    <button type="button" data-interval="15min">M15</button>
++                                    <button type="button" data-interval="1h">H1</button>
++                                    <button type="button" data-interval="4h">H4</button>
++                                    <button type="button" data-interval="1day">D1</button>
++                                </div>
+                             </div>
+-                            <button id="replayStartPicker" class="icon-button cut-button" type="button" aria-label="اختيار بداية الإعادة من الشارت" title="حدد البداية بالمقص">
++                            <button id="quickPendingButton" class="meta-tool pending-tool" type="button" aria-label="إضافة أمر معلق" title="أمر معلق"><span>⇅</span></button>
++                            <button id="indicatorMenuButton" class="meta-tool indicator-menu-button" type="button" aria-label="فتح قائمة المؤشرات" title="المؤشرات"><span>ƒ</span></button>
++                            <button id="replayStartPicker" class="meta-tool cut-button" type="button" aria-label="اختيار بداية الإعادة من الشارت" title="حدد البداية بالمقص">
+                                 <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="17" r="3"></circle><circle cx="6" cy="7" r="3"></circle><path d="M8.5 8.5L20 17M8.5 15.5L20 7"></path></svg>
+                             </button>
+-                            <button id="indicatorMenuButton" class="icon-button indicator-menu-button" type="button" aria-label="فتح قائمة المؤشرات" title="المؤشرات">
+-                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18V9M10 18V5M16 18v-7M22 18V3"></path><path d="M2 18h22"></path></svg>
+-                            </button>
+                         </div>
+                         <div class="chart-wrap" id="liveChartWrap">
+                             <canvas id="liveChart" aria-label="شارت شموع الذهب"></canvas>
+@@ -114,6 +132,16 @@
+                                 <div><b>حدد بداية الإعادة</b><small id="startPickerDate">اسحب الخط الذهبي فوق الشمعة المطلوبة</small></div>
+                                 <button id="confirmStartPicker" class="picker-confirm" type="button">ابدأ هنا</button>
+                             </div>
++                            <div id="positionQuickPanel" class="position-quick-panel hidden">

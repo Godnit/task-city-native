@@ -1,0 +1,93 @@
+                     '<div class="meta-position-actions"><small>#' + position.ticket + ' • Margin ' + formatAccountMoney(position.margin) + '</small><button type="button" data-close-manual="' + position.ticket + '">إغلاق</button></div>' +
+                     '</div>');
+             });
++            (state.account.pendingOrders || []).forEach(function (order) {
++                rows.push('<div class="meta-position-row pending-order-row" data-focus-manual="' + order.ticket + '">' +
++                    '<div class="meta-position-head"><strong>XAUUSD, <span class="' + (order.side === 'buy' ? 'positive' : 'negative') + ' order-kind">' +
++                    (order.side === 'buy' ? 'buy' : 'sell') + ' ' + escapeHtml(order.typeLabel.replace(/^(Buy|Sell)\s*/i, '').toLowerCase()) + ' ' + Number(order.lot).toFixed(2) + '</span></strong>' +
++                    '<b class="pending-badge" dir="ltr">' + formatPrice(order.price) + '</b></div>' +
++                    '<div class="meta-position-prices" dir="ltr"><span>placed</span><span>S/L ' + (order.stop == null ? '—' : formatPrice(order.stop)) + '</span><span>T/P ' + (order.target == null ? '—' : formatPrice(order.target)) + '</span></div>' +
++                    '<div class="meta-position-actions"><small>#' + order.ticket + '</small><button type="button" data-cancel-pending="' + order.ticket + '">إلغاء</button></div></div>');
++            });
+         }
+         if (openTrade) {
+             rows.push('<div class="meta-position-row">' +
+-                '<div class="meta-position-head"><strong>XAUUSD, <span class="' + (openTrade.side === 'buy' ? 'positive' : 'negative') + '">' + (openTrade.side === 'buy' ? 'شراء' : 'بيع') + ' ' + Number(openTrade.lot || settings.lot).toFixed(2) + '</span></strong>' +
++                '<div class="meta-position-head"><strong>XAUUSD, <span class="' + (openTrade.side === 'buy' ? 'positive' : 'negative') + ' order-kind">' + (openTrade.side === 'buy' ? 'buy' : 'sell') + ' ' + Number(openTrade.lot || settings.lot).toFixed(2) + '</span></strong>' +
+                 '<b class="' + (floating >= 0 ? 'positive' : 'negative') + '" dir="ltr">' + formatTradeMoney(floating) + '</b></div>' +
+                 '<div class="meta-position-prices" dir="ltr"><span>' + formatPrice(openTrade.entry) + ' → ' + formatPrice(currentPrice) + '</span>' +
+                 '<span>S/L ' + (openTrade.stop == null ? '—' : formatPrice(openTrade.stop)) + '</span>' +
+                 '<span>T/P ' + (openTrade.target == null ? '—' : formatPrice(openTrade.target)) + '</span></div>' +
+                 '</div>');
+         }
+-        openBody.innerHTML = rows.length ? rows.join('') : '<div class="meta-empty">لا توجد مراكز مفتوحة</div>';
++        openBody.innerHTML = rows.length ? rows.join('') : '<div class="meta-empty">لا توجد مراكز أو أوامر</div>';
+         byId('robotOpenCount').textContent = String(rows.length);
+-
+-        var pendingBody = byId('manualPendingOrdersBody');
+-        if (pendingBody) {
+-            var pending = state.account ? (state.account.pendingOrders || []) : [];
+-            byId('manualPendingCount').textContent = String(pending.length);
+-            pendingBody.innerHTML = pending.length ? pending.map(function (order) {
+-                return '<div class="meta-position-row pending-order-row"><div class="meta-position-head"><strong>' + order.typeLabel + ' <span class="' + (order.side === 'buy' ? 'positive' : 'negative') + '">' + Number(order.lot).toFixed(2) + '</span></strong><b dir="ltr">' + formatPrice(order.price) + '</b></div>' +
+-                    '<div class="meta-position-prices" dir="ltr"><span>SL ' + (order.stop == null ? '—' : formatPrice(order.stop)) + '</span><span>TP ' + (order.target == null ? '—' : formatPrice(order.target)) + '</span></div>' +
+-                    '<div class="meta-position-actions"><small>#' + order.ticket + '</small><button type="button" data-cancel-pending="' + order.ticket + '">إلغاء</button></div></div>';
+-            }).join('') : '<div class="meta-empty">لا توجد أوامر معلقة</div>';
+-        }
++        if (byId('manualPendingCount')) byId('manualPendingCount').textContent = state.account ? String((state.account.pendingOrders || []).length) : '0';
+ 
+         var events = robotTerminalEvents(trades, currentIndex);
+         if (state.historyView === 'deals' || state.historyView === 'positions') events = events.filter(function (event) { return event.kind === 'exit'; });
+@@ -3573,16 +3811,52 @@
+         byId('saveAccountButton').addEventListener('click', saveAccountFromGate);
+         byId('cancelAccountEdit').addEventListener('click', hideAccountGate);
+         byId('editAccountButton').addEventListener('click', function () { showAccountGate(true); });
+-        byId('newOrderButton').addEventListener('click', openManualOrderModal);
++        byId('newOrderButton').addEventListener('click', function () { openManualOrderModal(); });
++        byId('quickSell').addEventListener('click', function () { placeQuickMarket('sell'); });
++        byId('quickBuy').addEventListener('click', function () { placeQuickMarket('buy'); });
++        byId('quickLotDown').addEventListener('click', function () {
++            var input = byId('quickLot'); input.value = Math.max(.01, number(input.value, .1) - .01).toFixed(2);
++        });
++        byId('quickLotUp').addEventListener('click', function () {
++            var input = byId('quickLot'); input.value = Math.min(100, number(input.value, .1) + .01).toFixed(2);
++        });
++        byId('quickLot').addEventListener('change', function () {
++            this.value = clamp(number(toEnglishDigits(this.value), .1), .01, 100).toFixed(2);
++            if (state.account) { state.account.lastLot = Number(this.value); scheduleAccountPersist(); }
++        });
++        byId('quickPendingButton').addEventListener('click', function () { openManualOrderModal('buyLimit'); });
++        byId('timeframeMenuButton').addEventListener('click', function (event) {
++            var menu = byId('timeframes');
++            var open = menu.classList.toggle('hidden') === false;
++            this.setAttribute('aria-expanded', open ? 'true' : 'false');
++            byId('indicatorPopover').classList.add('hidden');
++            event.stopPropagation();
++        });
++        byId('closePositionQuickPanel').addEventListener('click', hidePositionQuickPanel);
++        byId('positionAddTp').addEventListener('click', function () { addOrSelectPositionLevel('target'); });
++        byId('positionAddSl').addEventListener('click', function () { addOrSelectPositionLevel('stop'); });
++        byId('positionEditButton').addEventListener('click', function () { if (state.selectedManualTicket) openManualPositionEdit(state.selectedManualTicket); });
+         byId('manualOrderType').addEventListener('change', syncManualOrderModal);
+         byId('placeManualOrder').addEventListener('click', placeManualOrderFromModal);
+         all('[data-close-manual-order]').forEach(function (button) { button.addEventListener('click', closeManualOrderModal); });
+         byId('robotOpenTradesBody').addEventListener('click', function (event) {
+-            var button = event.target.closest('[data-close-manual]');
+-            if (!button) return;
+-            var quote = currentManualQuote();
+-            if (!quote) { showToast('لا يوجد سعر متاح للإغلاق', 'error'); return; }
+-            if (closeManualPosition(Number(button.getAttribute('data-close-manual')), 'إغلاق يدوي', quote)) showToast('تم إغلاق الصفقة', 'success');
++            var closeButton = event.target.closest('[data-close-manual]');
++            if (closeButton) {
++                var quote = currentManualQuote();
++                if (!quote) { showToast('لا يوجد سعر متاح للإغلاق', 'error'); return; }
++                if (closeManualPosition(Number(closeButton.getAttribute('data-close-manual')), 'إغلاق يدوي', quote)) showToast('تم إغلاق الصفقة', 'success');
++                return;
++            }
++            var cancelButton = event.target.closest('[data-cancel-pending]');
++            if (cancelButton) { cancelManualPending(Number(cancelButton.getAttribute('data-cancel-pending'))); return; }
++            var row = event.target.closest('[data-focus-manual]');
++            if (row) {
++                var ticket = Number(row.getAttribute('data-focus-manual'));
++                var kind = manualPositionByTicket(ticket) ? 'entry' : 'pending';
++                selectManualTicket(ticket, kind);

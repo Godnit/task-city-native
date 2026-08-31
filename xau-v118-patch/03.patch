@@ -1,0 +1,145 @@
++                position.stop = price;
++            } else {
++                price = position.side === 'buy' ? Math.max(price, position.entry + step) : Math.min(price, position.entry - step);
++                position.target = price;
++            }
++            recalculateManualAccount(currentManualQuote());
++        } else if (kind === 'pending') {
++            var order = manualPendingByTicket(ticket);
++            if (!order) return;
++            var quote = currentManualQuote();
++            var gap = .01;
++            if (quote) {
++                if (order.type === 'buyLimit') price = Math.min(price, quote.ask - gap);
++                else if (order.type === 'sellLimit') price = Math.max(price, quote.bid + gap);
++                else if (order.type === 'buyStop') price = Math.max(price, quote.ask + gap);
++                else if (order.type === 'sellStop') price = Math.min(price, quote.bid - gap);
++            }
++            order.price = price;
++        } else {
++            return;
++        }
++        refreshManualOverlay(true);
++        if (finalChange) {
++            persistAccountNow();
++            renderRobotTerminal();
++            showToast(kind === 'pending' ? 'تم تعديل سعر الأمر' : (kind === 'stop' ? 'تم تعديل Stop Loss' : 'تم تعديل Take Profit'), 'success');
++        } else scheduleAccountPersist();
++    }
++
++    function addOrSelectPositionLevel(kind) {
++        var position = manualPositionByTicket(state.selectedManualTicket);
++        if (!position) return;
++        if (kind === 'stop' && position.stop == null) position.stop = round(defaultManualLevel(position, 'stop'), 2);
++        if (kind === 'target' && position.target == null) position.target = round(defaultManualLevel(position, 'target'), 2);
++        persistAccountNow();
++        refreshManualOverlay(true);
++        byId('positionPanelHint').textContent = 'الآن اسحب خط ' + (kind === 'stop' ? 'SL' : 'TP') + ' على الشارت';
++    }
++
++    function placeQuickMarket(side) {
++        if (!state.account) { showAccountGate(false); return; }
++        var quote = currentManualQuote();
++        if (!quote) { showToast('لا يوجد سعر حي متاح الآن', 'error'); return; }
++        var lot = clamp(number(toEnglishDigits(byId('quickLot').value), state.account.lastLot || .1), .01, 100);
++        var entry = side === 'buy' ? quote.ask : quote.bid;
++        if (openManualPosition(side, lot, entry, null, null, quote, null, 'تداول سريع')) {
++            state.account.lastLot = lot;
++            byId('quickLot').value = lot.toFixed(2);
++            persistAccountNow();
++            renderRobotTerminal();
++            showToast((side === 'buy' ? 'BUY ' : 'SELL ') + lot.toFixed(2) + ' • ' + formatPrice(entry), 'success');
++        }
++    }
++
++    function openManualPositionEdit(ticket) {
++        var position = manualPositionByTicket(ticket);
++        if (!position) return;
++        var modal = byId('manualOrderModal');
++        modal.setAttribute('data-edit-ticket', String(position.ticket));
++        byId('manualOrderTitle').textContent = 'تعديل الصفقة #' + position.ticket;
++        byId('manualOrderType').value = position.side === 'buy' ? 'marketBuy' : 'marketSell';
++        byId('manualOrderType').disabled = true;
++        byId('manualLot').value = Number(position.lot).toFixed(2);
++        byId('manualLot').disabled = true;
++        byId('manualStopLoss').value = position.stop == null ? '' : formatPrice(position.stop).replace(/,/g,'');
++        byId('manualTakeProfit').value = position.target == null ? '' : formatPrice(position.target).replace(/,/g,'');
++        byId('manualPendingPriceField').classList.add('hidden');
++        byId('placeManualOrder').textContent = 'حفظ التعديل';
++        byId('placeManualOrder').classList.remove('sell-action');
++        modal.classList.remove('hidden');
++    }
++
+     function closeManualPosition(ticket, reason, quote, forcedExit) {
+         if (!state.account) return false;
+         var positions = state.account.manualPositions || [];
+@@ -2861,9 +3073,13 @@
+         };
+         state.account.trades = (state.account.trades || []).concat([trade]).slice(-1200);
+         positions.splice(index, 1);
++        if (Number(state.selectedManualTicket) === Number(ticket)) {
++            state.selectedManualTicket = null;
++            if (byId('positionQuickPanel')) byId('positionQuickPanel').classList.add('hidden');
++        }
+         recalculateManualAccount(quote);
+         persistAccountNow();
+-        refreshManualOverlay(false);
++        refreshManualOverlay(true);
+         renderRobotTerminal();
+         return true;
+     }
+@@ -2972,10 +3188,15 @@
+         action.classList.toggle('sell-action', info.side === 'sell');
+     }
+ 
+-    function openManualOrderModal() {
++    function openManualOrderModal(preferredType) {
+         if (!state.account) { showAccountGate(false); return; }
+         var quote = currentManualQuote();
+         if (!quote) { showToast('لا يوجد سعر متاح الآن؛ افتح الشارت أو الإعادة أولًا', 'error'); return; }
++        byId('manualOrderModal').removeAttribute('data-edit-ticket');
++        byId('manualOrderTitle').textContent = 'أمر تداول جديد';
++        byId('manualOrderType').disabled = false;
++        byId('manualLot').disabled = false;
++        if (preferredType && manualTypeInfo(preferredType)) byId('manualOrderType').value = preferredType;
+         byId('manualLot').value = Number(state.account.lastLot || .1).toFixed(2);
+         byId('manualOrderPrice').value = '';
+         byId('manualStopLoss').value = '';
+@@ -2988,6 +3209,24 @@
+ 
+     function placeManualOrderFromModal() {
+         if (!state.account) return;
++        var editTicket = Number(byId('manualOrderModal').getAttribute('data-edit-ticket'));
++        if (editTicket) {
++            var editPosition = manualPositionByTicket(editTicket);
++            if (!editPosition) { closeManualOrderModal(); return; }
++            var editStop = number(toEnglishDigits(byId('manualStopLoss').value), 0) || null;
++            var editTarget = number(toEnglishDigits(byId('manualTakeProfit').value), 0) || null;
++            try { validateManualLevels(editPosition.side, editPosition.entry, editStop, editTarget); }
++            catch (error) { showToast(error.message, 'error'); return; }
++            editPosition.stop = editStop;
++            editPosition.target = editTarget;
++            persistAccountNow();
++            refreshManualOverlay(true);
++            renderRobotTerminal();
++            closeManualOrderModal();
++            selectManualTicket(editTicket, 'entry');
++            showToast('تم تعديل SL / TP', 'success');
++            return;
++        }
+         var quote = currentManualQuote();
+         if (!quote) { showToast('لا يوجد سعر متاح', 'error'); return; }
+         var type = byId('manualOrderType').value;
+@@ -3111,8 +3350,9 @@
+             (state.account.manualPositions || []).forEach(function (position) {
+                 var pnl = manualPositionFloating(position, quoteNow);
+                 var nowPrice = quoteNow ? (position.side === 'buy' ? quoteNow.bid : quoteNow.ask) : currentPrice;
+-                rows.push('<div class="meta-position-row manual-position-row">' +
+-                    '<div class="meta-position-head"><strong>XAUUSD, <span class="' + (position.side === 'buy' ? 'positive' : 'negative') + '">' + (position.side === 'buy' ? 'شراء' : 'بيع') + ' ' + Number(position.lot).toFixed(2) + '</span></strong>' +
++                var selectedClass = Number(state.selectedManualTicket) === Number(position.ticket) ? ' selected-position' : '';
++                rows.push('<div class="meta-position-row manual-position-row' + selectedClass + '" data-focus-manual="' + position.ticket + '">' +
++                    '<div class="meta-position-head"><strong>XAUUSD, <span class="' + (position.side === 'buy' ? 'positive' : 'negative') + ' order-kind">' + (position.side === 'buy' ? 'buy' : 'sell') + ' ' + Number(position.lot).toFixed(2) + '</span></strong>' +
+                     '<b class="' + (pnl >= 0 ? 'positive' : 'negative') + '" dir="ltr">' + formatTradeMoney(pnl) + '</b></div>' +
+                     '<div class="meta-position-prices" dir="ltr"><span>' + formatPrice(position.entry) + ' → ' + formatPrice(nowPrice) + '</span>' +
+                     '<span>S/L ' + (position.stop == null ? '—' : formatPrice(position.stop)) + '</span>' +
+@@ -3120,29 +3360,27 @@

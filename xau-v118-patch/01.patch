@@ -1,0 +1,139 @@
++            var selectedTicket = manualOverlay.selectedTicket == null ? null : Number(manualOverlay.selectedTicket);
++            function drawManualLevel(value, color, label, dashed, ticket, kind) {
+                 if (value == null || !isFinite(value)) return;
+                 var y = priceY(value);
+                 if (y < margin.top - 2 || y > margin.top + geometry.mainHeight + 2) return;
++                var selected = selectedTicket != null && Number(ticket) === selectedTicket;
+                 ctx.save();
+                 ctx.strokeStyle = color;
+-                ctx.lineWidth = 1.2;
+-                if (dashed) ctx.setLineDash([5, 3]);
++                ctx.lineWidth = selected ? 1.8 : 1.2;
++                ctx.setLineDash(dashed ? [7, 4] : [7, 4]);
+                 ctx.beginPath(); ctx.moveTo(margin.left, y); ctx.lineTo(margin.left + geometry.plotWidth, y); ctx.stroke();
+                 ctx.setLineDash([]);
+                 ctx.font = 'bold 7px sans-serif';
+                 ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+                 var text = label + '  ' + formatPrice(value);
+-                var width = Math.max(52, Math.min(118, text.length * 4.8 + 10));
+-                ctx.fillStyle = 'rgba(7,17,31,.88)';
+-                ctx.fillRect(margin.left + 3, y - 7, width, 14);
++                var width = Math.max(58, Math.min(138, text.length * 4.8 + 12));
++                ctx.fillStyle = 'rgba(7,17,31,.90)';
++                ctx.fillRect(margin.left + 3, y - 8, width, 16);
+                 ctx.fillStyle = color;
+-                ctx.fillText(text, margin.left + width - 2, y);
++                ctx.fillText(text, margin.left + width - 3, y);
++                if (selected && (kind === 'stop' || kind === 'target' || kind === 'pending')) {
++                    var hx = margin.left + geometry.plotWidth * .48;
++                    ctx.beginPath(); ctx.arc(hx, y, 5.5, 0, Math.PI * 2);
++                    ctx.fillStyle = color; ctx.fill();
++                    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.2; ctx.stroke();
++                }
+                 ctx.restore();
++                selfChart.manualHitLevels.push({ y:y, value:value, ticket:Number(ticket), kind:kind });
+             }
++            var selfChart = this;
+             (manualOverlay.positions || []).forEach(function (position) {
+                 var sideColor = position.side === 'buy' ? palette.up : palette.down;
+-                drawManualLevel(position.entry, sideColor, (position.side === 'buy' ? 'BUY' : 'SELL') + ' #' + position.ticket, false);
+-                drawManualLevel(position.stop, palette.down, 'SL #' + position.ticket, true);
+-                drawManualLevel(position.target, palette.up, 'TP #' + position.ticket, true);
++                drawManualLevel(position.entry, sideColor, (position.side === 'buy' ? 'BUY' : 'SELL') + ' ' + Number(position.lot || 0).toFixed(2), true, position.ticket, 'entry');
++                drawManualLevel(position.stop, palette.down, 'SL', true, position.ticket, 'stop');
++                drawManualLevel(position.target, palette.up, 'TP', true, position.ticket, 'target');
+             });
+             (manualOverlay.pending || []).forEach(function (order) {
+                 var pendingColor = order.side === 'buy' ? palette.blue : palette.violet;
+-                drawManualLevel(order.price, pendingColor, order.typeLabel + ' #' + order.ticket, true);
++                drawManualLevel(order.price, pendingColor, order.typeLabel + ' ' + Number(order.lot || 0).toFixed(2), true, order.ticket, 'pending');
+             });
++        } else {
++            this.manualHitLevels = [];
+         }
+ 
+         var last = candles[candles.length - 1];
+@@ -732,6 +749,22 @@
+         }
+     };
+ 
++    CandleChart.prototype.manualLevelAt = function (y) {
++        var best = null, bestDistance = Infinity;
++        (this.manualHitLevels || []).forEach(function (level) {
++            var distance = Math.abs(Number(level.y) - y);
++            if (distance <= 14 && distance < bestDistance) { best = level; bestDistance = distance; }
++        });
++        return best;
++    };
++
++    CandleChart.prototype.priceFromScreenY = function (y) {
++        var geometry = this.getGeometry();
++        var top = geometry.margins.top;
++        var ratio = clamp((y - top) / Math.max(geometry.mainHeight, 1), 0, 1);
++        return this.lastPriceCenter + this.lastPriceRange / 2 - ratio * this.lastPriceRange;
++    };
++
+     CandleChart.prototype.bindEvents = function () {
+         var self = this;
+         function position(touch) {
+@@ -750,8 +783,12 @@
+             } else if (event.touches.length === 1) {
+                 var point = position(event.touches[0]);
+                 var selectionX = self.selectionScreenX();
++                var manualLevel = self.manualLevelAt(point.y);
+                 var priceAxisStart = self.width - self.getGeometry().margins.right;
+-                if (point.x >= priceAxisStart) {
++                if (manualLevel && point.x < priceAxisStart) {
++                    self.drag = { manualLevel: manualLevel, moved:false };
++                    if (typeof self.onManualLevelTap === 'function') self.onManualLevelTap(manualLevel.ticket, manualLevel.kind);
++                } else if (point.x >= priceAxisStart) {
+                     self.drag = { priceAxis: true, y: point.y, priceScale: self.priceScale, moved: false };
+                 } else if (self.selectionMode && selectionX != null && Math.abs(point.x - selectionX) <= 30) {
+                     self.drag = { selection: true, moved: false };
+@@ -777,6 +814,13 @@
+                 self.draw();
+             } else if (event.touches.length === 1 && self.drag) {
+                 var point = position(event.touches[0]);
++                if (self.drag.manualLevel) {
++                    var nextPrice = self.priceFromScreenY(point.y);
++                    self.drag.moved = true;
++                    if (typeof self.onManualLevelDrag === 'function') self.onManualLevelDrag(self.drag.manualLevel.ticket, self.drag.manualLevel.kind, nextPrice, false);
++                    event.preventDefault();
++                    return;
++                }
+                 if (self.drag.priceAxis) {
+                     var scaleDelta = point.y - self.drag.y;
+                     self.drag.moved = Math.abs(scaleDelta) > 3;
+@@ -807,7 +851,11 @@
+             event.preventDefault();
+         }, { passive: false });
+         this.canvas.addEventListener('touchend', function (event) {
+-            if (self.drag && !self.drag.priceAxis && !self.drag.moved && event.changedTouches.length) {
++            if (self.drag && self.drag.manualLevel && event.changedTouches.length) {
++                var manualPoint = position(event.changedTouches[0]);
++                var finalPrice = self.priceFromScreenY(manualPoint.y);
++                if (typeof self.onManualLevelDrag === 'function' && self.drag.moved) self.onManualLevelDrag(self.drag.manualLevel.ticket, self.drag.manualLevel.kind, finalPrice, true);
++            } else if (self.drag && !self.drag.priceAxis && !self.drag.moved && event.changedTouches.length) {
+                 var point = position(event.changedTouches[0]);
+                 if (self.selectionMode) self.setSelectionFromPoint(point.x);
+                 else self.setCrosshair(point.x, point.y);
+@@ -819,6 +867,11 @@
+         this.canvas.addEventListener('click', function (event) {
+             if ('ontouchstart' in window) return;
+             var point = position(event);
++            var manualLevel = self.manualLevelAt(point.y);
++            if (manualLevel && typeof self.onManualLevelTap === 'function') {
++                self.onManualLevelTap(manualLevel.ticket, manualLevel.kind);
++                return;
++            }
+             if (self.selectionMode) self.setSelectionFromPoint(point.x);
+             else self.setCrosshair(point.x, point.y);
+         });
+@@ -931,9 +984,14 @@
+         all('.page').forEach(function (element) { element.classList.toggle('active', element.getAttribute('data-page') === page); });
+         updateNavSelection();
+         window.scrollTo(0, 0);
++        var needsLiveTerminal = (page === 'trades' || page === 'history') && state.account &&
++            (((state.account.manualPositions || []).length > 0) || ((state.account.pendingOrders || []).length > 0));
+         if (page === 'chart' && liveChart) {
+             setTimeout(function () { liveChart.resize(); }, 30);

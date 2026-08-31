@@ -1,0 +1,195 @@
+-            if (state.chartMode === 'market') scheduleLiveRefresh(50);
++            if (state.chartMode === 'market') scheduleLiveRefresh(30);
++        } else if (needsLiveTerminal) {
++            stopLiveQuoteTimer();
++            scheduleLiveRefresh(30);
+         } else stopLiveFeed();
+         if (page === 'replay') {
+             prepareReplay(false);
+@@ -1121,7 +1179,7 @@
+             return;
+         }
+         var started = null;
+-        var duration = 420;
++        var duration = 80;
+         last.c = fromPrice;
+         function frame(now) {
+             if (!started) started = now;
+@@ -1176,20 +1234,27 @@
+             try { localStorage.setItem(STORAGE.liveProvider, 'swissquote-bidask-v1'); } catch (error) { /* best effort */ }
+         }
+         rebuildLiveInterval();
+-        if (firstLiveCandle) updateDatasetUi(true);
+-        else if (state.chartMode === 'market') {
++        if (firstLiveCandle) {
++            updateDatasetUi(true);
++            updatePriceUi(price, timestamp, state.liveCandles);
++        } else if (state.chartMode === 'market') {
+             var latestBucket = state.liveRawCandles[state.liveRawCandles.length - 1].t;
+-            if (!cached && latestBucket === previousLiveBucket) animateLatestLivePrice(previousLivePrice, price, timestamp);
+-            else {
+-                renderMarketChart(false);
++            if (state.page === 'chart') {
++                if (!cached && latestBucket === previousLiveBucket) animateLatestLivePrice(previousLivePrice, price, timestamp);
++                else {
++                    renderMarketChart(false);
++                    updatePriceUi(price, timestamp, state.liveCandles);
++                }
++                byId('liveChartEmpty').classList.add('hidden');
++            } else {
+                 updatePriceUi(price, timestamp, state.liveCandles);
+             }
+-            byId('liveChartEmpty').classList.add('hidden');
+         }
+         var isFresh = Date.now() - timestamp < 180000;
+         setHeaderStatus(isFresh ? 'live' : 'offline', isFresh ? 'سعر حي' : 'آخر سعر محفوظ');
+         byId('terminalSource').textContent = liveSourceText();
+-        byId('marketSource').textContent = 'الشموع: Dukascopy M1 • السعر اللحظي: Bid/Ask';
++        updateQuickTradeBar(state.lastLiveQuote);
++        byId('marketSource').textContent = 'الشموع: Dukascopy M1 • السعر اللحظي: Swissquote Bid/Ask';
+         if (!cached && state.liveRawCandles.length && state.liveRawCandles[state.liveRawCandles.length - 1].t !== previousLiveBucket) cacheLiveCandles();
+     }
+ 
+@@ -1274,7 +1339,7 @@
+             return;
+         }
+         state.marketClosed = false;
+-        refreshLiveHistory(!!manual);
++        if (state.page === 'chart' && state.chartMode === 'market') refreshLiveHistory(!!manual);
+         state.liveUpdating = true;
+         state.liveManual = !!manual;
+         setHeaderStatus('connecting', state.liveCandles.length ? 'جارٍ التحديث' : 'جارٍ جلب السوق');
+@@ -1346,11 +1411,27 @@
+         }, 80);
+     }
+ 
++    function updateQuickTradeBar(quote) {
++        var sell = byId('quickSellPrice');
++        var buy = byId('quickBuyPrice');
++        if (!sell || !buy) return;
++        if (!quote || !isFinite(Number(quote.bid)) || !isFinite(Number(quote.ask))) {
++            sell.textContent = '—'; buy.textContent = '—'; return;
++        }
++        sell.textContent = formatPrice(Number(quote.bid));
++        buy.textContent = formatPrice(Number(quote.ask));
++        var lotInput = byId('quickLot');
++        if (lotInput && document.activeElement !== lotInput && state.account) {
++            lotInput.value = Number(state.account.lastLot || .10).toFixed(2);
++        }
++    }
++
+     function updatePriceUi(price, timestamp, series) {
+         series = series || state.candles;
+         byId('livePrice').textContent = formatPrice(price);
+         byId('livePrice').classList.remove('live-word');
+         byId('quoteTime').textContent = 'آخر تحديث: ' + formatDate(timestamp || Date.now(), true);
++        updateQuickTradeBar(currentManualQuote());
+         if (state.account) processManualTrading(currentManualQuote());
+         if (series.length > 1) {
+             var previous = series[series.length - 2].c;
+@@ -1398,6 +1479,12 @@
+         all('#timeframes button').forEach(function (button) {
+             button.classList.toggle('active', button.getAttribute('data-interval') === state.interval);
+         });
++        var tfCurrent = byId('timeframeCurrent');
++        if (tfCurrent) tfCurrent.textContent = intervalCode(state.interval);
++        var tfMenu = byId('timeframes');
++        if (tfMenu) tfMenu.classList.add('hidden');
++        var tfButton = byId('timeframeMenuButton');
++        if (tfButton) tfButton.setAttribute('aria-expanded', 'false');
+         byId('labReplayInterval').textContent = intervalCode(state.interval) + ' • UTC';
+         if (hasReplayData) {
+             var sourceName = String((state.datasetMeta && state.datasetMeta.source) || '') + ' ' + String((state.datasetMeta && state.datasetMeta.name) || '');
+@@ -2833,12 +2920,137 @@
+         if (!state.account) return;
+         var overlay = {
+             positions: (state.account.manualPositions || []).map(function (position) { return Object.assign({}, position); }),
+-            pending: (state.account.pendingOrders || []).map(function (order) { return Object.assign({}, order); })
++            pending: (state.account.pendingOrders || []).map(function (order) { return Object.assign({}, order); }),
++            selectedTicket: state.selectedManualTicket
+         };
+         if (liveChart) liveChart.setManualOverlay(overlay, redraw !== false);
+         if (replayChart) replayChart.setManualOverlay(overlay, redraw !== false);
+     }
+ 
++    function manualPositionByTicket(ticket) {
++        if (!state.account) return null;
++        return (state.account.manualPositions || []).filter(function (position) { return Number(position.ticket) === Number(ticket); })[0] || null;
++    }
++
++    function manualPendingByTicket(ticket) {
++        if (!state.account) return null;
++        return (state.account.pendingOrders || []).filter(function (order) { return Number(order.ticket) === Number(ticket); })[0] || null;
++    }
++
++    function hidePositionQuickPanel() {
++        state.selectedManualTicket = null;
++        var panel = byId('positionQuickPanel');
++        if (panel) panel.classList.add('hidden');
++        refreshManualOverlay(true);
++    }
++
++    function selectManualTicket(ticket, kind) {
++        if (!state.account) return;
++        var position = manualPositionByTicket(ticket);
++        var pending = manualPendingByTicket(ticket);
++        state.selectedManualTicket = Number(ticket);
++        refreshManualOverlay(true);
++        if (position) {
++            var panel = byId('positionQuickPanel');
++            if (panel) panel.classList.remove('hidden');
++            byId('positionPanelTitle').textContent = 'XAUUSD ' + (position.side === 'buy' ? 'BUY ' : 'SELL ') + Number(position.lot).toFixed(2) + '  #' + position.ticket;
++            byId('positionPanelHint').textContent = 'اسحب خط TP أو SL مباشرة على الشارت';
++            byId('positionAddTp').textContent = position.target == null ? '+ TP' : 'TP';
++            byId('positionAddSl').textContent = position.stop == null ? '+ SL' : 'SL';
++        } else if (pending && kind === 'pending') {
++            showToast(pending.typeLabel + ' #' + pending.ticket + ' • اسحب الخط لتغيير سعر الأمر');
++        }
++        renderRobotTerminal();
++    }
++
++    function defaultManualLevel(position, kind) {
++        var quote = currentManualQuote();
++        var spread = quote ? Math.max(.01, quote.ask - quote.bid) : .30;
++        var distance = Math.max(2.0, spread * 12);
++        if (kind === 'stop') return position.side === 'buy' ? position.entry - distance : position.entry + distance;
++        return position.side === 'buy' ? position.entry + distance : position.entry - distance;
++    }
++
++    function updateManualLevel(ticket, kind, price, finalChange) {
++        if (!state.account || !isFinite(Number(price))) return;
++        price = round(Number(price), 2);
++        var position = manualPositionByTicket(ticket);
++        if (position && (kind === 'stop' || kind === 'target')) {
++            var step = .01;
++            if (kind === 'stop') {
++                price = position.side === 'buy' ? Math.min(price, position.entry - step) : Math.max(price, position.entry + step);
++                position.stop = price;
++            } else {
++                price = position.side === 'buy' ? Math.max(price, position.entry + step) : Math.min(price, position.entry - step);
++                position.target = price;
++            }
++            recalculateManualAccount(currentManualQuote());
++        } else if (kind === 'pending') {
++            var order = manualPendingByTicket(ticket);
++            if (!order) return;
++            var quote = currentManualQuote();
++            var gap = .01;
++            if (quote) {
++                if (order.type === 'buyLimit') price = Math.min(price, quote.ask - gap);
++                else if (order.type === 'sellLimit') price = Math.max(price, quote.bid + gap);
++                else if (order.type === 'buyStop') price = Math.max(price, quote.ask + gap);
++                else if (order.type === 'sellStop') price = Math.min(price, quote.bid - gap);
++            }
++            order.price = price;
++        } else {
++            return;
++        }
++        refreshManualOverlay(true);
++        if (finalChange) {
++            persistAccountNow();
++            renderRobotTerminal();
++            showToast(kind === 'pending' ? 'تم تعديل سعر الأمر' : (kind === 'stop' ? 'تم تعديل Stop Loss' : 'تم تعديل Take Profit'), 'success');
++        } else scheduleAccountPersist();
++    }
++

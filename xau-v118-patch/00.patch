@@ -1,0 +1,149 @@
+diff -ruN '--exclude=vendor-data.min.js' '--exclude=manual-build' xau118_src/app/build.gradle xau118_work/app/build.gradle
+--- xau118_src/app/build.gradle	2026-08-31 08:05:22.000000000 +0000
++++ xau118_work/app/build.gradle	2026-08-31 09:31:21.701752396 +0000
+@@ -10,8 +10,8 @@
+         applicationId 'com.maimon.xaulab'
+         minSdk 26
+         targetSdk 35
+-        versionCode 18
+-        versionName '1.17.0'
++        versionCode 19
++        versionName '1.18.0'
+     }
+ 
+     buildTypes {
+diff -ruN '--exclude=vendor-data.min.js' '--exclude=manual-build' xau118_src/app/src/main/assets/app.css xau118_work/app/src/main/assets/app.css
+--- xau118_src/app/src/main/assets/app.css	2026-08-31 08:05:22.000000000 +0000
++++ xau118_work/app/src/main/assets/app.css	2026-08-31 09:37:22.362512728 +0000
+@@ -1314,3 +1314,95 @@
+ #placeManualOrder.sell-action { background:#d94d63; border-color:#d94d63; }
+ body.light .manual-quote-line { background:#f4f7fa; border-color:#d5dee7; color:#263b51; }
+ @media (max-width:360px) { .manual-order-grid { grid-template-columns:1fr; } }
++
++
++/* v1.18 — Meta-style quick trading, compact tools, draggable trade levels */
++.quick-trade-bar {
++    display:grid; grid-template-columns:minmax(0,1fr) 118px minmax(0,1fr);
++    min-height:62px; border-bottom:1px solid #26384e; background:#0a1727; direction:ltr;
++}
++.quick-side { border:0; color:#fff; display:flex; flex-direction:column; justify-content:center; gap:2px; padding:8px 14px; font-weight:900; }
++.quick-side span { font-size:11px; line-height:1; text-align:left; }
++.quick-side strong { font-size:19px; line-height:1.05; letter-spacing:.2px; }
++.quick-sell { background:#e84d61; align-items:flex-start; }
++.quick-buy { background:#2f80ed; align-items:flex-end; }
++.quick-buy span { text-align:right; }
++.quick-lot { display:grid; grid-template-columns:32px 1fr 32px; align-items:center; background:#fff; color:#111; border-left:1px solid #d8dfe7; border-right:1px solid #d8dfe7; }
++.quick-lot button { height:100%; border:0; background:transparent; font-size:22px; font-weight:900; color:#222; }
++.quick-lot input { width:100%; border:0; outline:0; background:transparent; text-align:center; color:#111; font-size:18px; font-weight:800; appearance:textfield; }
++.quick-lot input::-webkit-inner-spin-button, .quick-lot input::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
++.quick-side:active { filter:brightness(.92); }
++body.light .quick-trade-bar { border-color:#d8dfe7; background:#fff; }
++
++.meta-compact-toolbar { position:relative; display:flex; align-items:center; gap:7px; min-height:52px; padding:5px 8px; }
++.timeframe-compact { position:relative; margin-right:auto; }
++.meta-tool {
++    min-width:44px; height:42px; border:1px solid #31465d; border-radius:9px;
++    display:inline-flex; align-items:center; justify-content:center; gap:4px;
++    background:#0d1c2d; color:#dfe8f1; font-size:18px; font-weight:850;
++}
++.meta-tool svg { width:21px; height:21px; fill:none; stroke:currentColor; stroke-width:1.8; }
++.timeframe-current { min-width:70px; padding:0 10px; font-size:13px; }
++.timeframe-current strong { font-size:15px; }
++.timeframe-current span { font-size:12px; opacity:.75; }
++.timeframe-popover {
++    position:absolute; z-index:100; top:46px; left:0; min-width:150px; padding:6px;
++    display:grid; grid-template-columns:repeat(3,1fr); gap:4px; border:1px solid #31465d;
++    border-radius:11px; background:#0b192a; box-shadow:0 12px 28px rgba(0,0,0,.32);
++}
++.timeframe-popover button { min-height:38px; border:0; border-radius:7px; background:#11233a; color:#9fb0c2; font-size:11px; font-weight:850; }
++.timeframe-popover button.active { background:#2f80ed; color:#fff; }
++body.light .meta-tool { border-color:#cbd6e2; background:#f7f9fc; color:#273b50; }
++body.light .timeframe-popover { border-color:#d3dce6; background:#fff; box-shadow:0 12px 24px rgba(53,75,97,.16); }
++body.light .timeframe-popover button { background:#eef3f8; color:#536a82; }
++body.light .timeframe-popover button.active { background:#2f80ed; color:#fff; }
++
++.position-quick-panel {
++    position:absolute; z-index:25; left:8px; right:8px; bottom:8px; min-height:58px;
++    display:flex; align-items:center; gap:8px; padding:7px 9px; border:1px solid #344a63; border-radius:14px;
++    background:rgba(8,19,33,.95); box-shadow:0 10px 28px rgba(0,0,0,.28); backdrop-filter:blur(8px);
++}
++.position-quick-panel.hidden { display:none !important; }
++.position-back, .position-tp, .position-sl, .position-edit {
++    min-width:44px; height:42px; border:0; border-radius:21px; color:#fff; font-weight:900;
++}
++.position-back { background:#16334f; color:#6bb0ff; font-size:20px; }
++.position-tp { background:#12a53f; }
++.position-sl { background:#df5b4e; }
++.position-edit { min-width:62px; border-radius:10px; background:#4356b8; }
++.position-panel-main { min-width:0; flex:1; display:flex; flex-direction:column; gap:3px; }
++.position-panel-main strong { color:#f1f5f9; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
++.position-panel-main small { color:#8ea2b8; font-size:8px; line-height:1.3; }
++body.light .position-quick-panel { border-color:#ccd6e1; background:rgba(255,255,255,.97); }
++body.light .position-panel-main strong { color:#152d46; }
++body.light .position-panel-main small { color:#657a8f; }
++
++.manual-position-row, .pending-order-row { cursor:pointer; }
++.manual-position-row.selected-position { box-shadow:inset 3px 0 #2f80ed; }
++.pending-order-row { opacity:1; }
++.meta-position-row .order-kind { font-size:10px; font-weight:900; text-transform:lowercase; }
++.meta-position-row .pending-badge { color:#8ea2b8; font-size:9px; font-weight:800; }
++.meta-position-list .meta-empty { min-height:calc(100dvh - var(--nav-h) - 266px); }
++
++.chart-fullscreen .quick-trade-bar { position:relative; z-index:30; }
++@media (max-width:360px) {
++    .quick-trade-bar { grid-template-columns:minmax(0,1fr) 104px minmax(0,1fr); }
++    .quick-side strong { font-size:17px; }
++    .quick-lot input { font-size:16px; }
++    .position-panel-main small { display:none; }
++}
++
++#page-chart.lab-mode .quick-trade-bar { display:none; }
++
++#timeframes.timeframe-popover {
++    position:absolute; z-index:100; top:46px; left:0; width:150px; min-width:150px;
++    display:grid; grid-template-columns:repeat(3,1fr); gap:4px; padding:6px; overflow:visible;
++}
++#timeframes.timeframe-popover.hidden { display:none !important; }
++#timeframes.timeframe-popover button { width:auto; min-width:0; height:38px; padding:0 5px; }
++.lab-pane .meta-compact-toolbar .cut-button {
++    display:inline-flex !important; position:static; z-index:auto; top:auto; left:auto;
++    width:44px; height:42px; border-radius:9px; background:#0d1c2d; box-shadow:none;
++}
++.lab-pane .meta-compact-toolbar > .indicator-menu-button { flex:0 0 44px; width:44px; height:42px; }
++body.light .lab-pane .meta-compact-toolbar .cut-button { background:#f7f9fc; }
+diff -ruN '--exclude=vendor-data.min.js' '--exclude=manual-build' xau118_src/app/src/main/assets/app.js xau118_work/app/src/main/assets/app.js
+--- xau118_src/app/src/main/assets/app.js	2026-08-31 08:06:14.000000000 +0000
++++ xau118_work/app/src/main/assets/app.js	2026-08-31 09:35:38.535255783 +0000
+@@ -4,7 +4,7 @@
+     var MAX_SESSION_CANDLES = 150000;
+     var MAX_PERSISTED_CANDLES = 10000;
+     var REPLAY_HISTORY_LIMIT = 5000;
+-    var LIVE_POLL_MS = 1200;
++    var LIVE_POLL_MS = 350;
+     var LIVE_HISTORY_REFRESH_MS = 60000;
+     var LIVE_QUOTE_URL = 'https://forex-data-feed.swissquote.com/public-quotes/bboquotes/instrument/XAU/USD';
+     var STORAGE = {
+@@ -69,6 +69,7 @@
+         account: null,
+         accountEditing: false,
+         accountPersistTimer: null,
++        selectedManualTicket: null,
+         settings: { light: false, defaultSma: false, defaultEma: false }
+     };
+ 
+@@ -256,6 +257,9 @@
+         this.seriesCache = {};
+         this.robotOverlay = null;
+         this.manualOverlay = null;
++        this.manualHitLevels = [];
++        this.onManualLevelTap = null;
++        this.onManualLevelDrag = null;
+         this.indicators = { sma: false, ema: false, rsi: false };
+         this.visibleCount = 60;
+         this.offset = 0;
+@@ -609,36 +613,49 @@
+ 
+ 
+         if (manualOverlay) {
+-            function drawManualLevel(value, color, label, dashed) {
++            this.manualHitLevels = [];

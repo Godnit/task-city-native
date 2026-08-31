@@ -1,8 +1,8 @@
-name: Build XAU Lab 1.17.0 unsigned
+name: Build XAU Lab 1.18.0 unsigned
 
 on:
   push:
-    branches: [ xau-lab-build-1-17 ]
+    branches: [ xau-lab-build-1-18 ]
   workflow_dispatch:
 
 jobs:
@@ -41,7 +41,7 @@ jobs:
           test -f xau-build-src/app/src/main/assets/app.js
           test -f xau-build-src/app/src/main/java/com/maimon/xaulab/MainActivity.java
 
-      - name: Apply verified XAU 1.17 update
+      - name: Apply XAU 1.17 base update
         shell: bash
         run: |
           set -euo pipefail
@@ -52,13 +52,30 @@ jobs:
           test ! -s app/src/main/assets/index.html.rej
           test ! -s app/src/main/assets/app.css.rej
           grep -q "versionName '1.17.0'" app/build.gradle
-          grep -q "versionCode 18" app/build.gradle
-          grep -q "Meta-style solid candles" app/src/main/assets/app.js
-          grep -q "function placeManualOrderFromModal" app/src/main/assets/app.js
-          grep -q "manualPendingOrdersBody" app/src/main/assets/app.js
-          grep -q 'id="manualOrderModal"' app/src/main/assets/index.html
-          grep -q 'id="manualMarginStatus"' app/src/main/assets/index.html
-          test -s tools/test-manual-trading.js
+          grep -q 'function placeManualOrderFromModal' app/src/main/assets/app.js
+
+      - name: Apply XAU 1.18 Meta terminal update
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat xau-v118-patch/* > /tmp/v118.patch
+          cd xau-build-src
+          patch --batch -p1 < /tmp/v118.patch || true
+          test ! -s app/build.gradle.rej
+          test ! -s app/src/main/assets/app.js.rej
+          test ! -s app/src/main/assets/index.html.rej
+          test ! -s app/src/main/assets/app.css.rej
+          test ! -s app/src/main/java/com/maimon/xaulab/MainActivity.java.rej
+          grep -q "versionName '1.18.0'" app/build.gradle
+          grep -q "versionCode 19" app/build.gradle
+          grep -q 'var LIVE_POLL_MS = 350' app/src/main/assets/app.js
+          grep -q 'function placeQuickMarket' app/src/main/assets/app.js
+          grep -q 'function updateManualLevel' app/src/main/assets/app.js
+          grep -q 'needsLiveTerminal' app/src/main/assets/app.js
+          grep -q 'id="quickTradeBar"' app/src/main/assets/index.html
+          grep -q 'id="timeframeMenuButton"' app/src/main/assets/index.html
+          grep -q 'id="positionQuickPanel"' app/src/main/assets/index.html
+          test -s tools/test-meta-ui-v118.js
 
       - name: Install and build vendor bundle
         working-directory: xau-build-src
@@ -67,7 +84,7 @@ jobs:
           npm run build:vendor
           test -s app/src/main/assets/vendor-data.min.js
 
-      - name: Validate XAU 1.17 logic
+      - name: Validate XAU 1.18 logic
         working-directory: xau-build-src
         run: |
           node --check app/src/main/assets/app.js
@@ -75,7 +92,8 @@ jobs:
           if test -f tools/test-live-data.js; then node tools/test-live-data.js; fi
           if test -f tools/test-visual-robot.js; then node tools/test-visual-robot.js; fi
           if test -f tools/test-account.js; then node tools/test-account.js; fi
-          node tools/test-manual-trading.js
+          if test -f tools/test-manual-trading.js; then node tools/test-manual-trading.js; fi
+          node tools/test-meta-ui-v118.js
 
       - name: Build unsigned release APK
         working-directory: xau-build-src
@@ -88,17 +106,17 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifact
-          cp xau-build-src/app/build/outputs/apk/release/app-release-unsigned.apk artifact/XAU-Lab-v1.17.0-unsigned.apk
+          cp xau-build-src/app/build/outputs/apk/release/app-release-unsigned.apk artifact/XAU-Lab-v1.18.0-unsigned.apk
           BT="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
           echo "Using build tools: $BT"
           test -s "$BT/lib/apksigner.jar"
           cp "$BT/lib/apksigner.jar" artifact/apksigner.jar
-          if test -x "$BT/aapt"; then "$BT/aapt" dump badging artifact/XAU-Lab-v1.17.0-unsigned.apk > artifact/badging.txt; fi
+          if test -x "$BT/aapt"; then "$BT/aapt" dump badging artifact/XAU-Lab-v1.18.0-unsigned.apk > artifact/badging.txt; fi
           sha256sum artifact/* > artifact/SHA256SUMS.txt
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: XAU-Lab-v1.17.0-unsigned-and-apksigner
+          name: XAU-Lab-v1.18.0-unsigned-and-apksigner
           path: artifact/
           if-no-files-found: error

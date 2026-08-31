@@ -1,0 +1,27 @@
++process.stdout.write(JSON.stringify({manualMarketOrders:true,pendingOrders:true,slTp:true,margin:true,chartLevels:true,solidBullCandles:true,version:'1.18.0'})+'\n');
+diff -ruN '--exclude=vendor-data.min.js' '--exclude=manual-build' xau118_src/tools/test-meta-ui-v118.js xau118_work/tools/test-meta-ui-v118.js
+--- xau118_src/tools/test-meta-ui-v118.js	1970-01-01 00:00:00.000000000 +0000
++++ xau118_work/tools/test-meta-ui-v118.js	2026-08-31 09:36:28.421797611 +0000
+@@ -0,0 +1,22 @@
++const fs=require('fs'), path=require('path');
++const source=fs.readFileSync(path.resolve(__dirname,'../app/src/main/assets/app.js'),'utf8');
++const html=fs.readFileSync(path.resolve(__dirname,'../app/src/main/assets/index.html'),'utf8');
++const css=fs.readFileSync(path.resolve(__dirname,'../app/src/main/assets/app.css'),'utf8');
++const mustSource=[
++  'var LIVE_POLL_MS = 350',
++  'function placeQuickMarket(',
++  'function selectManualTicket(',
++  'function updateManualLevel(',
++  'manualLevelAt',
++  'onManualLevelDrag',
++  'selectedTicket: state.selectedManualTicket',
++  "needsLiveTerminal",
++  "updateQuickTradeBar"
++];
++for(const t of mustSource) if(!source.includes(t)) throw new Error('Missing v1.18 source token: '+t);
++for(const id of ['quickTradeBar','quickSell','quickSellPrice','quickLot','quickBuy','quickBuyPrice','timeframeMenuButton','timeframeCurrent','quickPendingButton','positionQuickPanel','positionAddTp','positionAddSl','positionEditButton']) {
++  if(!html.includes(`id="${id}"`)) throw new Error('Missing v1.18 UI: '+id);
++}
++for(const token of ['quick-trade-bar','timeframe-popover','position-quick-panel','lab-mode .quick-trade-bar']) if(!css.includes(token)) throw new Error('Missing v1.18 CSS: '+token);
++if(!source.includes("ctx.setLineDash(dashed ? [7, 4] : [7, 4])")) throw new Error('Trade entry lines are not dashed');
++process.stdout.write(JSON.stringify({quickTrade:true,liveTerminal:true,dragSlTp:true,dragPending:true,compactTimeframe:true,mergedOrders:true,pollMs:350})+'\\n');
