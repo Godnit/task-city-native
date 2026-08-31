@@ -54,11 +54,12 @@ jobs:
           grep -q "versionName '1.17.0'" app/build.gradle
           grep -q 'function placeManualOrderFromModal' app/src/main/assets/app.js
 
-      - name: Apply XAU 1.18 Meta terminal update
+      - name: Apply verified XAU 1.18 Meta terminal update
         shell: bash
         run: |
           set -euo pipefail
-          cat xau-v118-patch/* > /tmp/v118.patch
+          echo '0219ebb6d7b5ecb128a4a144eec6da70fe64b8e29f775938a51c0136ae17de0a  xau-v118.patch.xz' | sha256sum -c -
+          xz -dc xau-v118.patch.xz > /tmp/v118.patch
           cd xau-build-src
           patch --batch -p1 < /tmp/v118.patch || true
           test ! -s app/build.gradle.rej
