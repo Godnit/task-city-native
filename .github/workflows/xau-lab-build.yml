@@ -88,6 +88,7 @@ jobs:
           cat xau-v120-parts/part* > /tmp/xau-v120.py
           cd xau-build-src
           python /tmp/xau-v120.py
+          cp ../xau-v120-test.js tools/test-v120.js
           grep -q "versionName '1.20.0'" app/build.gradle
           grep -q 'versionCode 21' app/build.gradle
           grep -q 'function shouldKeepLiveQuotes()' app/src/main/assets/app.js
