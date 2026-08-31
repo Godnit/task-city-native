@@ -1,0 +1,118 @@
++        var info = manualTypeInfo(type);
++        var priceField = byId('manualPendingPriceField');
++        priceField.classList.toggle('hidden', info.market);
++        var quote = currentManualQuote();
++        byId('manualQuoteLine').textContent = quote ? ('Bid ' + formatPrice(quote.bid) + '  •  Ask ' + formatPrice(quote.ask)) : 'لا يوجد سعر متاح';
++        if (!info.market && quote && !byId('manualOrderPrice').value) {
++            var step = Math.max(.5, (quote.ask - quote.bid) * 3);
++            var suggested = type === 'buyLimit' || type === 'sellStop' ? quote.bid - step : quote.ask + step;
++            byId('manualOrderPrice').value = formatPrice(suggested);
++        }
++        var action = byId('placeManualOrder');
++        action.textContent = info.market ? (info.side === 'buy' ? 'شراء الآن' : 'بيع الآن') : 'وضع الأمر المعلق';
++        action.classList.toggle('sell-action', info.side === 'sell');
++    }
++
++    function openManualOrderModal() {
++        if (!state.account) { showAccountGate(false); return; }
++        var quote = currentManualQuote();
++        if (!quote) { showToast('لا يوجد سعر متاح الآن؛ افتح الشارت أو الإعادة أولًا', 'error'); return; }
++        byId('manualLot').value = Number(state.account.lastLot || .1).toFixed(2);
++        byId('manualOrderPrice').value = '';
++        byId('manualStopLoss').value = '';
++        byId('manualTakeProfit').value = '';
++        byId('manualOrderModal').classList.remove('hidden');
++        syncManualOrderModal();
++    }
++
++    function closeManualOrderModal() { byId('manualOrderModal').classList.add('hidden'); }
++
++    function placeManualOrderFromModal() {
++        if (!state.account) return;
++        var quote = currentManualQuote();
++        if (!quote) { showToast('لا يوجد سعر متاح', 'error'); return; }
++        var type = byId('manualOrderType').value;
++        var info = manualTypeInfo(type);
++        var lot = clamp(number(toEnglishDigits(byId('manualLot').value), .1), .01, 100);
++        var price = info.market ? (info.side === 'buy' ? quote.ask : quote.bid) : number(toEnglishDigits(byId('manualOrderPrice').value), 0);
++        var stop = number(toEnglishDigits(byId('manualStopLoss').value), 0) || null;
++        var target = number(toEnglishDigits(byId('manualTakeProfit').value), 0) || null;
++        try {
++            if (!isFinite(price) || price <= 0) throw new Error('اكتب سعرًا صحيحًا للأمر');
++            validateManualLevels(info.side, price, stop, target);
++            if (!info.market) {
++                if (type === 'buyLimit' && price >= quote.ask) throw new Error('Buy Limit يجب أن يكون أسفل Ask الحالي');
++                if (type === 'sellLimit' && price <= quote.bid) throw new Error('Sell Limit يجب أن يكون أعلى Bid الحالي');
++                if (type === 'buyStop' && price <= quote.ask) throw new Error('Buy Stop يجب أن يكون أعلى Ask الحالي');
++                if (type === 'sellStop' && price >= quote.bid) throw new Error('Sell Stop يجب أن يكون أسفل Bid الحالي');
++            }
++        } catch (error) { showToast(error.message, 'error'); return; }
++
++        if (info.market) {
++            if (!openManualPosition(info.side, lot, price, stop, target, quote, null, 'سوق')) return;
++            showToast((info.side === 'buy' ? 'تم فتح صفقة شراء' : 'تم فتح صفقة بيع') + ' • ' + lot.toFixed(2) + ' Lot', 'success');
++        } else {
++            var ticket = state.account.nextTicket++;
++            state.account.pendingOrders = (state.account.pendingOrders || []).concat([{
++                source: 'manual', ticket: ticket, type: type, typeLabel: info.label, side: info.side,
++                lot: lot, price: price, stop: stop, target: target, createdAt: quote.t, createdIndex: quote.index
++            }]).slice(-100);
++            state.account.lastLot = lot;
++            persistAccountNow();
++            refreshManualOverlay(false);
++            showToast('تم وضع ' + info.label + ' #' + ticket, 'success');
++        }
++        closeManualOrderModal();
++        renderRobotTerminal();
++    }
++
++    function cancelManualPending(ticket) {
++        if (!state.account) return;
++        var before = state.account.pendingOrders.length;
++        state.account.pendingOrders = state.account.pendingOrders.filter(function (order) { return Number(order.ticket) !== Number(ticket); });
++        if (state.account.pendingOrders.length !== before) {
++            persistAccountNow(); refreshManualOverlay(false); renderRobotTerminal(); showToast('تم إلغاء الأمر المعلق');
++        }
++    }
++
+     function renderRobotTerminal() {
+         if (!byId('robotTerminal')) return;
+         var settings = null;
+@@ -2722,8 +3045,18 @@
+         var floating = 0;
+         var margin = 0;
+         var openTrade = null;
++        var manualMode = !!(state.account && (((state.account.manualPositions || []).length || (state.account.pendingOrders || []).length) || (state.account.trades || []).some(function (trade) { return trade && trade.source === 'manual'; })));
+ 
+-        if (state.visualRobot) {
++        if (manualMode) {
++            var quote = currentManualQuote();
++            if (quote) recalculateManualAccount(quote);
++            settings = { initialBalance: state.account.initialBalance, leverage: state.account.leverage, lot: state.account.lastLot || .1 };
++            trades = state.account.trades || [];
++            balance = state.account.balance;
++            floating = state.account.floating || 0;
++            margin = state.account.margin || 0;
++            currentPrice = quote ? quote.bid : state.account.currentPrice;
++        } else if (state.visualRobot) {
+             settings = state.visualRobot.settings;
+             snapshot = visualRobotSnapshot(state.replayIndex);
+             trades = state.visualRobot.results.trades;
+@@ -2738,11 +3071,7 @@
+             trades = state.lastResults.trades;
+             balance = state.lastResults.finalBalance;
+         } else if (state.account) {
+-            settings = {
+-                initialBalance: state.account.initialBalance,
+-                leverage: state.account.leverage,
+-                lot: state.account.lastLot || .1
+-            };
++            settings = { initialBalance: state.account.initialBalance, leverage: state.account.leverage, lot: state.account.lastLot || .1 };
+             trades = state.account.trades || [];
+             currentIndex = state.account.currentIndex == null ? Infinity : state.account.currentIndex;
+             balance = state.account.balance;
+@@ -2757,7 +3086,7 @@
+ 
+         var equity = balance + floating;
+         var freeMargin = equity - margin;
+-        if (state.account && (state.visualRobot || state.lastResults)) {

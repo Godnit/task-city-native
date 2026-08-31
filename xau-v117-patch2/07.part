@@ -1,0 +1,56 @@
++            <div class="modal-handle"></div>
++            <div class="modal-title"><div><span class="eyebrow">XAUUSD</span><h3 id="manualOrderTitle">أمر تداول جديد</h3></div><button type="button" data-close-manual-order>×</button></div>
++            <div id="manualQuoteLine" class="manual-quote-line" dir="ltr">Bid — • Ask —</div>
++            <label class="field full"><span>نوع الأمر</span><select id="manualOrderType">
++                <option value="marketBuy">Market Buy — شراء سوق</option>
++                <option value="marketSell">Market Sell — بيع سوق</option>
++                <option value="buyLimit">Buy Limit</option>
++                <option value="sellLimit">Sell Limit</option>
++                <option value="buyStop">Buy Stop</option>
++                <option value="sellStop">Sell Stop</option>
++            </select></label>
++            <div class="manual-order-grid">
++                <label class="field"><span>الحجم (Lot)</span><input id="manualLot" type="number" min="0.01" max="100" step="0.01" value="0.10" inputmode="decimal"></label>
++                <label id="manualPendingPriceField" class="field hidden"><span>سعر الأمر</span><input id="manualOrderPrice" type="number" step="0.01" inputmode="decimal"></label>
++                <label class="field"><span>Stop Loss</span><input id="manualStopLoss" type="number" step="0.01" placeholder="اختياري" inputmode="decimal"></label>
++                <label class="field"><span>Take Profit</span><input id="manualTakeProfit" type="number" step="0.01" placeholder="اختياري" inputmode="decimal"></label>
++            </div>
++            <p class="manual-order-note">محاكاة فقط. الشراء ينفذ على Ask والبيع على Bid، والهامش محسوب على عقد ذهب 100 أونصة لكل 1 Lot.</p>
++            <div class="modal-actions"><button type="button" class="secondary-button" data-close-manual-order>إلغاء</button><button id="placeManualOrder" type="button" class="primary-button">شراء الآن</button></div>
++        </div>
++    </div>
++
+     <div id="savedRobotsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="savedRobotsTitle">
+         <div class="modal-backdrop" data-close-modal></div>
+         <div class="modal-sheet">
+diff -ruN '--exclude=vendor-data.min.js' old116/tools/test-account.js src/tools/test-account.js
+--- old116/tools/test-account.js	2026-08-30 20:32:27.000000000 +0000
++++ src/tools/test-account.js	2026-08-31 08:05:22.827521691 +0000
+@@ -15,5 +15,5 @@
+ if (!balanceTag.includes('disabled') || !leverageTag.includes('disabled')) throw new Error('Robot can still edit account capital/leverage');
+ if (!source.includes("initialBalance: state.account ?") || !source.includes("leverage: state.account ?")) throw new Error('Robot is not sourced from persistent account');
+ if (!source.includes("toEnglishDigits")) throw new Error('English digit normalization missing');
+-if (!gradle.includes("versionName '1.16.0'")) throw new Error('Version was not bumped');
+-process.stdout.write(JSON.stringify({firstRunAccount:true,persistentAccount:true,robotAccountSeparated:true,persistentTerminal:true,englishDigits:true,version:'1.16.0'})+'\n');
++if (!gradle.includes("versionName '1.17.0'")) throw new Error('Version was not bumped');
++process.stdout.write(JSON.stringify({firstRunAccount:true,persistentAccount:true,robotAccountSeparated:true,persistentTerminal:true,englishDigits:true,version:'1.17.0'})+'\n');
+diff -ruN '--exclude=vendor-data.min.js' old116/tools/test-manual-trading.js src/tools/test-manual-trading.js
+--- old116/tools/test-manual-trading.js	1970-01-01 00:00:00.000000000 +0000
++++ src/tools/test-manual-trading.js	2026-08-31 08:05:22.827738538 +0000
+@@ -0,0 +1,16 @@
++const fs = require('fs');
++const path = require('path');
++const source = fs.readFileSync(path.resolve(__dirname, '../app/src/main/assets/app.js'), 'utf8');
++const html = fs.readFileSync(path.resolve(__dirname, '../app/src/main/assets/index.html'), 'utf8');
++const gradle = fs.readFileSync(path.resolve(__dirname, '../app/build.gradle'), 'utf8');
++for (const token of [
++  'manualPositions:', 'pendingOrders:', 'function currentManualQuote()', 'function openManualPosition(',
++  'function closeManualPosition(', 'function processManualTrading(', 'function placeManualOrderFromModal()',
++  'function refreshManualOverlay(', 'CandleChart.prototype.setManualOverlay', 'Meta-style solid candles'
++]) if (!source.includes(token)) throw new Error('Missing manual trading token: ' + token);
++for (const id of ['newOrderButton','manualOrderModal','manualOrderType','manualLot','manualOrderPrice','manualStopLoss','manualTakeProfit','placeManualOrder','manualPendingOrdersBody','manualPendingCount','manualMarginStatus']) {
++  if (!html.includes(`id="${id}"`)) throw new Error('Missing manual trading UI: ' + id);
++}
++if (!gradle.includes("versionName '1.17.0'") || !gradle.includes('versionCode 18')) throw new Error('Version mismatch');
++if (!source.includes('ctx.fillRect(centerX - candleWidth / 2, bodyTop, candleWidth, bodyHeight);')) throw new Error('Solid candle fill missing');
++process.stdout.write(JSON.stringify({manualMarketOrders:true,pendingOrders:true,slTp:true,margin:true,chartLevels:true,solidBullCandles:true,version:'1.17.0'})+'\n');

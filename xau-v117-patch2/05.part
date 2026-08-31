@@ -1,0 +1,38 @@
+                 '<b class="' + (floating >= 0 ? 'positive' : 'negative') + '" dir="ltr">' + formatTradeMoney(floating) + '</b></div>' +
+                 '<div class="meta-position-prices" dir="ltr"><span>' + formatPrice(openTrade.entry) + ' → ' + formatPrice(currentPrice) + '</span>' +
+                 '<span>S/L ' + (openTrade.stop == null ? '—' : formatPrice(openTrade.stop)) + '</span>' +
+                 '<span>T/P ' + (openTrade.target == null ? '—' : formatPrice(openTrade.target)) + '</span></div>' +
+-                '</div>';
+-        } else {
+-            openBody.innerHTML = '<div class="meta-empty">لا توجد مراكز مفتوحة</div>';
++                '</div>');
++        }
++        openBody.innerHTML = rows.length ? rows.join('') : '<div class="meta-empty">لا توجد مراكز مفتوحة</div>';
++        byId('robotOpenCount').textContent = String(rows.length);
++
++        var pendingBody = byId('manualPendingOrdersBody');
++        if (pendingBody) {
++            var pending = state.account ? (state.account.pendingOrders || []) : [];
++            byId('manualPendingCount').textContent = String(pending.length);
++            pendingBody.innerHTML = pending.length ? pending.map(function (order) {
++                return '<div class="meta-position-row pending-order-row"><div class="meta-position-head"><strong>' + order.typeLabel + ' <span class="' + (order.side === 'buy' ? 'positive' : 'negative') + '">' + Number(order.lot).toFixed(2) + '</span></strong><b dir="ltr">' + formatPrice(order.price) + '</b></div>' +
++                    '<div class="meta-position-prices" dir="ltr"><span>SL ' + (order.stop == null ? '—' : formatPrice(order.stop)) + '</span><span>TP ' + (order.target == null ? '—' : formatPrice(order.target)) + '</span></div>' +
++                    '<div class="meta-position-actions"><small>#' + order.ticket + '</small><button type="button" data-cancel-pending="' + order.ticket + '">إلغاء</button></div></div>';
++            }).join('') : '<div class="meta-empty">لا توجد أوامر معلقة</div>';
+         }
+-        byId('robotOpenCount').textContent = openTrade ? '1' : '0';
+ 
+         var events = robotTerminalEvents(trades, currentIndex);
+         if (state.historyView === 'deals' || state.historyView === 'positions') events = events.filter(function (event) { return event.kind === 'exit'; });
+         else if (state.historyView === 'orders') events = events.filter(function (event) { return event.kind === 'entry'; });
+         byId('robotHistoryCount').textContent = String(events.length);
+         var historyBody = byId('robotHistoryBody');
+-        if (!events.length) {
+-            historyBody.innerHTML = '<div class="meta-empty">لا توجد صفقات في السجل</div>';
+-        } else {
++        if (!events.length) historyBody.innerHTML = '<div class="meta-empty">لا توجد صفقات في السجل</div>';
++        else {
+             historyBody.innerHTML = events.slice(0, 300).map(function (event) {
+                 var result = event.result == null ? '' : formatTradeMoney(event.result);
+                 return '<div class="meta-history-row ' + (event.kind === 'entry' ? 'entry-event' : 'exit-event') + '">' +
+                     '<div class="meta-history-head"><strong>XAUUSD, <span class="' + (event.side === 'buy' ? 'positive' : 'negative') + '">' + (event.side === 'buy' ? 'شراء' : 'بيع') + ' ' + Number(event.lot || settings.lot).toFixed(2) + '</span></strong>' +

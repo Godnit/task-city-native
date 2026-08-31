@@ -1,0 +1,40 @@
++        if (state.account && !manualMode && (state.visualRobot || state.lastResults)) {
+             persistTerminalToAccount(settings, balance, equity, freeMargin, margin, floating, openTrade, trades, currentIndex, currentPrice);
+         }
+         setTerminalMoney('robotCapitalBalance', balance, false);
+@@ -2765,42 +3094,72 @@
+         setTerminalMoney('robotCapitalFloating', floating, true);
+         setTerminalMoney('robotCapitalMargin', margin, false);
+         setTerminalMoney('robotCapitalFree', freeMargin, false);
++        var marginLevel = margin > 0 ? equity / margin * 100 : Infinity;
+         byId('robotCapitalMarginLevel').textContent = margin > 0
+-            ? (equity / margin * 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%'
++            ? marginLevel.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%'
+             : '—';
++        var status = byId('manualMarginStatus');
++        if (status) {
++            status.textContent = margin <= 0 ? 'بدون مراكز' : (marginLevel <= (state.account ? state.account.stopOutLevel : 50) ? 'Stop Out' : (marginLevel <= (state.account ? state.account.marginCallLevel : 100) ? 'Margin Call' : 'آمن'));
++            status.className = margin <= 0 ? 'neutral' : (marginLevel <= (state.account ? state.account.marginCallLevel : 100) ? 'negative' : 'positive');
++        }
+ 
+         var openBody = byId('robotOpenTradesBody');
++        var rows = [];
++        if (state.account) {
++            var quoteNow = currentManualQuote();
++            (state.account.manualPositions || []).forEach(function (position) {
++                var pnl = manualPositionFloating(position, quoteNow);
++                var nowPrice = quoteNow ? (position.side === 'buy' ? quoteNow.bid : quoteNow.ask) : currentPrice;
++                rows.push('<div class="meta-position-row manual-position-row">' +
++                    '<div class="meta-position-head"><strong>XAUUSD, <span class="' + (position.side === 'buy' ? 'positive' : 'negative') + '">' + (position.side === 'buy' ? 'شراء' : 'بيع') + ' ' + Number(position.lot).toFixed(2) + '</span></strong>' +
++                    '<b class="' + (pnl >= 0 ? 'positive' : 'negative') + '" dir="ltr">' + formatTradeMoney(pnl) + '</b></div>' +
++                    '<div class="meta-position-prices" dir="ltr"><span>' + formatPrice(position.entry) + ' → ' + formatPrice(nowPrice) + '</span>' +
++                    '<span>S/L ' + (position.stop == null ? '—' : formatPrice(position.stop)) + '</span>' +
++                    '<span>T/P ' + (position.target == null ? '—' : formatPrice(position.target)) + '</span></div>' +
++                    '<div class="meta-position-actions"><small>#' + position.ticket + ' • Margin ' + formatAccountMoney(position.margin) + '</small><button type="button" data-close-manual="' + position.ticket + '">إغلاق</button></div>' +
++                    '</div>');
++            });
++        }
+         if (openTrade) {
+-            openBody.innerHTML = '<div class="meta-position-row">' +
++            rows.push('<div class="meta-position-row">' +
+                 '<div class="meta-position-head"><strong>XAUUSD, <span class="' + (openTrade.side === 'buy' ? 'positive' : 'negative') + '">' + (openTrade.side === 'buy' ? 'شراء' : 'بيع') + ' ' + Number(openTrade.lot || settings.lot).toFixed(2) + '</span></strong>' +

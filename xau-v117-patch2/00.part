@@ -1,0 +1,128 @@
+diff -ruN '--exclude=vendor-data.min.js' old116/app/build.gradle src/app/build.gradle
+--- old116/app/build.gradle	2026-08-30 20:32:27.000000000 +0000
++++ src/app/build.gradle	2026-08-31 08:05:22.827476422 +0000
+@@ -10,8 +10,8 @@
+         applicationId 'com.maimon.xaulab'
+         minSdk 26
+         targetSdk 35
+-        versionCode 17
+-        versionName '1.16.0'
++        versionCode 18
++        versionName '1.17.0'
+     }
+ 
+     buildTypes {
+diff -ruN '--exclude=vendor-data.min.js' old116/app/src/main/assets/app.css src/app/src/main/assets/app.css
+--- old116/app/src/main/assets/app.css	2026-08-30 20:35:15.000000000 +0000
++++ src/app/src/main/assets/app.css	2026-08-31 08:05:22.827384284 +0000
+@@ -1293,3 +1293,24 @@
+ body.light .meta-account-identity span { color:#637990; }
+ body.light .tester-account-fields input:disabled, body.light .tester-account-fields select:disabled { color:#17314d; -webkit-text-fill-color:#17314d; background:#f3f6f9; }
+ @media (max-width:350px) { .account-gate-grid { grid-template-columns:1fr; } .account-gate-card { padding:18px 14px 14px; } }
++
++
++/* v1.17 manual trading + Meta-style terminal */
++.new-order-button { border:0; border-radius:9px; padding:8px 12px; background:#1b8f66; color:#fff; font-weight:850; font-size:11px; box-shadow:0 4px 14px rgba(27,143,102,.20); }
++.new-order-button:active { transform:translateY(1px); }
++body.light .new-order-button { background:#078960; }
++.meta-position-actions { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:8px; direction:ltr; }
++.meta-position-actions small { color:#7f93a8; font-size:9px; }
++.meta-position-actions button { border:1px solid #39516b; border-radius:7px; padding:5px 10px; color:#dfe8f1; background:#102237; font-size:9px; font-weight:800; }
++.pending-order-row { opacity:.94; }
++.pending-title { border-top:1px solid #26384e; }
++.pending-list { padding-bottom:14px; }
++body.light .meta-position-actions button { color:#34495e; border-color:#cfd8e2; background:#f5f8fb; }
++body.light .pending-title { border-color:#e0e3e8; }
++.manual-order-sheet { max-height:86vh; }
++.manual-quote-line { margin:10px 0 13px; padding:11px 12px; border-radius:10px; border:1px solid #2c4158; background:#0a1726; color:#dce8f3; text-align:center; font-size:12px; font-weight:850; letter-spacing:.2px; }
++.manual-order-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
++.manual-order-note { margin:5px 0 13px; color:var(--muted); font-size:9px; line-height:1.7; }
++#placeManualOrder.sell-action { background:#d94d63; border-color:#d94d63; }
++body.light .manual-quote-line { background:#f4f7fa; border-color:#d5dee7; color:#263b51; }
++@media (max-width:360px) { .manual-order-grid { grid-template-columns:1fr; } }
+diff -ruN '--exclude=vendor-data.min.js' old116/app/src/main/assets/app.js src/app/src/main/assets/app.js
+--- old116/app/src/main/assets/app.js	2026-08-30 20:35:15.000000000 +0000
++++ src/app/src/main/assets/app.js	2026-08-31 08:06:14.441085095 +0000
+@@ -255,6 +255,7 @@
+         this.closes = [];
+         this.seriesCache = {};
+         this.robotOverlay = null;
++        this.manualOverlay = null;
+         this.indicators = { sma: false, ema: false, rsi: false };
+         this.visibleCount = 60;
+         this.offset = 0;
+@@ -349,6 +350,11 @@
+         if (redraw !== false) this.draw();
+     };
+ 
++    CandleChart.prototype.setManualOverlay = function (overlay, redraw) {
++        this.manualOverlay = overlay || null;
++        if (redraw !== false) this.draw();
++    };
++
+     CandleChart.prototype.getGeometry = function () {
+         var margins = { left: 5, right: 58, top: 12, bottom: 22 };
+         var hasRobotRsi = !!(this.robotOverlay && this.robotOverlay.rsi);
+@@ -384,6 +390,7 @@
+         var candles = slice.items;
+         if (!candles.length) return;
+         var robotOverlay = this.robotOverlay;
++        var manualOverlay = this.manualOverlay;
+         var sma20 = this.indicators.sma ? (this.seriesCache.sma20 || (this.seriesCache.sma20 = sma(this.closes, 20))) : null;
+         var ema50 = this.indicators.ema ? (this.seriesCache.ema50 || (this.seriesCache.ema50 = ema(this.closes, 50))) : null;
+         var rsi14 = this.indicators.rsi ? (this.seriesCache.rsi14 || (this.seriesCache.rsi14 = rsi(this.closes, 14))) : null;
+@@ -421,6 +428,18 @@
+                 maximum = Math.max(maximum, value);
+             });
+         }
++        if (manualOverlay) {
++            (manualOverlay.positions || []).forEach(function (position) {
++                [position.entry, position.stop, position.target].forEach(function (value) {
++                    if (value == null) return;
++                    minimum = Math.min(minimum, value); maximum = Math.max(maximum, value);
++                });
++            });
++            (manualOverlay.pending || []).forEach(function (order) {
++                if (order.price == null) return;
++                minimum = Math.min(minimum, order.price); maximum = Math.max(maximum, order.price);
++            });
++        }
+         var pricePadding = Math.max((maximum - minimum) * .09, maximum * .00025, .1);
+         minimum -= pricePadding;
+         maximum += pricePadding;
+@@ -478,12 +497,9 @@
+             ctx.beginPath(); ctx.moveTo(centerX, highY); ctx.lineTo(centerX, lowY); ctx.stroke();
+             var bodyTop = Math.min(openY, closeY);
+             var bodyHeight = Math.max(1.25, Math.abs(openY - closeY));
+-            if (up) {
+-                ctx.fillStyle = palette.background;
+-                ctx.strokeRect(centerX - candleWidth / 2, bodyTop, candleWidth, bodyHeight);
+-            } else {
+-                ctx.fillRect(centerX - candleWidth / 2, bodyTop, candleWidth, bodyHeight);
+-            }
++            // Meta-style solid candles: both bullish and bearish bodies are fully filled.
++            ctx.fillStyle = color;
++            ctx.fillRect(centerX - candleWidth / 2, bodyTop, candleWidth, bodyHeight);
+         }
+ 
+         function drawLine(series, color) {
+@@ -591,6 +607,40 @@
+             }, this);
+         }
+ 
++
++        if (manualOverlay) {
++            function drawManualLevel(value, color, label, dashed) {
++                if (value == null || !isFinite(value)) return;
++                var y = priceY(value);
++                if (y < margin.top - 2 || y > margin.top + geometry.mainHeight + 2) return;
++                ctx.save();
++                ctx.strokeStyle = color;
++                ctx.lineWidth = 1.2;
++                if (dashed) ctx.setLineDash([5, 3]);
++                ctx.beginPath(); ctx.moveTo(margin.left, y); ctx.lineTo(margin.left + geometry.plotWidth, y); ctx.stroke();
++                ctx.setLineDash([]);
++                ctx.font = 'bold 7px sans-serif';
++                ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
++                var text = label + '  ' + formatPrice(value);
++                var width = Math.max(52, Math.min(118, text.length * 4.8 + 10));

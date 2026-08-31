@@ -1,0 +1,87 @@
+                     '<b class="' + (event.result == null ? '' : (event.result >= 0 ? 'positive' : 'negative')) + '" dir="ltr">' + result + '</b></div>' +
+-                    '<div class="meta-history-details"><span dir="ltr">' + escapeHtml(formatDate(event.time, true)) + '</span>' +
+-                    '<span>' + (event.kind === 'entry' ? 'دخول' : 'خروج') + '</span><span dir="ltr">' + formatPrice(event.price) + '</span></div>' +
+-                    '</div>';
++                    '<div class="meta-history-details"><span dir="ltr">' + escapeHtml(formatDate(event.time, true)) + '</span><span>' + (event.kind === 'entry' ? 'دخول' : 'خروج') + '</span><span dir="ltr">' + formatPrice(event.price) + '</span></div></div>';
+             }).join('');
+         }
++        refreshManualOverlay(false);
+     }
+ 
+     function selectRobotTerminalTab(name) {
+@@ -3214,6 +3573,21 @@
+         byId('saveAccountButton').addEventListener('click', saveAccountFromGate);
+         byId('cancelAccountEdit').addEventListener('click', hideAccountGate);
+         byId('editAccountButton').addEventListener('click', function () { showAccountGate(true); });
++        byId('newOrderButton').addEventListener('click', openManualOrderModal);
++        byId('manualOrderType').addEventListener('change', syncManualOrderModal);
++        byId('placeManualOrder').addEventListener('click', placeManualOrderFromModal);
++        all('[data-close-manual-order]').forEach(function (button) { button.addEventListener('click', closeManualOrderModal); });
++        byId('robotOpenTradesBody').addEventListener('click', function (event) {
++            var button = event.target.closest('[data-close-manual]');
++            if (!button) return;
++            var quote = currentManualQuote();
++            if (!quote) { showToast('لا يوجد سعر متاح للإغلاق', 'error'); return; }
++            if (closeManualPosition(Number(button.getAttribute('data-close-manual')), 'إغلاق يدوي', quote)) showToast('تم إغلاق الصفقة', 'success');
++        });
++        byId('manualPendingOrdersBody').addEventListener('click', function (event) {
++            var button = event.target.closest('[data-cancel-pending]');
++            if (button) cancelManualPending(Number(button.getAttribute('data-cancel-pending')));
++        });
+         bindEnglishNumericInputs();
+         all('.nav-item').forEach(function (button) {
+             button.addEventListener('click', function () {
+@@ -3338,6 +3712,7 @@
+         bindEvents();
+         loadSettings();
+         loadAccount();
++        refreshManualOverlay(false);
+         updateReplaySpeedSlider(byId('labReplaySpeed').value);
+         state.liveProviderMigrated = localStorage.getItem(STORAGE.liveProvider) === 'swissquote-bidask-v1';
+         liveChart = new CandleChart(byId('liveChart'));
+diff -ruN '--exclude=vendor-data.min.js' old116/app/src/main/assets/index.html src/app/src/main/assets/index.html
+--- old116/app/src/main/assets/index.html	2026-08-30 20:35:15.000000000 +0000
++++ src/app/src/main/assets/index.html	2026-08-31 08:05:22.827240036 +0000
+@@ -336,16 +336,21 @@
+ 
+             <section id="page-trades" class="page meta-trades-page" data-page="trades">
+                 <div id="robotTerminal" class="meta-terminal" aria-label="التداول">
+-                    <div class="meta-page-header"><strong>التداول</strong><span>⇅</span></div>
++                    <div class="meta-page-header"><strong>التداول</strong><button id="newOrderButton" class="new-order-button" type="button">+ أمر جديد</button></div>
+                     <div class="meta-account-identity"><strong id="tradeAccountName">حساب المحاكاة</strong><span id="tradeAccountMeta" dir="ltr">XAU Lab Demo • 1:100</span></div>
+                     <div class="meta-balance-lines">
+-                        <div><span>رصيد الحساب:</span><i></i><strong id="robotCapitalBalance" dir="ltr">10,000.00</strong></div>
+-                        <div><span>قيمة رأس المال:</span><i></i><strong id="robotCapitalEquity" dir="ltr">10,000.00</strong></div>
++                        <div><span>الرصيد:</span><i></i><strong id="robotCapitalBalance" dir="ltr">10,000.00</strong></div>
++                        <div><span>Equity:</span><i></i><strong id="robotCapitalEquity" dir="ltr">10,000.00</strong></div>
++                        <div><span>الهامش:</span><i></i><strong id="robotCapitalMargin" dir="ltr">0.00</strong></div>
+                         <div><span>الهامش المتاح:</span><i></i><strong id="robotCapitalFree" dir="ltr">10,000.00</strong></div>
++                        <div><span>Margin Level:</span><i></i><strong id="robotCapitalMarginLevel" dir="ltr">—</strong></div>
++                        <div><span>الربح العائم:</span><i></i><strong id="robotCapitalFloating" dir="ltr">0.00 USD</strong></div>
++                        <div><span>الحالة:</span><i></i><strong id="manualMarginStatus">بدون مراكز</strong></div>
+                     </div>
+-                    <div class="meta-hidden-metrics hidden"><span id="robotCapitalFloating">0.00 USD</span><span id="robotCapitalMargin">0.00 USD</span><span id="robotCapitalMarginLevel">—</span></div>
+                     <div class="meta-list-title"><strong>المراكز المفتوحة</strong><span id="robotOpenCount" dir="ltr">0</span></div>
+                     <div id="robotOpenTradesBody" class="meta-position-list"><div class="meta-empty">لا توجد مراكز مفتوحة</div></div>
++                    <div class="meta-list-title pending-title"><strong>الأوامر المعلقة</strong><span id="manualPendingCount" dir="ltr">0</span></div>
++                    <div id="manualPendingOrdersBody" class="meta-position-list pending-list"><div class="meta-empty">لا توجد أوامر معلقة</div></div>
+                 </div>
+             </section>
+ 
+@@ -400,7 +405,7 @@
+ 
+                 <div class="card about-card">
+                     <div class="about-logo"><div class="brand-mark"><i></i><i></i><i></i></div></div>
+-                    <div><strong>XAU Lab — مختبر الذهب</strong><span>الإصدار <b id="appVersion">1.16.0</b></span></div>
++                    <div><strong>XAU Lab — مختبر الذهب</strong><span>الإصدار <b id="appVersion">1.17.0</b></span></div>
+                     <p>أداة تعليم ومحاكاة واختبار فقط. لا تفتح صفقات ولا تتصل بحساب تداول، ونتائج الماضي لا تضمن نتائج مستقبلية.</p>
+                 </div>
+ 
+@@ -425,6 +430,32 @@
+         </nav>
+     </div>
+ 
++
++    <div id="manualOrderModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="manualOrderTitle">
++        <div class="modal-backdrop" data-close-manual-order></div>
++        <div class="modal-sheet manual-order-sheet">
