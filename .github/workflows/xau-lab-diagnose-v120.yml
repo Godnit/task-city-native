@@ -1,0 +1,52 @@
+name: Diagnose XAU Lab 1.20 trading logic
+
+on:
+  push:
+    branches: [ xau-lab-build-1-20 ]
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reconstruct source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat xau-src-parts/* > /tmp/xau-source.b64
+          base64 -d /tmp/xau-source.b64 > /tmp/xau-source.tar.xz
+          rm -rf xau-build-src && mkdir xau-build-src
+          tar -xJf /tmp/xau-source.tar.xz -C xau-build-src
+          cat xau-v117-patch2/* > /tmp/v117.patch
+          cd xau-build-src
+          patch --batch -p1 < /tmp/v117.patch || true
+          cd ..
+          xz -dc xau-v118.patch.xz > /tmp/v118.patch
+          cd xau-build-src
+          patch --batch -p1 < /tmp/v118.patch || true
+          python ../xau-v119-patch.py
+          cd ..
+          python - <<'PY'
+          import glob,json
+          parts=[]
+          for name in sorted(glob.glob('xau-v120-json/part*.json')):
+              with open(name,encoding='utf-8') as f: parts.append(json.load(f))
+          code=''.join(parts)
+          compile(code,'/tmp/xau-v120.py','exec')
+          open('/tmp/xau-v120.py','w',encoding='utf-8').write(code)
+          PY
+          cd xau-build-src
+          python /tmp/xau-v120.py
+      - name: Print trading functions
+        working-directory: xau-build-src
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('app/src/main/assets/app.js').read_text()
+          pats=['function openManualPosition','function processManualTrading','function closeManualPosition','function recalculateManualAccount','function manualPositionFloating','function validateManualLevels','function placeQuickMarket']
+          for p in pats:
+              i=s.find(p)
+              print('\n===== '+p+' =====')
+              print(s[i:i+6000] if i>=0 else 'NOT FOUND')
+          PY
