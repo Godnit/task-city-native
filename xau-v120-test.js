@@ -1,0 +1,14 @@
+const fs=require('fs'),path=require('path');
+const js=fs.readFileSync(path.resolve(__dirname,'../app/src/main/assets/app.js'),'utf8');
+const html=fs.readFileSync(path.resolve(__dirname,'../app/src/main/assets/index.html'),'utf8');
+const css=fs.readFileSync(path.resolve(__dirname,'../app/src/main/assets/app.css'),'utf8');
+const grad=fs.readFileSync(path.resolve(__dirname,'../app/build.gradle'),'utf8');
+for(const t of ["versionName '1.20.0'",'versionCode 21']) if(!grad.includes(t)) throw Error('version '+t);
+for(const t of ['function shouldKeepLiveQuotes()','function ensureManualDraft(','function commitManualDraft(','state.lastManualLiveKey','processManualTrading({ bid: price','state.manualDraft','pnlLabel','plainLabel','priceScale = 1','updatePositionQuickPanel()']) if(!js.includes(t)) throw Error('missing '+t);
+if(js.includes("showToast(kind === 'pending' ? 'تم تعديل سعر الأمر'")) throw Error('drag toast remains');
+if(js.includes("if (state.account) processManualTrading(currentManualQuote());")) throw Error('cached/UI redraw can still execute stops');
+if(!html.includes('id="accountMenuButton"')||!html.includes('class="toolbar-spacer"')) throw Error('account toolbar missing');
+if(html.indexOf('id="accountMenuButton"') < html.indexOf('id="replayStartPicker"')) throw Error('Accounts is not at far end');
+if(!html.includes('id="positionPanelPnl"')) throw Error('position pnl missing');
+for(const t of ['border:0!important;background:transparent!important','toolbar-spacer','pnl-plus','pnl-minus']) if(!css.includes(t)) throw Error('css '+t);
+console.log(JSON.stringify({liveAcrossPages:true,draftSlTp:true,confirmBeforeCommit:true,noDragToast:true,autoScaleDrag:true,accountSeparated:true,pnlOnlyLabel:true,version:'1.20.0'}));
