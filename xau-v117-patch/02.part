@@ -1,0 +1,133 @@
+r margin = requiredManualMargin(entry, lot);
++        recalculateManualAccount(quote);
++        if (margin > Math.max(0, state.account.freeMargin)) {
++            showToast('الهامش المتاح لا يكفي لفتح هذه الصفقة', 'error');
++            return false;
++        }
++        var position = {
++            source: 'manual', ticket: ticket || state.account.nextTicket++, side: side, lot: lot,
++            entry: entry, stop: stop, target: target, margin: margin,
++            entryTime: quote.t, entryIndex: quote.index == null ? Infinity : quote.index,
++            sourceLabel: sourceLabel || 'يدوي'
++        };
++        state.account.manualPositions = (state.account.manualPositions || []).concat([position]).slice(-50);
++        state.account.lastLot = lot;
++        recalculateManualAccount(quote);
++        persistAccountNow();
++        refreshManualOverlay(false);
++        return true;
++    }
++
++    function processManualTrading(quote, replayCandle) {
++        if (!state.account || !quote) return;
++        var changed = false;
++        var pending = state.account.pendingOrders || [];
++        var spread = quote.spread == null ? Math.max(0, quote.ask - quote.bid) : quote.spread;
++        var bidLow = replayCandle ? replayCandle.l : quote.bid;
++        var bidHigh = replayCandle ? replayCandle.h : quote.bid;
++        var askLow = replayCandle ? replayCandle.l + spread : quote.ask;
++        var askHigh = replayCandle ? replayCandle.h + spread : quote.ask;
++        var triggered = [];
++        pending.forEach(function (order) {
++            var hit = order.type === 'buyLimit' ? askLow <= order.price
++                : order.type === 'sellLimit' ? bidHigh >= order.price
++                : order.type === 'buyStop' ? askHigh >= order.price
++                : order.type === 'sellStop' ? bidLow <= order.price : false;
++            if (hit) triggered.push(order);
++        });
++        triggered.forEach(function (order) {
++            var triggerQuote = Object.assign({}, quote);
++            var opened = openManualPosition(order.side, order.lot, order.price, order.stop, order.target, triggerQuote, order.ticket, order.typeLabel);
++            if (opened) {
++                state.account.pendingOrders = (state.account.pendingOrders || []).filter(function (item) { return item.ticket !== order.ticket; });
++                changed = true;
++            }
++        });
++
++        var positions = (state.account.manualPositions || []).slice();
++        positions.forEach(function (position) {
++            var stopHit = false, targetHit = false;
++            if (position.side === 'buy') {
++                stopHit = position.stop != null && bidLow <= position.stop;
++                targetHit = position.target != null && bidHigh >= position.target;
++            } else {
++                stopHit = position.stop != null && askHigh >= position.stop;
++                targetHit = position.target != null && askLow <= position.target;
++            }
++            if (stopHit) { closeManualPosition(position.ticket, 'وقف الخسارة', quote, position.stop); changed = true; }
++            else if (targetHit) { closeManualPosition(position.ticket, 'هدف الربح', quote, position.target); changed = true; }
++        });
++        recalculateManualAccount(quote);
++
++        var marginLevel = state.account.margin > 0 ? state.account.equity / state.account.margin * 100 : Infinity;
++        if (marginLevel <= state.account.stopOutLevel && state.account.manualPositions.length) {
++            var worst = state.account.manualPositions.slice().sort(function (a, b) {
++                return manualPositionFloating(a, quote) - manualPositionFloating(b, quote);
++            })[0];
++            if (worst) { closeManualPosition(worst.ticket, 'Stop Out', quote); changed = true; }
++        }
++        if (changed) persistAccountNow(); else scheduleAccountPersist();
++        refreshManualOverlay(false);
++        if (state.page === 'trades' || state.page === 'history') renderRobotTerminal();
++    }
++
++    function validateManualLevels(side, entry, stop, target) {
++        if (stop != null && stop > 0) {
++            if (side === 'buy' && stop >= entry) throw new Error('وقف خسارة الشراء يجب أن يكون أقل من سعر الدخول');
++            if (side === 'sell' && stop <= entry) throw new Error('وقف خسارة البيع يجب أن يكون أعلى من سعر الدخول');
++        }
++        if (target != null && target > 0) {
++            if (side === 'buy' && target <= entry) throw new Error('هدف الشراء يجب أن يكون أعلى من سعر الدخول');
++            if (side === 'sell' && target >= entry) throw new Error('هدف البيع يجب أن يكون أقل من سعر الدخول');
++        }
++    }
++
++    function syncManualOrderModal() {
++        var type = byId('manualOrderType').value;
++        var info = manualTypeInfo(type);
++        var priceField = byId('manualPendingPriceField');
++        priceField.classList.toggle('hidden', info.market);
++        var quote = currentManualQuote();
++        byId('manualQuoteLine').textContent = quote ? ('Bid ' + formatPrice(quote.bid) + '  •  Ask ' + formatPrice(quote.ask)) : 'لا يوجد سعر متاح';
++        if (!info.market && quote && !byId('manualOrderPrice').value) {
++            var step = Math.max(.5, (quote.ask - quote.bid) * 3);
++            var suggested = type === 'buyLimit' || type === 'sellStop' ? quote.bid - step : quote.ask + step;
++            byId('manualOrderPrice').value = formatPrice(suggested);
++        }
++        var action = byId('placeManualOrder');
++        action.textContent = info.market ? (info.side === 'buy' ? 'شراء الآن' : 'بيع الآن') : 'وضع الأمر المعلق';
++        action.classList.toggle('sell-action', info.side === 'sell');
++    }
++
++    function openManualOrderModal() {
++        if (!state.account) { showAccountGate(false); return; }
++        var quote = currentManualQuote();
++        if (!quote) { showToast('لا يوجد سعر متاح الآن؛ افتح الشارت أو الإعادة أولًا', 'error'); return; }
++        byId('manualLot').value = Number(state.account.lastLot || .1).toFixed(2);
++        byId('manualOrderPrice').value = '';
++        byId('manualStopLoss').value = '';
++        byId('manualTakeProfit').value = '';
++        byId('manualOrderModal').classList.remove('hidden');
++        syncManualOrderModal();
++    }
++
++    function closeManualOrderModal() { byId('manualOrderModal').classList.add('hidden'); }
++
++    function placeManualOrderFromModal() {
++        if (!state.account) return;
++        var quote = currentManualQuote();
++        if (!quote) { showToast('لا يوجد سعر متاح', 'error'); return; }
++        var type = byId('manualOrderType').value;
++        var info = manualTypeInfo(type);
++        var lot = clamp(number(toEnglishDigits(byId('manualLot').value), .1), .01, 100);
++        var price = info.market ? (info.side === 'buy' ? quote.ask : quote.bid) : number(toEnglishDigits(byId('manualOrderPrice').value), 0);
++        var stop = number(toEnglishDigits(byId('manualStopLoss').value), 0) || null;
++        var target = number(toEnglishDigits(byId('manualTakeProfit').value), 0) || null;
++        try {
++            if (!isFinite(price) || price <= 0) throw new Error('اكتب سعرًا صحيحًا للأمر');
++            validateManualLevels(info.side, price, stop, target);
++            if (!info.market) {
++                if (type === 'buyLimit' && price >= quote.ask) throw new Error('Buy Limit يجب أن يكون أسفل Ask الحالي');
++                if (type === 'sellLimit' && price <= quote.bid) throw new Error('Sell Limit يجب أن يكون أعلى Bid الحالي');
++                if (type === 'buyStop' && price <= quote.ask) throw new Error('Buy Stop يجب أن يكون أعلى Ask الحالي');
++                if (type

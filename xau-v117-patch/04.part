@@ -1,0 +1,93 @@
+  }
++        openBody.innerHTML = rows.length ? rows.join('') : '<div class="meta-empty">لا توجد مراكز مفتوحة</div>';
++        byId('robotOpenCount').textContent = String(rows.length);
++
++        var pendingBody = byId('manualPendingOrdersBody');
++        if (pendingBody) {
++            var pending = state.account ? (state.account.pendingOrders || []) : [];
++            byId('manualPendingCount').textContent = String(pending.length);
++            pendingBody.innerHTML = pending.length ? pending.map(function (order) {
++                return '<div class="meta-position-row pending-order-row"><div class="meta-position-head"><strong>' + order.typeLabel + ' <span class="' + (order.side === 'buy' ? 'positive' : 'negative') + '">' + Number(order.lot).toFixed(2) + '</span></strong><b dir="ltr">' + formatPrice(order.price) + '</b></div>' +
++                    '<div class="meta-position-prices" dir="ltr"><span>SL ' + (order.stop == null ? '—' : formatPrice(order.stop)) + '</span><span>TP ' + (order.target == null ? '—' : formatPrice(order.target)) + '</span></div>' +
++                    '<div class="meta-position-actions"><small>#' + order.ticket + '</small><button type="button" data-cancel-pending="' + order.ticket + '">إلغاء</button></div></div>';
++            }).join('') : '<div class="meta-empty">لا توجد أوامر معلقة</div>';
+         }
+-        byId('robotOpenCount').textContent = openTrade ? '1' : '0';
+ 
+         var events = robotTerminalEvents(trades, currentIndex);
+         if (state.historyView === 'deals' || state.historyView === 'positions') events = events.filter(function (event) { return event.kind === 'exit'; });
+         else if (state.historyView === 'orders') events = events.filter(function (event) { return event.kind === 'entry'; });
+         byId('robotHistoryCount').textContent = String(events.length);
+         var historyBody = byId('robotHistoryBody');
+-        if (!events.length) {
+-            historyBody.innerHTML = '<div class="meta-empty">لا توجد صفقات في السجل</div>';
+-        } else {
++        if (!events.length) historyBody.innerHTML = '<div class="meta-empty">لا توجد صفقات في السجل</div>';
++        else {
+             historyBody.innerHTML = events.slice(0, 300).map(function (event) {
+                 var result = event.result == null ? '' : formatTradeMoney(event.result);
+                 return '<div class="meta-history-row ' + (event.kind === 'entry' ? 'entry-event' : 'exit-event') + '">' +
+                     '<div class="meta-history-head"><strong>XAUUSD, <span class="' + (event.side === 'buy' ? 'positive' : 'negative') + '">' + (event.side === 'buy' ? 'شراء' : 'بيع') + ' ' + Number(event.lot || settings.lot).toFixed(2) + '</span></strong>' +
+                     '<b class="' + (event.result == null ? '' : (event.result >= 0 ? 'positive' : 'negative')) + '" dir="ltr">' + result + '</b></div>' +
+-                    '<div class="meta-history-details"><span dir="ltr">' + escapeHtml(formatDate(event.time, true)) + '</span>' +
+-                    '<span>' + (event.kind === 'entry' ? 'دخول' : 'خروج') + '</span><span dir="ltr">' + formatPrice(event.price) + '</span></div>' +
+-                    '</div>';
++                    '<div class="meta-history-details"><span dir="ltr">' + escapeHtml(formatDate(event.time, true)) + '</span><span>' + (event.kind === 'entry' ? 'دخول' : 'خروج') + '</span><span dir="ltr">' + formatPrice(event.price) + '</span></div></div>';
+             }).join('');
+         }
++        refreshManualOverlay(false);
+     }
+ 
+     function selectRobotTerminalTab(name) {
+@@ -3214,6 +3573,21 @@
+         byId('saveAccountButton').addEventListener('click', saveAccountFromGate);
+         byId('cancelAccountEdit').addEventListener('click', hideAccountGate);
+         byId('editAccountButton').addEventListener('click', function () { showAccountGate(true); });
++        byId('newOrderButton').addEventListener('click', openManualOrderModal);
++        byId('manualOrderType').addEventListener('change', syncManualOrderModal);
++        byId('placeManualOrder').addEventListener('click', placeManualOrderFromModal);
++        all('[data-close-manual-order]').forEach(function (button) { button.addEventListener('click', closeManualOrderModal); });
++        byId('robotOpenTradesBody').addEventListener('click', function (event) {
++            var button = event.target.closest('[data-close-manual]');
++            if (!button) return;
++            var quote = currentManualQuote();
++            if (!quote) { showToast('لا يوجد سعر متاح للإغلاق', 'error'); return; }
++            if (closeManualPosition(Number(button.getAttribute('data-close-manual')), 'إغلاق يدوي', quote)) showToast('تم إغلاق الصفقة', 'success');
++        });
++        byId('manualPendingOrdersBody').addEventListener('click', function (event) {
++            var button = event.target.closest('[data-cancel-pending]');
++            if (button) cancelManualPending(Number(button.getAttribute('data-cancel-pending')));
++        });
+         bindEnglishNumericInputs();
+         all('.nav-item').forEach(function (button) {
+             button.addEventListener('click', function () {
+@@ -3338,6 +3712,7 @@
+         bindEvents();
+         loadSettings();
+         loadAccount();
++        refreshManualOverlay(false);
+         updateReplaySpeedSlider(byId('labReplaySpeed').value);
+         state.liveProviderMigrated = localStorage.getItem(STORAGE.liveProvider) === 'swissquote-bidask-v1';
+         liveChart = new CandleChart(byId('liveChart'));
+diff -ruN '--exclude=vendor-data.min.js' old116/app/src/main/assets/index.html src/app/src/main/assets/index.html
+--- old116/app/src/main/assets/index.html	2026-08-30 20:35:15.000000000 +0000
++++ src/app/src/main/assets/index.html	2026-08-31 08:05:22.827240036 +0000
+@@ -336,16 +336,21 @@
+ 
+             <section id="page-trades" class="page meta-trades-page" data-page="trades">
+                 <div id="robotTerminal" class="meta-terminal" aria-label="التداول">
+-                    <div class="meta-page-header"><strong>التداول</strong><span>⇅</span></div>
++                    <div class="meta-page-header"><strong>التداول</strong><button id="newOrderButton" class="new-order-button" type="button">+ أمر جديد</button></div>
+                     <div class="meta-account-identity"><strong id="tradeAccountName">حساب المحاكاة</strong><span id="tradeAccountMeta" dir="ltr">XAU Lab Demo • 1:100</span></div>
+                     <div class="meta-balance-lines">
+-                        <div><span>رصيد الحساب:</span><i></i><strong id="robotCapitalBalance" dir="ltr">10,000.00</strong></div>
+-                        <div><span>قيمة رأس المال:</span><i></i><strong id="robotCapitalEquity" dir="ltr">10,000.00</strong></div>
++                        <div><span>الرصيد:</span><i></i><strong id="robotCapitalBalance" dir="ltr">10,000.00</strong></div>
++                        <div><span>Equity:</span><i></i><strong id="robotCapitalEquity" dir="ltr">10,000.00</strong></div>
++                        <div><span>الهامش:</span><i></i><strong id="robotCapitalMargin" dir="ltr">0.00</strong></div>
+                         <div><span>الهامش المتاح:</span><i></i><strong id="robotCapitalFree" dir="ltr">10,000.00</strong></div>
++                        <div><span>Margin Level:</span><i></i><strong id="robotCapitalMarginLevel" dir="ltr">—</strong></div>
++                        <div><span>الربح العائم:</span><i></i><strong id="robotCapitalFloating" dir="ltr">0.00 USD</strong></div>
++                        <div><span>الحالة:</span><i></i><strong id="manualMarginStatus">بدون مراكز</strong></div>
+                     </div>
+-                    <div class="meta-hidden-metrics hidden"><span id="robotCapitalFloating">0.00 USD</spa

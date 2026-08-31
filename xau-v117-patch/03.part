@@ -1,0 +1,121 @@
+ === 'sellStop' && price >= quote.bid) throw new Error('Sell Stop يجب أن يكون أسفل Bid الحالي');
++            }
++        } catch (error) { showToast(error.message, 'error'); return; }
++
++        if (info.market) {
++            if (!openManualPosition(info.side, lot, price, stop, target, quote, null, 'سوق')) return;
++            showToast((info.side === 'buy' ? 'تم فتح صفقة شراء' : 'تم فتح صفقة بيع') + ' • ' + lot.toFixed(2) + ' Lot', 'success');
++        } else {
++            var ticket = state.account.nextTicket++;
++            state.account.pendingOrders = (state.account.pendingOrders || []).concat([{
++                source: 'manual', ticket: ticket, type: type, typeLabel: info.label, side: info.side,
++                lot: lot, price: price, stop: stop, target: target, createdAt: quote.t, createdIndex: quote.index
++            }]).slice(-100);
++            state.account.lastLot = lot;
++            persistAccountNow();
++            refreshManualOverlay(false);
++            showToast('تم وضع ' + info.label + ' #' + ticket, 'success');
++        }
++        closeManualOrderModal();
++        renderRobotTerminal();
++    }
++
++    function cancelManualPending(ticket) {
++        if (!state.account) return;
++        var before = state.account.pendingOrders.length;
++        state.account.pendingOrders = state.account.pendingOrders.filter(function (order) { return Number(order.ticket) !== Number(ticket); });
++        if (state.account.pendingOrders.length !== before) {
++            persistAccountNow(); refreshManualOverlay(false); renderRobotTerminal(); showToast('تم إلغاء الأمر المعلق');
++        }
++    }
++
+     function renderRobotTerminal() {
+         if (!byId('robotTerminal')) return;
+         var settings = null;
+@@ -2722,8 +3045,18 @@
+         var floating = 0;
+         var margin = 0;
+         var openTrade = null;
++        var manualMode = !!(state.account && (((state.account.manualPositions || []).length || (state.account.pendingOrders || []).length) || (state.account.trades || []).some(function (trade) { return trade && trade.source === 'manual'; })));
+ 
+-        if (state.visualRobot) {
++        if (manualMode) {
++            var quote = currentManualQuote();
++            if (quote) recalculateManualAccount(quote);
++            settings = { initialBalance: state.account.initialBalance, leverage: state.account.leverage, lot: state.account.lastLot || .1 };
++            trades = state.account.trades || [];
++            balance = state.account.balance;
++            floating = state.account.floating || 0;
++            margin = state.account.margin || 0;
++            currentPrice = quote ? quote.bid : state.account.currentPrice;
++        } else if (state.visualRobot) {
+             settings = state.visualRobot.settings;
+             snapshot = visualRobotSnapshot(state.replayIndex);
+             trades = state.visualRobot.results.trades;
+@@ -2738,11 +3071,7 @@
+             trades = state.lastResults.trades;
+             balance = state.lastResults.finalBalance;
+         } else if (state.account) {
+-            settings = {
+-                initialBalance: state.account.initialBalance,
+-                leverage: state.account.leverage,
+-                lot: state.account.lastLot || .1
+-            };
++            settings = { initialBalance: state.account.initialBalance, leverage: state.account.leverage, lot: state.account.lastLot || .1 };
+             trades = state.account.trades || [];
+             currentIndex = state.account.currentIndex == null ? Infinity : state.account.currentIndex;
+             balance = state.account.balance;
+@@ -2757,7 +3086,7 @@
+ 
+         var equity = balance + floating;
+         var freeMargin = equity - margin;
+-        if (state.account && (state.visualRobot || state.lastResults)) {
++        if (state.account && !manualMode && (state.visualRobot || state.lastResults)) {
+             persistTerminalToAccount(settings, balance, equity, freeMargin, margin, floating, openTrade, trades, currentIndex, currentPrice);
+         }
+         setTerminalMoney('robotCapitalBalance', balance, false);
+@@ -2765,42 +3094,72 @@
+         setTerminalMoney('robotCapitalFloating', floating, true);
+         setTerminalMoney('robotCapitalMargin', margin, false);
+         setTerminalMoney('robotCapitalFree', freeMargin, false);
++        var marginLevel = margin > 0 ? equity / margin * 100 : Infinity;
+         byId('robotCapitalMarginLevel').textContent = margin > 0
+-            ? (equity / margin * 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%'
++            ? marginLevel.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%'
+             : '—';
++        var status = byId('manualMarginStatus');
++        if (status) {
++            status.textContent = margin <= 0 ? 'بدون مراكز' : (marginLevel <= (state.account ? state.account.stopOutLevel : 50) ? 'Stop Out' : (marginLevel <= (state.account ? state.account.marginCallLevel : 100) ? 'Margin Call' : 'آمن'));
++            status.className = margin <= 0 ? 'neutral' : (marginLevel <= (state.account ? state.account.marginCallLevel : 100) ? 'negative' : 'positive');
++        }
+ 
+         var openBody = byId('robotOpenTradesBody');
++        var rows = [];
++        if (state.account) {
++            var quoteNow = currentManualQuote();
++            (state.account.manualPositions || []).forEach(function (position) {
++                var pnl = manualPositionFloating(position, quoteNow);
++                var nowPrice = quoteNow ? (position.side === 'buy' ? quoteNow.bid : quoteNow.ask) : currentPrice;
++                rows.push('<div class="meta-position-row manual-position-row">' +
++                    '<div class="meta-position-head"><strong>XAUUSD, <span class="' + (position.side === 'buy' ? 'positive' : 'negative') + '">' + (position.side === 'buy' ? 'شراء' : 'بيع') + ' ' + Number(position.lot).toFixed(2) + '</span></strong>' +
++                    '<b class="' + (pnl >= 0 ? 'positive' : 'negative') + '" dir="ltr">' + formatTradeMoney(pnl) + '</b></div>' +
++                    '<div class="meta-position-prices" dir="ltr"><span>' + formatPrice(position.entry) + ' → ' + formatPrice(nowPrice) + '</span>' +
++                    '<span>S/L ' + (position.stop == null ? '—' : formatPrice(position.stop)) + '</span>' +
++                    '<span>T/P ' + (position.target == null ? '—' : formatPrice(position.target)) + '</span></div>' +
++                    '<div class="meta-position-actions"><small>#' + position.ticket + ' • Margin ' + formatAccountMoney(position.margin) + '</small><button type="button" data-close-manual="' + position.ticket + '">إغلاق</button></div>' +
++                    '</div>');
++            });
++        }
+         if (openTrade) {
+-            openBody.innerHTML = '<div class="meta-position-row">' +
++            rows.push('<div class="meta-position-row">' +
+                 '<div class="meta-position-head"><strong>XAUUSD, <span class="' + (openTrade.side === 'buy' ? 'positive' : 'negative') + '">' + (openTrade.side === 'buy' ? 'شراء' : 'بيع') + ' ' + Number(openTrade.lot || settings.lot).toFixed(2) + '</span></strong>' +
+                 '<b class="' + (floating >= 0 ? 'positive' : 'negative') + '" dir="ltr">' + formatTradeMoney(floating) + '</b></div>' +
+                 '<div class="meta-position-prices" dir="ltr"><span>' + formatPrice(openTrade.entry) + ' → ' + formatPrice(currentPrice) + '</span>' +
+                 '<span>S/L ' + (openTrade.stop == null ? '—' : formatPrice(openTrade.stop)) + '</span>' +
+                 '<span>T/P ' + (openTrade.target == null ? '—' : formatPrice(openTrade.target)) + '</span></div>' +
+-                '</div>';
+-        } else {
+-            openBody.innerHTML = '<div class="meta-empty">لا توجد مراكز مفتوحة</div>';
++                '</div>');
++        }

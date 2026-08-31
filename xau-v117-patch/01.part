@@ -1,0 +1,149 @@
+      });
++        }
++
+         var last = candles[candles.length - 1];
+         var lastY = priceY(last.c);
+         ctx.save();
+@@ -1301,6 +1351,7 @@
+         byId('livePrice').textContent = formatPrice(price);
+         byId('livePrice').classList.remove('live-word');
+         byId('quoteTime').textContent = 'آخر تحديث: ' + formatDate(timestamp || Date.now(), true);
++        if (state.account) processManualTrading(currentManualQuote());
+         if (series.length > 1) {
+             var previous = series[series.length - 2].c;
+             var change = price - previous;
+@@ -2196,6 +2247,10 @@
+         byId('labReplayDate').textContent = formatDate(current.t, false);
+         byId('labReplayProgress').textContent = Math.max(1, state.replayIndex - state.replayStart + 1).toLocaleString('en-US') + ' / ' + Math.max(1, replayEnd - state.replayStart + 1).toLocaleString('en-US');
+         byId('labReplayRange').value = String(state.replayIndex);
++        if (state.account) {
++            var manualQuote = currentManualQuote();
++            if (manualQuote) processManualTrading(manualQuote, current);
++        }
+     }
+ 
+     function replayStep(amount) {
+@@ -2528,6 +2583,12 @@
+             currentIndex: raw.currentIndex == null ? Infinity : raw.currentIndex,
+             openTrade: raw.openTrade || null,
+             trades: Array.isArray(raw.trades) ? raw.trades.slice(-1200) : [],
++            manualPositions: Array.isArray(raw.manualPositions) ? raw.manualPositions.slice(-50) : [],
++            pendingOrders: Array.isArray(raw.pendingOrders) ? raw.pendingOrders.slice(-100) : [],
++            nextTicket: Math.max(100001, Math.floor(number(raw.nextTicket, 100001))),
++            manualSpread: Math.max(0, number(raw.manualSpread, .30)),
++            marginCallLevel: clamp(number(raw.marginCallLevel, 100), 20, 500),
++            stopOutLevel: clamp(number(raw.stopOutLevel, 50), 10, 300),
+             lastLot: Math.max(.01, number(raw.lastLot, .1)),
+             createdAt: number(raw.createdAt, Date.now()),
+             updatedAt: number(raw.updatedAt, Date.now())
+@@ -2633,6 +2694,8 @@
+                 existing.currentIndex = Infinity;
+                 existing.openTrade = null;
+                 existing.trades = [];
++                existing.manualPositions = [];
++                existing.pendingOrders = [];
+                 state.lastResults = null;
+                 state.visualRobot = null;
+             }
+@@ -2711,6 +2774,266 @@
+         element.classList.toggle('negative', signed && value < 0);
+     }
+ 
++
++    function manualTypeInfo(type) {
++        var map = {
++            marketBuy: { side: 'buy', market: true, label: 'شراء سوق' },
++            marketSell: { side: 'sell', market: true, label: 'بيع سوق' },
++            buyLimit: { side: 'buy', market: false, label: 'Buy Limit' },
++            sellLimit: { side: 'sell', market: false, label: 'Sell Limit' },
++            buyStop: { side: 'buy', market: false, label: 'Buy Stop' },
++            sellStop: { side: 'sell', market: false, label: 'Sell Stop' }
++        };
++        return map[type] || map.marketBuy;
++    }
++
++    function currentManualQuote() {
++        var spread = state.account ? Math.max(0, number(state.account.manualSpread, .30)) : .30;
++        if (state.chartMode === 'market' && state.lastLiveQuote && isFinite(state.lastLiveQuote.bid) && isFinite(state.lastLiveQuote.ask)) {
++            return { bid: Number(state.lastLiveQuote.bid), ask: Number(state.lastLiveQuote.ask), t: Number(state.lastLiveQuote.t) || Date.now(), source: 'live', index: Infinity };
++        }
++        if (state.chartMode === 'lab' && state.candles.length) {
++            var index = clamp(state.replayIndex, 0, state.candles.length - 1);
++            var candle = state.candles[index];
++            return { bid: candle.c, ask: candle.c + spread, t: candle.t, source: 'replay', index: index, candle: candle, spread: spread };
++        }
++        var series = state.liveCandles.length ? state.liveCandles : state.candles;
++        if (series.length) {
++            var last = series[series.length - 1];
++            return { bid: last.c, ask: last.c + spread, t: last.t, source: state.liveCandles.length ? 'live-candle' : 'history', index: Infinity, candle: last, spread: spread };
++        }
++        return null;
++    }
++
++    function manualPositionFloating(position, quote) {
++        if (!position || !quote) return 0;
++        var lot = Math.max(.01, number(position.lot, .1));
++        var exitPrice = position.side === 'buy' ? quote.bid : quote.ask;
++        return (position.side === 'buy' ? exitPrice - position.entry : position.entry - exitPrice) * lot * 100;
++    }
++
++    function recalculateManualAccount(quote) {
++        if (!state.account) return;
++        var positions = state.account.manualPositions || [];
++        var floating = positions.reduce(function (sum, position) { return sum + manualPositionFloating(position, quote); }, 0);
++        var margin = positions.reduce(function (sum, position) { return sum + Math.max(0, number(position.margin, 0)); }, 0);
++        state.account.floating = floating;
++        state.account.margin = margin;
++        state.account.equity = state.account.balance + floating;
++        state.account.freeMargin = state.account.equity - margin;
++        if (quote) state.account.currentPrice = quote.bid;
++    }
++
++    function requiredManualMargin(entry, lot) {
++        var leverage = state.account ? Math.max(1, number(state.account.leverage, 100)) : 100;
++        return entry * lot * 100 / leverage;
++    }
++
++    function refreshManualOverlay(redraw) {
++        if (!state.account) return;
++        var overlay = {
++            positions: (state.account.manualPositions || []).map(function (position) { return Object.assign({}, position); }),
++            pending: (state.account.pendingOrders || []).map(function (order) { return Object.assign({}, order); })
++        };
++        if (liveChart) liveChart.setManualOverlay(overlay, redraw !== false);
++        if (replayChart) replayChart.setManualOverlay(overlay, redraw !== false);
++    }
++
++    function closeManualPosition(ticket, reason, quote, forcedExit) {
++        if (!state.account) return false;
++        var positions = state.account.manualPositions || [];
++        var index = positions.findIndex(function (position) { return Number(position.ticket) === Number(ticket); });
++        if (index < 0) return false;
++        quote = quote || currentManualQuote();
++        if (!quote) return false;
++        var position = positions[index];
++        var exitPrice = forcedExit != null ? number(forcedExit, null) : (position.side === 'buy' ? quote.bid : quote.ask);
++        if (exitPrice == null) return false;
++        var profit = (position.side === 'buy' ? exitPrice - position.entry : position.entry - exitPrice) * position.lot * 100;
++        state.account.balance += profit;
++        var trade = {
++            source: 'manual', ticket: position.ticket, side: position.side, lot: position.lot,
++            entry: position.entry, exit: exitPrice, entryTime: position.entryTime, exitTime: quote.t,
++            reason: reason || 'إغلاق يدوي', profit: profit, balance: state.account.balance,
++            stop: position.stop, target: position.target, margin: position.margin,
++            entryIndex: position.entryIndex == null ? Infinity : position.entryIndex,
++            exitIndex: quote.index == null ? Infinity : quote.index
++        };
++        state.account.trades = (state.account.trades || []).concat([trade]).slice(-1200);
++        positions.splice(index, 1);
++        recalculateManualAccount(quote);
++        persistAccountNow();
++        refreshManualOverlay(false);
++        renderRobotTerminal();
++        return true;
++    }
++
++    function openManualPosition(side, lot, entry, stop, target, quote, ticket, sourceLabel) {
++        if (!state.account || !quote) return false;
++        lot = clamp(number(lot, .1), .01, 100);
++        va

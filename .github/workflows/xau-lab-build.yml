@@ -1,8 +1,8 @@
-name: Build XAU Lab 1.16.0 unsigned
+name: Build XAU Lab 1.17.0 unsigned
 
 on:
   push:
-    branches: [ xau-lab-build-1-16 ]
+    branches: [ xau-lab-build-1-17 ]
   workflow_dispatch:
 
 jobs:
@@ -28,7 +28,7 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
-      - name: Reconstruct XAU source
+      - name: Reconstruct verified XAU 1.16 source
         shell: bash
         run: |
           set -euo pipefail
@@ -41,13 +41,33 @@ jobs:
           test -f xau-build-src/app/src/main/assets/app.js
           test -f xau-build-src/app/src/main/java/com/maimon/xaulab/MainActivity.java
 
-      - name: Build vendor bundle
+      - name: Apply XAU 1.17 update
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat xau-v117-patch/* > /tmp/v117.patch
+          cd xau-build-src
+          patch -p1 < /tmp/v117.patch
+          grep -q "versionName '1.17.0'" app/build.gradle
+          grep -q "versionCode 18" app/build.gradle
+          grep -q "Meta-style solid candles" app/src/main/assets/app.js
+
+      - name: Install and build vendor bundle
         working-directory: xau-build-src
         run: |
           npm ci
           npm run build:vendor
           test -s app/src/main/assets/vendor-data.min.js
+
+      - name: Validate XAU 1.17 logic
+        working-directory: xau-build-src
+        run: |
           node --check app/src/main/assets/app.js
+          node tools/test-chart-core.js
+          node tools/test-live-data.js
+          node tools/test-visual-robot.js
+          node tools/test-account.js
+          node tools/test-manual-trading.js
 
       - name: Build unsigned release APK
         working-directory: xau-build-src
@@ -55,21 +75,22 @@ jobs:
           gradle :app:assembleRelease --stacktrace
           test -s app/build/outputs/apk/release/app-release-unsigned.apk
 
-      - name: Collect APK and apksig tool
+      - name: Collect APK and signing tool
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p artifact
-          cp xau-build-src/app/build/outputs/apk/release/app-release-unsigned.apk artifact/XAU-Lab-v1.16.0-unsigned.apk
+          cp xau-build-src/app/build/outputs/apk/release/app-release-unsigned.apk artifact/XAU-Lab-v1.17.0-unsigned.apk
           BT="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
           echo "Using build tools: $BT"
           test -s "$BT/lib/apksigner.jar"
           cp "$BT/lib/apksigner.jar" artifact/apksigner.jar
+          if test -x "$BT/aapt"; then "$BT/aapt" dump badging artifact/XAU-Lab-v1.17.0-unsigned.apk > artifact/badging.txt; fi
           sha256sum artifact/* > artifact/SHA256SUMS.txt
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: XAU-Lab-v1.16.0-unsigned-and-apksigner
+          name: XAU-Lab-v1.17.0-unsigned-and-apksigner
           path: artifact/
           if-no-files-found: error
