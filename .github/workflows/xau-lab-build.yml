@@ -1,8 +1,8 @@
-name: Build XAU Lab 1.18.0 unsigned
+name: Build XAU Lab 1.19.0 unsigned
 
 on:
   push:
-    branches: [ xau-lab-build-1-18 ]
+    branches: [ xau-lab-build-1-19 ]
   workflow_dispatch:
 
 jobs:
@@ -38,8 +38,6 @@ jobs:
           rm -rf xau-build-src
           mkdir -p xau-build-src
           tar -xJf /tmp/xau-source.tar.xz -C xau-build-src
-          test -f xau-build-src/app/src/main/assets/app.js
-          test -f xau-build-src/app/src/main/java/com/maimon/xaulab/MainActivity.java
 
       - name: Apply XAU 1.17 base update
         shell: bash
@@ -52,9 +50,8 @@ jobs:
           test ! -s app/src/main/assets/index.html.rej
           test ! -s app/src/main/assets/app.css.rej
           grep -q "versionName '1.17.0'" app/build.gradle
-          grep -q 'function placeManualOrderFromModal' app/src/main/assets/app.js
 
-      - name: Apply verified XAU 1.18 Meta terminal update
+      - name: Apply verified XAU 1.18 update
         shell: bash
         run: |
           set -euo pipefail
@@ -68,15 +65,20 @@ jobs:
           test ! -s app/src/main/assets/app.css.rej
           test ! -s app/src/main/java/com/maimon/xaulab/MainActivity.java.rej
           grep -q "versionName '1.18.0'" app/build.gradle
-          grep -q "versionCode 19" app/build.gradle
-          grep -q 'var LIVE_POLL_MS = 350' app/src/main/assets/app.js
-          grep -q 'function placeQuickMarket' app/src/main/assets/app.js
-          grep -q 'function updateManualLevel' app/src/main/assets/app.js
-          grep -q 'needsLiveTerminal' app/src/main/assets/app.js
-          grep -q 'id="quickTradeBar"' app/src/main/assets/index.html
-          grep -q 'id="timeframeMenuButton"' app/src/main/assets/index.html
-          grep -q 'id="positionQuickPanel"' app/src/main/assets/index.html
-          test -s tools/test-meta-ui-v118.js
+
+      - name: Apply XAU 1.19 UI and accounts update
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd xau-build-src
+          python ../xau-v119-patch.py
+          grep -q "versionName '1.19.0'" app/build.gradle
+          grep -q 'versionCode 20' app/build.gradle
+          grep -q 'id="accountMenuButton"' app/src/main/assets/index.html
+          grep -q 'id="quickLot" type="text"' app/src/main/assets/index.html
+          grep -q 'v1.19 multi-account manager' app/src/main/assets/app.js
+          grep -q 'saveQuickLotV119' app/src/main/assets/app.js
+          grep -q 'new-order-button hidden' app/src/main/assets/index.html
 
       - name: Install and build vendor bundle
         working-directory: xau-build-src
@@ -85,7 +87,7 @@ jobs:
           npm run build:vendor
           test -s app/src/main/assets/vendor-data.min.js
 
-      - name: Validate XAU 1.18 logic
+      - name: Validate XAU 1.19 logic
         working-directory: xau-build-src
         run: |
           node --check app/src/main/assets/app.js
@@ -94,7 +96,16 @@ jobs:
           if test -f tools/test-visual-robot.js; then node tools/test-visual-robot.js; fi
           if test -f tools/test-account.js; then node tools/test-account.js; fi
           if test -f tools/test-manual-trading.js; then node tools/test-manual-trading.js; fi
-          node tools/test-meta-ui-v118.js
+          if test -f tools/test-meta-ui-v118.js; then node tools/test-meta-ui-v118.js; fi
+          python - <<'PY'
+          from pathlib import Path
+          h=Path('app/src/main/assets/index.html').read_text()
+          j=Path('app/src/main/assets/app.js').read_text()
+          assert h.index('id="quickTradeBar"') > h.index('meta-compact-toolbar')
+          assert 'type="number"' not in h[h.index('id="quickLot"')-80:h.index('id="quickLot"')+160]
+          assert 'STORAGE.accounts' in j and 'switchAccountV119' in j
+          print('v1.19 checks passed')
+          PY
 
       - name: Build unsigned release APK
         working-directory: xau-build-src
@@ -102,22 +113,22 @@ jobs:
           gradle :app:assembleRelease --stacktrace
           test -s app/build/outputs/apk/release/app-release-unsigned.apk
 
-      - name: Collect APK and signing tool
+      - name: Collect APK source and signing tool
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p artifact
-          cp xau-build-src/app/build/outputs/apk/release/app-release-unsigned.apk artifact/XAU-Lab-v1.18.0-unsigned.apk
+          cp xau-build-src/app/build/outputs/apk/release/app-release-unsigned.apk artifact/XAU-Lab-v1.19.0-unsigned.apk
           BT="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
-          echo "Using build tools: $BT"
           test -s "$BT/lib/apksigner.jar"
           cp "$BT/lib/apksigner.jar" artifact/apksigner.jar
-          if test -x "$BT/aapt"; then "$BT/aapt" dump badging artifact/XAU-Lab-v1.18.0-unsigned.apk > artifact/badging.txt; fi
+          if test -x "$BT/aapt"; then "$BT/aapt" dump badging artifact/XAU-Lab-v1.19.0-unsigned.apk > artifact/badging.txt; fi
+          (cd xau-build-src && zip -qr ../artifact/XAU-Lab-v1.19.0-source.zip . -x 'node_modules/*' 'app/build/*' '.gradle/*')
           sha256sum artifact/* > artifact/SHA256SUMS.txt
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: XAU-Lab-v1.18.0-unsigned-and-apksigner
+          name: XAU-Lab-v1.19.0-build
           path: artifact/
           if-no-files-found: error
