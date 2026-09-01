@@ -1,0 +1,112 @@
+name: Build XAU Lab 1.28.0 unsigned
+
+on:
+  push:
+    branches: [ xau-lab-build-1-28 ]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Download verified XAU 1.27 source artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl --fail --location \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/9803997085/zip" \
+            -o /tmp/xau127-artifact.zip
+          rm -rf /tmp/xau127-artifact xau-build-src
+          mkdir -p /tmp/xau127-artifact xau-build-src
+          unzip -q /tmp/xau127-artifact.zip -d /tmp/xau127-artifact
+          test -s /tmp/xau127-artifact/XAU-Lab-v1.27.0-source.zip
+          unzip -q /tmp/xau127-artifact/XAU-Lab-v1.27.0-source.zip -d xau-build-src
+          grep -q "versionName '1.27.0'" xau-build-src/app/build.gradle
+          grep -q 'versionCode 28' xau-build-src/app/build.gradle
+
+      - name: Apply XAU 1.28 replay account and one-touch level fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d xau-v128.patch.xz.b64 > /tmp/xau-v128.patch.xz
+          echo 'cab5c52e06d3f05a0f95cae02b4dd4b5541cdf6bc9032037802e6d73a51fb63c  /tmp/xau-v128.patch.xz' | sha256sum -c -
+          xz -dc /tmp/xau-v128.patch.xz > /tmp/xau-v128.patch
+          cd xau-build-src
+          patch --batch -p1 < /tmp/xau-v128.patch
+          test ! -s app/src/main/assets/app.js.rej
+          test ! -s app/build.gradle.rej
+          grep -q "versionName '1.28.0'" app/build.gradle
+          grep -q 'versionCode 29' app/build.gradle
+          node --check app/src/main/assets/app.js
+          node tools/test-v128.js
+
+      - name: Build vendor and run regression tests
+        working-directory: xau-build-src
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build:vendor
+          node tools/test-manual-trading.js
+          node tools/test-meta-ui-v118.js
+          node tools/test-v120.js
+          node tools/test-v121.js
+          node tools/test-v122.js
+          node tools/test-v123.js
+          node tools/test-v124.js
+          node tools/test-v125.js
+          node tools/test-v126.js
+          node tools/test-v127.js
+          node tools/test-v128.js
+
+      - name: Build unsigned release APK
+        working-directory: xau-build-src
+        run: |
+          gradle :app:assembleRelease --stacktrace
+          test -s app/build/outputs/apk/release/app-release-unsigned.apk
+
+      - name: Collect artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifact
+          cp xau-build-src/app/build/outputs/apk/release/app-release-unsigned.apk artifact/XAU-Lab-v1.28.0-unsigned.apk
+          BT="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          cp "$BT/lib/apksigner.jar" artifact/apksigner.jar
+          if test -x "$BT/aapt"; then "$BT/aapt" dump badging artifact/XAU-Lab-v1.28.0-unsigned.apk > artifact/badging.txt; fi
+          (cd xau-build-src && zip -qr ../artifact/XAU-Lab-v1.28.0-source.zip . -x 'node_modules/*' 'app/build/*' '.gradle/*')
+          sha256sum artifact/* > artifact/SHA256SUMS.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: XAU-Lab-v1.28.0-build
+          path: artifact/
+          if-no-files-found: error
