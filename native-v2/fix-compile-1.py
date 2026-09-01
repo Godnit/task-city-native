@@ -12,3 +12,8 @@ s=s.replace('private fun topBar(title:String, actions:List<Pair<String,()->Unit>
 s=s.replace('val close=actionButton("←"){chartView?.clearSelection();visibility=View.GONE}', 'val close=actionButton("←"){chartView?.clearSelection();row.visibility=View.GONE}')
 s=s.replace('val play=actionButton(if(replayPlaying)"Ⅱ":"▶"){replayPlaying=!replayPlaying;render(Screen.REPLAY);if(replayPlaying)scheduleReplay()}', 'val play=actionButton(if (replayPlaying) "Ⅱ" else "▶"){replayPlaying=!replayPlaying;render(Screen.REPLAY);if(replayPlaying)scheduleReplay()}')
 main.write_text(s)
+styles=root/'app/src/main/res/values/styles.xml'
+if styles.exists():
+    x=styles.read_text()
+    x=x.replace('        <item name="android:windowLightNavigationBar">false</item>\n','')
+    styles.write_text(x)
