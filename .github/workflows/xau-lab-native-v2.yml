@@ -54,6 +54,13 @@ jobs:
           fi
           test ! -d native-src/app/src/main/assets || test -z "$(find native-src/app/src/main/assets -type f -print -quit)"
 
+      - name: Android lint QA
+        working-directory: native-src
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle :app:lintRelease --stacktrace
+
       - name: Build native release APK
         working-directory: native-src
         shell: bash
@@ -86,6 +93,7 @@ jobs:
           BT="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
           cp "$BT/lib/apksigner.jar" artifact/apksigner.jar
           if test -x "$BT/aapt"; then "$BT/aapt" dump badging artifact/XAU-Lab-v2.0.0-native-unsigned.apk > artifact/badging.txt; fi
+          cp native-src/app/build/reports/lint-results-release.html artifact/lint-results-release.html || true
           (cd native-src && zip -qr ../artifact/XAU-Lab-v2.0.0-native-source.zip . -x 'app/build/*' '.gradle/*')
           sha256sum artifact/* > artifact/SHA256SUMS.txt
 
