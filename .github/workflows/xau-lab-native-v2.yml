@@ -35,6 +35,7 @@ jobs:
           echo 'f373d6f7e4ddcd0ec2c99aabfebe20ae6e8b98273c2022375630e4f87011dee8  /tmp/xau-native-v2.tar.xz' | sha256sum -c -
           rm -rf native-src && mkdir native-src
           tar -xJf /tmp/xau-native-v2.tar.xz -C native-src
+          python native-v2/fix-compile-1.py native-src
           test -s native-src/app/src/main/java/com/maimon/xaulab/MainActivity.kt
           grep -q "versionName '2.0.0'" native-src/app/build.gradle
           grep -q 'versionCode 31' native-src/app/build.gradle
