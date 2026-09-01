@@ -94,6 +94,16 @@ jobs:
           xz -dc /tmp/xau-v125.patch.xz > /tmp/xau-v125.patch
           cd xau-build-src
           patch --batch -p1 < /tmp/xau-v125.patch
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('app/build.gradle')
+          s=p.read_text()
+          old="    compileOptions {\n        sourceCompatibility JavaVersion.VERSION_17\n        targetCompatibility JavaVersion.VERSION_17\n    }\n}\n\n\nkotlinOptions {\n    jvmTarget = '17'\n}\n"
+          new="    compileOptions {\n        sourceCompatibility JavaVersion.VERSION_17\n        targetCompatibility JavaVersion.VERSION_17\n    }\n\n    kotlinOptions {\n        jvmTarget = '17'\n    }\n}\n"
+          if old not in s:
+              raise SystemExit('kotlinOptions hotfix pattern missing')
+          p.write_text(s.replace(old,new))
+          PY
           test ! -s app/src/main/assets/app.js.rej
           test ! -s app/build.gradle.rej
           test ! -s build.gradle.rej
