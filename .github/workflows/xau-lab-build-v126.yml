@@ -1,0 +1,168 @@
+name: Build XAU Lab 1.26.0 unsigned
+
+on:
+  push:
+    branches: [ xau-lab-build-1-26 ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Reconstruct XAU 1.24 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat xau-src-parts/* > /tmp/xau-source.b64
+          base64 -d /tmp/xau-source.b64 > /tmp/xau-source.tar.xz
+          echo 'ef98eb889a43a7110add831c92ec96556af0ec4e302976dfd208d03ab48f4ead  /tmp/xau-source.tar.xz' | sha256sum -c -
+          rm -rf xau-build-src && mkdir xau-build-src
+          tar -xJf /tmp/xau-source.tar.xz -C xau-build-src
+          cat xau-v117-patch2/* > /tmp/v117.patch
+          cd xau-build-src
+          patch --batch -p1 < /tmp/v117.patch || true
+          test ! -s app/src/main/assets/app.js.rej
+          test ! -s app/src/main/assets/index.html.rej
+          test ! -s app/src/main/assets/app.css.rej
+          cd ..
+          xz -dc xau-v118.patch.xz > /tmp/v118.patch
+          cd xau-build-src
+          patch --batch -p1 < /tmp/v118.patch || true
+          test ! -s app/build.gradle.rej
+          test ! -s app/src/main/assets/app.js.rej
+          test ! -s app/src/main/assets/index.html.rej
+          test ! -s app/src/main/assets/app.css.rej
+          python ../xau-v119-patch.py
+          cd ..
+          python - <<'PY'
+          import glob,json
+          parts=[]
+          for name in sorted(glob.glob('xau-v120-json/part*.json')):
+              with open(name,encoding='utf-8') as f: parts.append(json.load(f))
+          code=''.join(parts)
+          compile(code,'/tmp/xau-v120.py','exec')
+          open('/tmp/xau-v120.py','w',encoding='utf-8').write(code)
+          PY
+          cd xau-build-src
+          python /tmp/xau-v120.py
+          python ../xau-v121-patch.py
+          cd ..
+          base64 -d xau-v122.patch.xz.b64 > /tmp/xau-v122.patch.xz
+          echo '7b7e4a9af7f16b9f6b56c4cfd5490848cd83ec8331bc7120b34c2374f14c77ac  /tmp/xau-v122.patch.xz' | sha256sum -c -
+          xz -dc /tmp/xau-v122.patch.xz > /tmp/xau-v122.patch
+          cd xau-build-src
+          patch --batch -p1 < /tmp/xau-v122.patch
+          cd ..
+          base64 -d xau-v123.patch.xz.b64 > /tmp/xau-v123.patch.xz
+          echo '561744124dd5b1fd56f9fa03d3baaa55f2f4c29bf84f8505c014b8c7ad1d10fd  /tmp/xau-v123.patch.xz' | sha256sum -c -
+          xz -dc /tmp/xau-v123.patch.xz > /tmp/xau-v123.patch
+          cd xau-build-src
+          patch --batch -p4 < /tmp/xau-v123.patch
+          test ! -s app/src/main/assets/app.js.rej
+          test ! -s app/build.gradle.rej
+          cd ..
+          base64 -d xau-v124.patch.xz.b64 > /tmp/xau-v124.patch.xz
+          echo '8d853b03029900c0dce5bf6d37eb701d0a3a824772c822b7c6254bf0f35b721c  /tmp/xau-v124.patch.xz' | sha256sum -c -
+          xz -dc /tmp/xau-v124.patch.xz > /tmp/xau-v124.patch
+          cd xau-build-src
+          patch --batch -p1 < /tmp/xau-v124.patch
+          test ! -s app/src/main/assets/app.js.rej
+          test ! -s app/build.gradle.rej
+          grep -q "versionName '1.24.0'" app/build.gradle
+          grep -q 'versionCode 25' app/build.gradle
+      - name: Apply XAU 1.25 Kotlin-native core
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat xau-v125-parts/* > /tmp/xau-v125.patch.xz.b64
+          base64 -d /tmp/xau-v125.patch.xz.b64 > /tmp/xau-v125.patch.xz
+          echo '8feebb9ae244050ac1fce3b549576d2e87ee7d18aec20d80467321584e59f6c2  /tmp/xau-v125.patch.xz' | sha256sum -c -
+          xz -dc /tmp/xau-v125.patch.xz > /tmp/xau-v125.patch
+          cd xau-build-src
+          patch --batch -p1 < /tmp/xau-v125.patch
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('app/build.gradle')
+          s=p.read_text()
+          old="    compileOptions {\n        sourceCompatibility JavaVersion.VERSION_17\n        targetCompatibility JavaVersion.VERSION_17\n    }\n}\n\n\nkotlinOptions {\n    jvmTarget = '17'\n}\n"
+          new="    compileOptions {\n        sourceCompatibility JavaVersion.VERSION_17\n        targetCompatibility JavaVersion.VERSION_17\n    }\n\n    kotlinOptions {\n        jvmTarget = '17'\n    }\n}\n"
+          if old not in s:
+              raise SystemExit('kotlinOptions hotfix pattern missing')
+          p.write_text(s.replace(old,new))
+          PY
+          test ! -s app/src/main/assets/app.js.rej
+          test ! -s app/build.gradle.rej
+          test ! -s build.gradle.rej
+          grep -q "versionName '1.25.0'" app/build.gradle
+          grep -q 'versionCode 26' app/build.gradle
+          test -s app/src/main/java/com/maimon/xaulab/MainActivity.kt
+          test -s app/src/main/java/com/maimon/xaulab/NativeTradingEngine.kt
+          test -s app/src/main/java/com/maimon/xaulab/PriceFeed.kt
+          test -s app/src/main/java/com/maimon/xaulab/RobotJsonImporter.kt
+      - name: Apply XAU 1.26 replay/import/selection fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d xau-v126.patch.xz.b64 > /tmp/xau-v126.patch.xz
+          echo '599f52863a4769f3c33e3700499d55837ab544bfd51d2871fc99bffbac4fb405  /tmp/xau-v126.patch.xz' | sha256sum -c -
+          xz -dc /tmp/xau-v126.patch.xz > /tmp/xau-v126.patch
+          cd xau-build-src
+          patch --batch -p1 < /tmp/xau-v126.patch
+          test ! -s app/src/main/assets/app.js.rej
+          test ! -s app/build.gradle.rej
+          grep -q "versionName '1.26.0'" app/build.gradle
+          grep -q 'versionCode 27' app/build.gradle
+          node --check app/src/main/assets/app.js
+          node tools/test-v126.js
+      - name: Build vendor and run regression tests
+        working-directory: xau-build-src
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build:vendor
+          node tools/test-manual-trading.js
+          node tools/test-meta-ui-v118.js
+          node tools/test-v120.js
+          node tools/test-v121.js
+          node tools/test-v122.js
+          node tools/test-v123.js
+          node tools/test-v124.js
+          node tools/test-v125.js
+          node tools/test-v126.js
+      - name: Build unsigned release APK
+        working-directory: xau-build-src
+        run: |
+          gradle :app:assembleRelease --stacktrace
+          test -s app/build/outputs/apk/release/app-release-unsigned.apk
+      - name: Collect artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifact
+          cp xau-build-src/app/build/outputs/apk/release/app-release-unsigned.apk artifact/XAU-Lab-v1.26.0-unsigned.apk
+          BT="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          cp "$BT/lib/apksigner.jar" artifact/apksigner.jar
+          if test -x "$BT/aapt"; then "$BT/aapt" dump badging artifact/XAU-Lab-v1.26.0-unsigned.apk > artifact/badging.txt; fi
+          (cd xau-build-src && zip -qr ../artifact/XAU-Lab-v1.26.0-source.zip . -x 'node_modules/*' 'app/build/*' '.gradle/*')
+          sha256sum artifact/* > artifact/SHA256SUMS.txt
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: XAU-Lab-v1.26.0-build
+          path: artifact/
+          if-no-files-found: error
