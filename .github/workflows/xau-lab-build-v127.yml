@@ -55,7 +55,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          base64 -d xau-v127-source/part00.b64 > /tmp/xau-v127.patch.xz
+          base64 -d xau-v127.patch.xz.b64 > /tmp/xau-v127.patch.xz
           echo 'b00a03a6313ba93c8150282222625b7ba3ff03c3a887eacc384be11889f32782  /tmp/xau-v127.patch.xz' | sha256sum -c -
           xz -dc /tmp/xau-v127.patch.xz > /tmp/xau-v127.patch
           cd xau-build-src
