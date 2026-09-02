@@ -4,7 +4,11 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.res.ColorStateList;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
@@ -12,14 +16,13 @@ import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.ScrollView;
-import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -29,26 +32,32 @@ import org.json.JSONObject;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public class MainActivity extends Activity {
-    private static final int GREEN = Color.rgb(20, 108, 91);
-    private static final int NAVY = Color.rgb(25, 54, 93);
-    private static final int TEXT = Color.rgb(30, 40, 55);
-    private static final int MUTED = Color.rgb(101, 112, 128);
     private static final int BG = Color.rgb(246, 248, 252);
-    private static final int GOLD = Color.rgb(173, 118, 24);
-    private static final int SOFT_GREEN = Color.rgb(235, 247, 243);
+    private static final int NAVY = Color.rgb(24, 49, 83);
+    private static final int TEXT = Color.rgb(31, 40, 54);
+    private static final int MUTED = Color.rgb(103, 113, 128);
+    private static final int GREEN = Color.rgb(22, 123, 98);
+    private static final int GOLD = Color.rgb(184, 126, 28);
+    private static final int BORDER = Color.rgb(225, 231, 239);
+
+    private static final int DAILY_TARGET = 120;
+    private static final int WEEKLY_TARGET = 720;
+    private static final int MONTHLY_TARGET = 3000;
+    private static final int YEAR_TARGET = 25000;
 
     private SharedPreferences prefs;
     private String todayKey;
     private String activeTab = "today";
-    private final EditText[] taskInputs = new EditText[3];
-    private final CheckBox[] taskChecks = new CheckBox[3];
-    private final CheckBox[] indicatorChecks = new CheckBox[5];
-    private TextView priorityProgress;
-    private TextView indicatorProgress;
+
+    private final LinkedHashMap<String, Integer> domainColors = new LinkedHashMap<>();
+    private final LinkedHashMap<String, String[]> domainBadges = new LinkedHashMap<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,12 +66,34 @@ public class MainActivity extends Activity {
         getWindow().setNavigationBarColor(Color.WHITE);
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         prefs = getSharedPreferences("masari_data", Context.MODE_PRIVATE);
-        todayKey = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Calendar.getInstance().getTime());
+        todayKey = dateKey(Calendar.getInstance());
+        setupDomains();
         showTab("today");
     }
 
+    private void setupDomains() {
+        domainColors.put("القرآن", Color.rgb(25, 126, 96));
+        domainColors.put("الإنجليزية والقبول", Color.rgb(46, 94, 170));
+        domainColors.put("العمل والدخل", Color.rgb(183, 122, 31));
+        domainColors.put("الصحة", Color.rgb(184, 77, 61));
+        domainColors.put("المعرفة والقراءة", Color.rgb(115, 83, 165));
+        domainColors.put("التواصل", Color.rgb(35, 139, 158));
+        domainColors.put("الأسرة", Color.rgb(170, 82, 121));
+        domainColors.put("الدين والمسجد", Color.rgb(74, 117, 78));
+        domainColors.put("الانضباط", Color.rgb(87, 96, 110));
+
+        domainBadges.put("القرآن", new String[]{"بداية المراجعة", "ثابت الورد", "حافظ بصري", "طريق الإتقان"});
+        domainBadges.put("الإنجليزية والقبول", new String[]{"فاتح المفردات", "مستمع ثابت", "قارئ قوي", "طريق الطلاقة"});
+        domainBadges.put("العمل والدخل", new String[]{"أول تنفيذ", "باني مشروع", "مجرّب السوق", "صانع دخل"});
+        domainBadges.put("الصحة", new String[]{"بدأ الحركة", "متدرّب ثابت", "تحمل أعلى", "قوة مستمرة"});
+        domainBadges.put("المعرفة والقراءة", new String[]{"قارئ", "مستكشف", "واسع المعرفة", "موسوعي المسار"});
+        domainBadges.put("التواصل", new String[]{"صوت أوضح", "محاور", "متحدث واثق", "خطيب متدرّب"});
+        domainBadges.put("الأسرة", new String[]{"مبادر", "مساند", "واصل", "سند الأسرة"});
+        domainBadges.put("الدين والمسجد", new String[]{"ملازم", "طالب علم", "ثابت المسار", "نافع بإذن الله"});
+        domainBadges.put("الانضباط", new String[]{"منتظم", "ثابت", "منضبط", "لا ينقطع بسهولة"});
+    }
+
     private void showTab(String tab) {
-        saveTasks(false);
         activeTab = tab;
         setContentView(buildApp());
     }
@@ -78,10 +109,10 @@ public class MainActivity extends Activity {
 
         View screen;
         switch (activeTab) {
-            case "plan": screen = buildPlanScreen(); break;
+            case "domains": screen = buildDomainsScreen(); break;
+            case "badges": screen = buildBadgesScreen(); break;
             case "progress": screen = buildProgressScreen(); break;
             case "later": screen = buildLaterScreen(); break;
-            case "more": screen = buildMoreScreen(); break;
             default: screen = buildTodayScreen();
         }
         content.addView(screen, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -92,361 +123,410 @@ public class MainActivity extends Activity {
     private View buildTodayScreen() {
         ScrollView scroll = baseScroll();
         LinearLayout root = baseRoot(scroll);
-        addHeader(root, "خطة اليوم • مرحلة التأسيس");
-        addTodayActions(root);
-        addTopThreeCard(root);
-        addReserveCard(root);
-        addIndicatorsCard(root);
+        addHeader(root, "نظام النقاط والمكافآت");
 
-        TextView title = text("جدول اليوم", 22, NAVY, true);
-        title.setPadding(0, dp(22), 0, dp(4));
-        root.addView(title);
-        TextView sub = text("كل فترة لها عمل واحد واضح، والوقت مكتوب بنظام ١٢ ساعة.", 13, MUTED, false);
-        sub.setPadding(0, 0, 0, dp(8));
-        root.addView(sub);
+        int dayPoints = getDayPoints(Calendar.getInstance());
+        int planPoints = getPlanYearPoints();
+        LinearLayout hero = card();
+        hero.setPadding(dp(16), dp(15), dp(16), dp(15));
+        addCard(root, hero, dp(14));
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        TextView total = text(arabicNumber(planPoints) + " نقطة", 25, NAVY, true);
+        row.addView(total, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        TextView lvl = pill("المستوى " + arabicNumber(1 + planPoints / 500), GOLD, Color.rgb(255, 247, 226));
+        row.addView(lvl);
+        hero.addView(row);
+        TextView day = text("اليوم: " + arabicNumber(dayPoints) + " / " + arabicNumber(DAILY_TARGET) + " نقطة", 14, GREEN, true);
+        day.setPadding(0, dp(8), 0, dp(6));
+        hero.addView(day);
+        hero.addView(progressBar(dayPoints, DAILY_TARGET, GREEN));
 
-        for (String[] row : scheduleForToday()) {
-            addTimelineRow(root, row[0], row[1], row[2], "1".equals(row[3]));
+        List<Task> tasks = tasksForToday();
+        Task current = currentTask(tasks);
+        if (current != null) addCurrentTask(root, current);
+
+        TextView wheelTitle = text("دائرة اليوم", 21, NAVY, true);
+        wheelTitle.setPadding(0, dp(20), 0, dp(4));
+        root.addView(wheelTitle);
+        TextView wheelSub = text("كل قطاع يمثل وقت المهمة، والخط يشير إلى الوقت الحالي.", 13, MUTED, false);
+        wheelSub.setPadding(0, 0, 0, dp(8));
+        root.addView(wheelSub);
+        DayWheelView wheel = new DayWheelView(this, tasks);
+        root.addView(wheel, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(315)));
+
+        LinearLayout quick = new LinearLayout(this);
+        quick.setOrientation(LinearLayout.HORIZONTAL);
+        quick.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        quick.setPadding(0, dp(8), 0, 0);
+        Button later = button("＋ فكرة إلى لاحقًا", NAVY);
+        quick.addView(later, new LinearLayout.LayoutParams(0, dp(46), 1f));
+        later.setOnClickListener(v -> showQuickLaterDialog());
+        root.addView(quick);
+
+        TextView tasksTitle = text("مهام اليوم الدقيقة", 22, NAVY, true);
+        tasksTitle.setPadding(0, dp(22), 0, dp(3));
+        root.addView(tasksTitle);
+        TextView hint = text("أنجز المهمة كما هي مكتوبة؛ لا توجد عبارات عامة مثل «اعمل على الإنجليزي». كل مهمة تعطي نقاط مجالها.", 13, MUTED, false);
+        hint.setPadding(0, 0, 0, dp(8));
+        root.addView(hint);
+
+        for (Task task : tasks) addTaskCard(root, task, current != null && current.id.equals(task.id));
+        return scroll;
+    }
+
+    private void addCurrentTask(LinearLayout root, Task task) {
+        LinearLayout c = card();
+        c.setPadding(dp(16), dp(14), dp(16), dp(14));
+        c.setBackground(rounded(Color.rgb(238, 248, 244), 18, Color.rgb(169, 216, 202)));
+        addCard(root, c, dp(12));
+        LinearLayout line = new LinearLayout(this);
+        line.setOrientation(LinearLayout.HORIZONTAL);
+        line.setGravity(Gravity.CENTER_VERTICAL);
+        line.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        TextView now = text("الآن", 13, GREEN, true);
+        line.addView(now);
+        TextView points = pill("+" + arabicNumber(task.points), domainColor(task.domain), Color.WHITE);
+        LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        pp.setMargins(dp(8), 0, 0, 0);
+        line.addView(points, pp);
+        c.addView(line);
+        TextView title = text(task.title, 18, NAVY, true);
+        title.setPadding(0, dp(5), 0, 0);
+        c.addView(title);
+        c.addView(detailText(formatTimeRange(task.startMin, task.endMin) + " • " + task.domain));
+        c.addView(detailText(task.details));
+    }
+
+    private void addTaskCard(LinearLayout root, Task task, boolean current) {
+        LinearLayout c = card();
+        c.setPadding(dp(14), dp(12), dp(14), dp(12));
+        if (current) c.setBackground(rounded(Color.rgb(240, 247, 255), 18, Color.rgb(164, 193, 226)));
+        addCard(root, c, dp(7));
+
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        top.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+
+        CheckBox cb = new CheckBox(this);
+        cb.setButtonTintList(ColorStateList.valueOf(domainColor(task.domain)));
+        cb.setChecked(isTaskDone(task));
+        top.addView(cb, new LinearLayout.LayoutParams(dp(45), dp(48)));
+
+        LinearLayout info = new LinearLayout(this);
+        info.setOrientation(LinearLayout.VERTICAL);
+        top.addView(info, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        info.addView(text(task.title, 16, TEXT, true));
+        TextView time = text(formatTimeRange(task.startMin, task.endMin), 12, MUTED, false);
+        time.setPadding(0, dp(2), 0, 0);
+        info.addView(time);
+
+        TextView pts = pill("+" + arabicNumber(task.points), domainColor(task.domain), Color.rgb(248, 250, 253));
+        top.addView(pts);
+        c.addView(top);
+
+        TextView d = text(task.details, 13, TEXT, false);
+        d.setPadding(dp(4), dp(5), dp(45), 0);
+        c.addView(d);
+        TextView domain = text(task.domain, 12, domainColor(task.domain), true);
+        domain.setPadding(dp(4), dp(6), dp(45), 0);
+        c.addView(domain);
+
+        cb.setOnCheckedChangeListener((buttonView, checked) -> {
+            setTaskDone(task, checked);
+            Toast.makeText(this, checked ? "+" + task.points + " نقطة في " + task.domain : "تم التراجع عن المهمة", Toast.LENGTH_SHORT).show();
+            showTab("today");
+        });
+    }
+
+    private List<Task> tasksForToday() {
+        List<Task> t = new ArrayList<>();
+        t.add(new Task("fajr", 240, 390, "الفجر والحلقة", "افتح المسجد، صلِّ ما تيسر، أذّن وأقم، أكمل الأذكار، اسمع للطلاب حتى ٦:٠٠، ثم احضر درس الشيخ حتى ٦:٣٠.", "الدين والمسجد", 5));
+        t.add(new Task("exercise", 390, 420, "تمرين القوة الصباحي", "٥د إحماء + ٣×١٢ سكوات + ٣×٨ ضغط مائل فقط إذا كان بلا ألم + ٣×٢٠ث بلانك. توقف عن أي حركة تؤلم الكتف.", "الصحة", 10));
+        t.add(new Task("english", 420, 480, "ساعة الإنجليزية المركزة", "١٥ مفردة باسترجاع نشط + ٢٠د استماع بلا ترجمة أول مرة + ١٥د قراءة قصيرة + ١٠د مراجعة الكلمات والقواعد.", "الإنجليزية والقبول", 25));
+        t.add(new Task("sleep2", 480, 570, "النوم التكميلي", "نم من ٨:٠٠ إلى ٩:٣٠ قدر الإمكان ولا تحوّل هذه الفترة إلى تصفح.", "الصحة", 5));
+        t.add(new Task("book1", 570, 600, "ليب أهيد — الكتاب ١", "مع الفطور: استمع ٢٥ دقيقة على الأقل من الكتاب الأول أو أكمله إن كان أقصر.", "المعرفة والقراءة", 5));
+        t.add(new Task("academy", 600, 690, "الأكاديمية — درس واحد فقط", "اختر درسًا واحدًا: بسّط ٣ فقرات صعبة، جرّب الشاشات، أصلح خطأ واحد واضح، وأي فكرة إضافية ضعها في «لاحقًا» بدل فتح تعديل جديد.", "العمل والدخل", 20));
+        t.add(new Task("quran1", 705, 780, "القرآن قبل الظهر — صفحتان", "راجع صفحتين؛ بعد كل صفحة أغلق المصحف واستحضر أول الصفحة ووسطها وآخرها ومكان آيتين على الأقل.", "القرآن", 10));
+        t.add(new Task("marketing", 810, 855, "التسويق — تعلم ثم تطبيق", "٢٠د من دورة التسويق المحملة، ثم ٢٥د تطبيق مباشر: اكتب عرضًا واحدًا للأكاديمية أو عدّل إعلانًا واحدًا فقط.", "العمل والدخل", 15));
+        t.add(new Task("book2", 855, 880, "ليب أهيد — الكتاب ٢", "استمع ٢٥ دقيقة على الأقل من الكتاب الثاني أو أكمله إن كان أقصر.", "المعرفة والقراءة", 5));
+        t.add(new Task("quran2", 885, 970, "القرآن قبل العصر — صفحتان", "راجع صفحتين جديدتين بنفس اختبار الاستحضار البصري، ثم صلِّ العصر واحضر الدرس.", "القرآن", 10));
+        t.add(new Task("family", 990, 1020, "مبادرة للأسرة", "نفّذ خدمة منزلية واحدة دون أن يطلبوها منك أو اسأل والدتك تحديدًا: «هل تحتاجين مني شيئًا الآن؟» ونفّذ إن كان مناسبًا.", "الأسرة", 5));
+        t.add(new Task("talk", 1020, 1050, "تدريب الكلام", "سجّل ٥ دقائق عن موضوع تعرفه، ثم أعد الفكرة مرة ثانية بأقل توقفات، وابدأ محادثة واحدة خلال اليوم بدل انتظار الطرف الآخر.", "التواصل", 10));
+        t.add(new Task("maghrib", 1080, 1200, "المغرب والتحفيظ والعشاء", "افتح المسجد، التحفيظ بين المغرب والعشاء، صلِّ العشاء ثم حاسب الطلاب وأنهِ ما يلزم للحلقة.", "الدين والمسجد", 5));
+        t.add(new Task("book3", 1230, 1260, "ليب أهيد — الكتاب ٣", "استمع ٢٥ دقيقة على الأقل من الكتاب الثالث أو أكمله إن كان أقصر.", "المعرفة والقراءة", 5));
+        t.add(new Task("tomorrow", 1320, 1335, "إغلاق اليوم وتحديد الغد", "اختر ٣ مهام رئيسية للغد فقط، وانقل أي فكرة جديدة إلى «لاحقًا» دون البدء بها الليلة.", "الانضباط", 5));
+        t.add(new Task("sleep", 1335, 1350, "الاستعداد للنوم", "أوقف Shorts والبحث، ضع الهاتف بعيدًا، جهز للنوم بحيث يكون الهدف ١٠:٣٠ م.", "الصحة", 5));
+        return t;
+    }
+
+    private Task currentTask(List<Task> tasks) {
+        Calendar c = Calendar.getInstance();
+        int now = c.get(Calendar.HOUR_OF_DAY) * 60 + c.get(Calendar.MINUTE);
+        for (Task t : tasks) if (now >= t.startMin && now < t.endMin) return t;
+        return null;
+    }
+
+    private boolean isTaskDone(Task task) {
+        return prefs.getBoolean("reward_done_" + todayKey + "_" + task.id, false);
+    }
+
+    private void setTaskDone(Task task, boolean done) {
+        boolean old = isTaskDone(task);
+        if (old == done) return;
+        int delta = done ? task.points : -task.points;
+        String dayKey = "reward_day_points_" + todayKey;
+        int day = Math.max(0, prefs.getInt(dayKey, 0) + delta);
+        String domainKey = "reward_domain_" + task.domain;
+        int domain = Math.max(0, prefs.getInt(domainKey, 0) + delta);
+        prefs.edit()
+                .putBoolean("reward_done_" + todayKey + "_" + task.id, done)
+                .putInt(dayKey, day)
+                .putInt(domainKey, domain)
+                .apply();
+    }
+
+    private View buildDomainsScreen() {
+        ScrollView scroll = baseScroll();
+        LinearLayout root = baseRoot(scroll);
+        addHeader(root, "المجالات ونقاطك");
+        TextView intro = text("كل مجال يتقدم مستقلًا. لا يمكن لنقاط العمل أن تخفي ضعف القرآن أو العكس.", 13, MUTED, false);
+        intro.setPadding(0, dp(12), 0, dp(6));
+        root.addView(intro);
+
+        for (String domain : domainColors.keySet()) {
+            int points = prefs.getInt("reward_domain_" + domain, 0);
+            int[] next = badgeProgress(points);
+            LinearLayout c = card();
+            c.setPadding(dp(15), dp(13), dp(15), dp(13));
+            addCard(root, c, dp(8));
+            LinearLayout top = new LinearLayout(this);
+            top.setOrientation(LinearLayout.HORIZONTAL);
+            top.setGravity(Gravity.CENTER_VERTICAL);
+            top.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+            TextView name = text(domain, 17, TEXT, true);
+            top.addView(name, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            top.addView(pill(arabicNumber(points) + " نقطة", domainColor(domain), Color.rgb(248, 250, 253)));
+            c.addView(top);
+            TextView badge = text("الوسام الحالي: " + currentBadgeName(domain, points), 13, domainColor(domain), true);
+            badge.setPadding(0, dp(6), 0, dp(5));
+            c.addView(badge);
+            if (next[1] > 0) {
+                c.addView(progressBar(next[0], next[1], domainColor(domain)));
+                c.addView(detailText("باقي " + arabicNumber(Math.max(0, next[1] - next[0])) + " نقطة للوسام التالي"));
+            } else {
+                c.addView(detailText("وصلت إلى أعلى وسام حالي في هذا المجال."));
+            }
         }
         return scroll;
     }
 
-    private void addTodayActions(LinearLayout root) {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER);
-        row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        rowLp.setMargins(0, dp(14), 0, 0);
-        root.addView(row, rowLp);
+    private View buildBadgesScreen() {
+        ScrollView scroll = baseScroll();
+        LinearLayout root = baseRoot(scroll);
+        addHeader(root, "الأوسمة");
+        TextView intro = text("تُفتح الأوسمة عند ١٠٠، ٣٠٠، ٧٠٠، ١٥٠٠ نقطة في المجال.", 13, MUTED, false);
+        intro.setPadding(0, dp(12), 0, dp(6));
+        root.addView(intro);
+        int[] thresholds = {100, 300, 700, 1500};
 
-        Button idea = smallButton("＋ لاحقًا", GREEN);
-        row.addView(idea, buttonWeight());
-        idea.setOnClickListener(v -> showQuickIdeaDialog());
-
-        int emergency = prefs.getInt("emergency_" + todayKey, 0);
-        Button urgent = smallButton(emergency > 0 ? "⚡ طارئ " + arabicNumber(emergency) + "د" : "⚡ طارئ", GOLD);
-        row.addView(urgent, buttonWeight());
-        urgent.setOnClickListener(v -> showEmergencyDialog());
-
-        Button flex = smallButton(isFlexibleToday() ? "✓ اليوم مرن" : "يوم مرن", NAVY);
-        row.addView(flex, buttonWeight());
-        flex.setOnClickListener(v -> toggleFlexibleToday());
+        for (String domain : domainBadges.keySet()) {
+            int points = prefs.getInt("reward_domain_" + domain, 0);
+            TextView title = text(domain, 18, NAVY, true);
+            title.setPadding(0, dp(14), 0, dp(5));
+            root.addView(title);
+            String[] names = domainBadges.get(domain);
+            for (int i = 0; i < names.length; i++) {
+                boolean unlocked = points >= thresholds[i];
+                LinearLayout c = card();
+                c.setPadding(dp(14), dp(11), dp(14), dp(11));
+                if (!unlocked) c.setAlpha(0.58f);
+                addCard(root, c, dp(5));
+                LinearLayout line = new LinearLayout(this);
+                line.setOrientation(LinearLayout.HORIZONTAL);
+                line.setGravity(Gravity.CENTER_VERTICAL);
+                line.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+                TextView icon = text(unlocked ? "★" : "☆", 24, unlocked ? GOLD : MUTED, true);
+                line.addView(icon, new LinearLayout.LayoutParams(dp(38), ViewGroup.LayoutParams.WRAP_CONTENT));
+                LinearLayout info = new LinearLayout(this);
+                info.setOrientation(LinearLayout.VERTICAL);
+                line.addView(info, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+                info.addView(text(names[i], 15, unlocked ? TEXT : MUTED, true));
+                info.addView(text(arabicNumber(thresholds[i]) + " نقطة", 12, MUTED, false));
+                TextView state = pill(unlocked ? "مفتوح" : "مغلق", unlocked ? GREEN : MUTED, Color.rgb(248, 250, 253));
+                line.addView(state);
+                c.addView(line);
+            }
+        }
+        return scroll;
     }
 
-    private void addTopThreeCard(LinearLayout root) {
-        LinearLayout topCard = card();
-        topCard.setPadding(dp(16), dp(16), dp(16), dp(16));
-        addCard(root, topCard, dp(14));
+    private View buildProgressScreen() {
+        ScrollView scroll = baseScroll();
+        LinearLayout root = baseRoot(scroll);
+        addHeader(root, "التقدم اليومي والأسبوعي والشهري والسنوي");
 
-        LinearLayout head = new LinearLayout(this);
-        head.setOrientation(LinearLayout.HORIZONTAL);
-        head.setGravity(Gravity.CENTER_VERTICAL);
-        head.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        TextView topTitle = text("أهم ٣ أشياء اليوم", 20, NAVY, true);
-        head.addView(topTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        priorityProgress = pill("أنجزت ٠ من ٣", GREEN);
-        head.addView(priorityProgress);
-        topCard.addView(head);
+        int daily = getDayPoints(Calendar.getInstance());
+        int weekly = getWeekPoints();
+        int monthly = getMonthPoints();
+        int yearly = getPlanYearPoints();
 
-        String[] defaults = {
-                "مراجعة ٤ صفحات من القرآن: صفحتان قبل الظهر وصفحتان قبل العصر",
-                "الإنجليزية: ١٥ مفردة + ٢٠ دقيقة استماع + قراءة/قواعد",
-                "الأكاديميات: تعديل شرح درس واحد ثم اختبار التطبيق"
-        };
-        for (int i = 0; i < 3; i++) addTaskRow(topCard, i, defaults[i]);
-        updatePriorityProgress();
-    }
+        addPeriodProgress(root, "اليوم", daily, DAILY_TARGET, "الهدف: يوم قوي عند ١٢٠ نقطة", GREEN);
+        addPeriodProgress(root, "هذا الأسبوع", weekly, WEEKLY_TARGET, "الأسبوع من السبت إلى الجمعة", Color.rgb(46, 94, 170));
+        addPeriodProgress(root, "هذا الشهر", monthly, MONTHLY_TARGET, "الهدف الشهري ٣٠٠٠ نقطة", GOLD);
+        addPeriodProgress(root, "الخطة السنوية", yearly, YEAR_TARGET, "من سبتمبر ٢٠٢٦ إلى نهاية مايو ٢٠٢٧", Color.rgb(115, 83, 165));
 
-    private void addReserveCard(LinearLayout root) {
         LinearLayout c = card();
-        c.setPadding(dp(16), dp(14), dp(16), dp(14));
-        addCard(root, c, dp(12));
-        TextView title = text("الوقت الاحتياطي", 18, NAVY, true);
-        c.addView(title);
-        TextView desc = text("إذا انتهى وقت مهمة ولم تكتمل، استخدم ١٥ دقيقة إضافية بدل أن يمتد اليوم بلا حدود.", 13, MUTED, false);
-        desc.setPadding(0, dp(4), 0, dp(8));
-        c.addView(desc);
-
-        for (int i = 0; i < 3; i++) {
-            final int idx = i;
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-            TextView label = text("المهمة " + arabicNumber(i + 1), 14, TEXT, true);
-            row.addView(label, new LinearLayout.LayoutParams(0, dp(44), 1f));
-            int used = prefs.getInt("reserve_" + i + "_" + todayKey, 0);
-            Button b = smallButton(used > 0 ? "مستخدم +" + arabicNumber(used) + " د" : "استخدام +١٥ د", used > 0 ? GREEN : NAVY);
-            row.addView(b, new LinearLayout.LayoutParams(dp(150), dp(42)));
-            b.setOnClickListener(v -> {
-                int current = prefs.getInt("reserve_" + idx + "_" + todayKey, 0);
-                int next = current == 0 ? 15 : 0;
-                prefs.edit().putInt("reserve_" + idx + "_" + todayKey, next).apply();
-                showTab("today");
-            });
-            c.addView(row);
-        }
+        c.setPadding(dp(15), dp(13), dp(15), dp(13));
+        addCard(root, c, dp(14));
+        c.addView(text("كيف تُحسب؟", 17, NAVY, true));
+        c.addView(detailText("المهمة لا تمنحك النقاط إلا مرة واحدة في يومها. إذا ألغيت علامة الإنجاز تُسحب النقاط. التقدم الأسبوعي والشهري والسنوي هو مجموع نقاط الأيام الفعلية."));
+        return scroll;
     }
 
-    private void addIndicatorsCard(LinearLayout root) {
+    private void addPeriodProgress(LinearLayout root, String titleValue, int value, int target, String note, int color) {
         LinearLayout c = card();
-        c.setPadding(dp(16), dp(14), dp(16), dp(14));
-        addCard(root, c, dp(12));
-        LinearLayout head = new LinearLayout(this);
-        head.setOrientation(LinearLayout.HORIZONTAL);
-        head.setGravity(Gravity.CENTER_VERTICAL);
-        head.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        TextView title = text("المؤشرات اليومية الخمسة", 18, NAVY, true);
-        head.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        indicatorProgress = pill("أنجزت ٠ من ٥", GREEN);
-        head.addView(indicatorProgress);
-        c.addView(head);
-
-        String[] labels = {"القرآن", "الإنجليزية / القبول", "العمل / الدخل", "الصحة أو التواصل", "إغلاق اليوم والنوم"};
-        for (int i = 0; i < labels.length; i++) {
-            final int idx = i;
-            CheckBox cb = new CheckBox(this);
-            cb.setText(labels[i]);
-            cb.setTextSize(15);
-            cb.setTextColor(TEXT);
-            cb.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
-            cb.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-            cb.setButtonTintList(android.content.res.ColorStateList.valueOf(GREEN));
-            cb.setChecked(prefs.getBoolean("indicator_" + i + "_" + todayKey, false));
-            cb.setOnCheckedChangeListener((buttonView, checked) -> {
-                prefs.edit().putBoolean("indicator_" + idx + "_" + todayKey, checked).apply();
-                updateIndicatorProgress();
-            });
-            indicatorChecks[i] = cb;
-            c.addView(cb, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(46)));
-        }
-        updateIndicatorProgress();
+        c.setPadding(dp(15), dp(13), dp(15), dp(13));
+        addCard(root, c, dp(10));
+        LinearLayout line = new LinearLayout(this);
+        line.setOrientation(LinearLayout.HORIZONTAL);
+        line.setGravity(Gravity.CENTER_VERTICAL);
+        line.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        line.addView(text(titleValue, 17, TEXT, true), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        int pct = Math.min(100, Math.round(value * 100f / target));
+        line.addView(pill(arabicNumber(pct) + "٪", color, Color.rgb(248, 250, 253)));
+        c.addView(line);
+        TextView score = text(arabicNumber(value) + " / " + arabicNumber(target) + " نقطة", 14, color, true);
+        score.setPadding(0, dp(7), 0, dp(5));
+        c.addView(score);
+        c.addView(progressBar(value, target, color));
+        c.addView(detailText(note));
     }
 
-    private List<String[]> scheduleForToday() {
-        List<String[]> rows = new ArrayList<>();
-        boolean flex = isFlexibleToday();
-        int emergency = prefs.getInt("emergency_" + todayKey, 0);
-
-        rows.add(r("من ٤:٠٠ ص إلى ٦:٣٠ ص", "الفجر • المسجد • التحفيظ • الدرس الشرعي", "ثابت", false));
-        rows.add(r("من ٦:٣٠ ص إلى ٧:٠٠ ص", "تمرين بدني صباحي ٣٠ دقيقة", "صحة", true));
-        rows.add(r("من ٧:٠٠ ص إلى ٨:٠٠ ص", "ساعة التركيز الذهبية: إنجليزي — ١٥ مفردة + ٢٠د استماع + ٢٠د قراءة أو قواعد + ٥د مراجعة", "إنجليزي", true));
-        rows.add(r("من ٨:٠٠ ص إلى ٩:٣٠ ص", "نوم تكميلي", "نوم", false));
-        rows.add(r("من ٩:٣٠ ص إلى ١٠:٠٠ ص", "الفطور + الاستماع إلى كتاب ليب أهيد رقم ١", "كتاب ١ من ٣", false));
-
-        if (!flex) {
-            rows.add(r("من ١٠:٠٠ ص إلى ١١:٣٠ ص", "مشروع الأكاديميات: تعديل شرح درس واحد ثم اختبار التطبيق", "عمل مركز", true));
-        } else {
-            rows.add(r("من ١٠:٠٠ ص إلى ١١:٣٠ ص", "وقت مرن لهذا الأسبوع — لا مشروع جديد اليوم", "اليوم المرن", false));
-        }
-
-        rows.add(r("من ١١:٤٥ ص إلى ١:٠٠ م", "المسجد: مراجعة صفحتين من القرآن + صلاة الظهر + العودة للبيت", "قرآن + ظهر", true));
-        rows.add(r("من ١:٠٠ م إلى ١:٣٠ م", "الغداء", "وجبة", false));
-
-        if (emergency >= 90) {
-            rows.add(r("من ١:٣٠ م إلى ٢:١٥ م", "وقت للطرف الطارئ — جلسة المال والتسويق مؤجلة ولا تُحسب فشلًا", "طارئ", false));
-        } else if (!flex) {
-            rows.add(r("من ١:٣٠ م إلى ٢:١٥ م", "المال والتسويق: ٢٠د تعلم + ٢٥د تطبيق مباشر على بيع الأكاديميات", "دخل", false));
-        } else {
-            rows.add(r("من ١:٣٠ م إلى ٢:١٥ م", "راحة اليوم المرن", "مرن", false));
-        }
-
-        rows.add(r("من ٢:١٥ م إلى ٢:٤٠ م", "الاستماع إلى كتاب ليب أهيد رقم ٢", "كتاب ٢ من ٣", false));
-        rows.add(r("من ٢:٤٥ م إلى ٤:١٠ م", "المسجد: مراجعة صفحتين من القرآن + صلاة العصر + الدرس", "قرآن + عصر", true));
-
-        if (emergency >= 60) {
-            rows.add(r("من ٤:٣٠ م إلى ٥:٣٠ م", "وقت الطارئ المحجوز — المهام المرنة تُرحّل ولا تزاحم المسجد", "طارئ", false));
-        } else if (emergency == 30) {
-            rows.add(r("من ٤:٣٠ م إلى ٥:٠٠ م", "وقت الطارئ المحجوز", "طارئ", false));
-            rows.add(r("من ٥:٠٠ م إلى ٥:٣٠ م", "وقت الأسرة والمساعدة في البيت", "أسرة", false));
-        } else {
-            rows.add(r("من ٤:٣٠ م إلى ٥:٣٠ م", "وقت الأسرة والمساعدة في البيت", "أسرة", false));
-        }
-
-        rows.add(r("من ٦:٠٠ م إلى ٨:٠٠ م", "المغرب • التحفيظ • العشاء • محاسبة الطلاب", "ثابت", false));
-        rows.add(r("من ٨:٠٠ م إلى ٨:٣٠ م", "العشاء مع الأسرة", "أسرة", false));
-        rows.add(r("من ٨:٣٠ م إلى ٩:٠٠ م", "الاستماع إلى كتاب ليب أهيد رقم ٣", "كتاب ٣ من ٣", false));
-        rows.add(r("من ٩:٠٠ م إلى ١٠:٠٠ م", flex ? "وقت حر موسع لليوم المرن" : "وقت حر بلا شعور بالذنب", "راحة", false));
-        rows.add(r("من ١٠:٠٠ م إلى ١٠:١٥ م", "تحديد أهم ٣ مهام للغد ومراجعة قائمة «لاحقًا» فقط دون بدء شيء جديد", "إغلاق اليوم", false));
-        rows.add(r("من ١٠:١٥ م إلى ١٠:٣٠ م", "إبعاد الهاتف والاستعداد للنوم", "نوم", true));
-        rows.add(r("١٠:٣٠ م", "النوم", "الهدف الليلي", true));
-        return rows;
+    private int getDayPoints(Calendar c) {
+        return prefs.getInt("reward_day_points_" + dateKey(c), 0);
     }
 
-    private String[] r(String time, String label, String tag, boolean highlight) {
-        return new String[]{time, label, tag, highlight ? "1" : "0"};
-    }
-
-    private void showEmergencyDialog() {
-        String[] choices = {"٣٠ دقيقة", "٦٠ دقيقة", "٩٠ دقيقة", "إلغاء وضع الطارئ"};
-        new AlertDialog.Builder(this)
-                .setTitle("كم أخذ الطارئ من وقتك؟")
-                .setItems(choices, (dialog, which) -> {
-                    int value = which == 0 ? 30 : which == 1 ? 60 : which == 2 ? 90 : 0;
-                    prefs.edit().putInt("emergency_" + todayKey, value).apply();
-                    showTab("today");
-                })
-                .setNegativeButton("رجوع", null)
-                .show();
-    }
-
-    private boolean isFlexibleToday() {
-        return todayKey.equals(prefs.getString("flex_day_" + weekKey(), ""));
-    }
-
-    private void toggleFlexibleToday() {
-        String key = "flex_day_" + weekKey();
-        if (isFlexibleToday()) prefs.edit().remove(key).apply();
-        else prefs.edit().putString(key, todayKey).apply();
-        showTab("today");
-    }
-
-    private String weekKey() {
+    private int getWeekPoints() {
         Calendar c = Calendar.getInstance();
-        return c.get(Calendar.YEAR) + "-" + c.get(Calendar.WEEK_OF_YEAR);
+        int dow = c.get(Calendar.DAY_OF_WEEK);
+        int daysSinceSaturday = (dow - Calendar.SATURDAY + 7) % 7;
+        Calendar start = (Calendar) c.clone();
+        start.add(Calendar.DAY_OF_MONTH, -daysSinceSaturday);
+        int total = 0;
+        Calendar p = (Calendar) start.clone();
+        for (int i = 0; i < 7; i++) {
+            total += getDayPoints(p);
+            p.add(Calendar.DAY_OF_MONTH, 1);
+        }
+        return total;
     }
 
-    private void showQuickIdeaDialog() {
-        EditText input = dialogInput("اكتب الفكرة فقط…");
-        new AlertDialog.Builder(this)
-                .setTitle("خطرت لي فكرة")
-                .setMessage("احفظها هنا وارجع فورًا لما كنت تفعله.")
-                .setView(input)
-                .setPositiveButton("حفظ في لاحقًا", (d, w) -> {
-                    String value = input.getText().toString().trim();
-                    if (!value.isEmpty()) {
-                        saveLaterItem(value, "بحث", "", "عادية", "", "", "لاحقًا");
-                        Toast.makeText(this, "حُفظت الفكرة في لاحقًا", Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .setNegativeButton("إلغاء", null)
-                .show();
+    private int getMonthPoints() {
+        Calendar c = Calendar.getInstance();
+        Calendar p = (Calendar) c.clone();
+        p.set(Calendar.DAY_OF_MONTH, 1);
+        int month = p.get(Calendar.MONTH);
+        int total = 0;
+        while (p.get(Calendar.MONTH) == month) {
+            total += getDayPoints(p);
+            p.add(Calendar.DAY_OF_MONTH, 1);
+        }
+        return total;
+    }
+
+    private int getPlanYearPoints() {
+        Calendar start = Calendar.getInstance();
+        start.set(2026, Calendar.SEPTEMBER, 1, 0, 0, 0);
+        start.set(Calendar.MILLISECOND, 0);
+        Calendar end = Calendar.getInstance();
+        end.set(2027, Calendar.MAY, 31, 23, 59, 59);
+        Calendar now = Calendar.getInstance();
+        Calendar last = now.before(end) ? now : end;
+        int total = 0;
+        Calendar p = (Calendar) start.clone();
+        while (!p.after(last)) {
+            total += getDayPoints(p);
+            p.add(Calendar.DAY_OF_MONTH, 1);
+        }
+        return total;
+    }
+
+    private int[] badgeProgress(int points) {
+        int[] thresholds = {100, 300, 700, 1500};
+        int prev = 0;
+        for (int threshold : thresholds) {
+            if (points < threshold) return new int[]{points - prev, threshold - prev};
+            prev = threshold;
+        }
+        return new int[]{1, 0};
+    }
+
+    private String currentBadgeName(String domain, int points) {
+        String[] names = domainBadges.get(domain);
+        if (names == null) return "—";
+        if (points >= 1500) return names[3];
+        if (points >= 700) return names[2];
+        if (points >= 300) return names[1];
+        if (points >= 100) return names[0];
+        return "لم يُفتح أول وسام بعد";
     }
 
     private View buildLaterScreen() {
         ScrollView scroll = baseScroll();
         LinearLayout root = baseRoot(scroll);
-        addHeader(root, "لاحقًا • لا تغيّر خطتك بسبب فكرة جديدة");
+        addHeader(root, "لاحقًا");
+        Button add = button("＋ احفظ فكرة ولا تقطع مهمتك", NAVY);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48));
+        lp.setMargins(0, dp(14), 0, dp(8));
+        root.addView(add, lp);
+        add.setOnClickListener(v -> showQuickLaterDialog());
 
-        Button add = smallButton("＋ إضافة شيء بالتفصيل", GREEN);
-        LinearLayout.LayoutParams addLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48));
-        addLp.setMargins(0, dp(16), 0, dp(8));
-        root.addView(add, addLp);
-        add.setOnClickListener(v -> showFullLaterDialog());
-
-        JSONArray items = getLaterItems();
-        if (items.length() == 0) {
-            LinearLayout empty = card();
-            empty.setPadding(dp(16), dp(18), dp(16), dp(18));
-            addCard(root, empty, dp(8));
-            empty.addView(text("القائمة فارغة. أي فكرة تقطع عليك القرآن أو العمل احفظها هنا بدل البحث عنها فورًا.", 14, TEXT, false));
-            return scroll;
-        }
-
-        for (int i = items.length() - 1; i >= 0; i--) {
-            JSONObject o = items.optJSONObject(i);
-            if (o != null) addLaterCard(root, o, i);
+        JSONArray arr = getLaterItems();
+        if (arr.length() == 0) {
+            LinearLayout c = card();
+            c.setPadding(dp(15), dp(15), dp(15), dp(15));
+            addCard(root, c, dp(8));
+            c.addView(text("أي سؤال أو مجال جديد يخطر لك أثناء مهمة، خزّنه هنا ثم ارجع للمهمة. هذه القائمة لا تعطي نقاطًا حتى تتحول إلى مهمة فعلية في الخطة.", 14, TEXT, false));
+        } else {
+            for (int i = arr.length() - 1; i >= 0; i--) {
+                JSONObject o = arr.optJSONObject(i);
+                if (o == null) continue;
+                LinearLayout c = card();
+                c.setPadding(dp(14), dp(12), dp(14), dp(12));
+                addCard(root, c, dp(7));
+                c.addView(text(o.optString("title"), 16, TEXT, true));
+                c.addView(detailText(o.optString("created", "")));
+                final int idx = i;
+                Button delete = button("حذف", Color.rgb(145, 62, 62));
+                LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(dp(90), dp(40));
+                dlp.gravity = Gravity.LEFT;
+                c.addView(delete, dlp);
+                delete.setOnClickListener(v -> deleteLaterItem(idx));
+            }
         }
         return scroll;
     }
 
-    private void addLaterCard(LinearLayout root, JSONObject o, int index) {
-        LinearLayout c = card();
-        c.setPadding(dp(16), dp(14), dp(16), dp(14));
-        addCard(root, c, dp(8));
-        c.addView(text(o.optString("title"), 17, NAVY, true));
-        String info = o.optString("category", "بحث") + " • " + o.optString("importance", "عادية") + " • " + o.optString("status", "لاحقًا");
-        TextView meta = text(info, 12, GREEN, true);
-        meta.setPadding(0, dp(4), 0, 0);
-        c.addView(meta);
-        if (!o.optString("why").isEmpty()) c.addView(detail("لماذا؟ " + o.optString("why")));
-        if (!o.optString("duration").isEmpty()) c.addView(detail("المدة المتوقعة: " + o.optString("duration")));
-        if (!o.optString("review").isEmpty()) c.addView(detail("المراجعة/الموعد: " + o.optString("review")));
-
-        LinearLayout actions = new LinearLayout(this);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
-        actions.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        actions.setPadding(0, dp(8), 0, 0);
-        Button month = smallButton("هذا الشهر", GREEN);
-        Button later = smallButton("لاحقًا", NAVY);
-        Button delete = smallButton("حذف", Color.rgb(145, 55, 55));
-        actions.addView(month, buttonWeight());
-        actions.addView(later, buttonWeight());
-        actions.addView(delete, buttonWeight());
-        c.addView(actions);
-        month.setOnClickListener(v -> setLaterStatus(index, "هذا الشهر"));
-        later.setOnClickListener(v -> setLaterStatus(index, "لاحقًا"));
-        delete.setOnClickListener(v -> deleteLaterItem(index));
-    }
-
-    private TextView detail(String value) {
-        TextView t = text(value, 13, TEXT, false);
-        t.setPadding(0, dp(4), 0, 0);
-        return t;
-    }
-
-    private void showFullLaterDialog() {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(18), 0, dp(18), 0);
-        box.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-
-        EditText title = dialogInput("العنوان");
-        EditText why = dialogInput("لماذا أريده؟");
-        EditText duration = dialogInput("المدة المتوقعة، مثل: ساعة أو شهر");
-        EditText review = dialogInput("متى أراجعه؟ أو موعده إن وجد");
-        box.addView(title); box.addView(why); box.addView(duration); box.addView(review);
-
-        String[] cats = {"علم", "تعلم", "مشروع", "تجربة", "مهارة", "بحث"};
-        Spinner cat = spinner(cats);
-        String[] levels = {"عالية", "عادية", "منخفضة"};
-        Spinner importance = spinner(levels);
-        box.addView(labeled("التصنيف", cat));
-        box.addView(labeled("الأهمية", importance));
-
+    private void showQuickLaterDialog() {
+        EditText input = new EditText(this);
+        input.setHint("مثال: كيف تتكون الأعاصير؟");
+        input.setGravity(Gravity.RIGHT);
+        input.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         new AlertDialog.Builder(this)
-                .setTitle("إضافة إلى لاحقًا")
-                .setView(box)
+                .setTitle("احفظها في لاحقًا")
+                .setMessage("اكتب الفكرة فقط ثم ارجع لما كنت تفعله.")
+                .setView(input)
                 .setPositiveButton("حفظ", (d, w) -> {
-                    String value = title.getText().toString().trim();
-                    if (!value.isEmpty()) {
-                        saveLaterItem(value, cat.getSelectedItem().toString(), why.getText().toString().trim(), importance.getSelectedItem().toString(), duration.getText().toString().trim(), review.getText().toString().trim(), "لاحقًا");
-                        showTab("later");
-                    }
+                    String value = input.getText().toString().trim();
+                    if (!value.isEmpty()) saveLater(value);
                 })
                 .setNegativeButton("إلغاء", null)
                 .show();
-    }
-
-    private View labeled(String label, View field) {
-        LinearLayout wrap = new LinearLayout(this);
-        wrap.setOrientation(LinearLayout.VERTICAL);
-        wrap.setPadding(0, dp(8), 0, 0);
-        wrap.addView(text(label, 12, MUTED, true));
-        wrap.addView(field, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
-        return wrap;
-    }
-
-    private Spinner spinner(String[] values) {
-        Spinner s = new Spinner(this);
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, values);
-        s.setAdapter(adapter);
-        return s;
-    }
-
-    private EditText dialogInput(String hint) {
-        EditText e = new EditText(this);
-        e.setHint(hint);
-        e.setTextSize(15);
-        e.setTextColor(TEXT);
-        e.setHintTextColor(MUTED);
-        e.setGravity(Gravity.RIGHT);
-        e.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        e.setSingleLine(false);
-        e.setMaxLines(3);
-        e.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
-        return e;
     }
 
     private JSONArray getLaterItems() {
@@ -454,30 +534,15 @@ public class MainActivity extends Activity {
         catch (Exception e) { return new JSONArray(); }
     }
 
-    private void saveLaterItem(String title, String category, String why, String importance, String duration, String review, String status) {
+    private void saveLater(String value) {
         try {
             JSONArray arr = getLaterItems();
             JSONObject o = new JSONObject();
-            o.put("title", title);
-            o.put("category", category);
-            o.put("why", why);
-            o.put("importance", importance);
-            o.put("duration", duration);
-            o.put("review", review);
-            o.put("status", status);
-            o.put("created", todayKey);
+            o.put("title", value);
+            o.put("created", arabicDate());
             arr.put(o);
             prefs.edit().putString("later_items", arr.toString()).apply();
-        } catch (Exception ignored) {}
-    }
-
-    private void setLaterStatus(int index, String status) {
-        try {
-            JSONArray arr = getLaterItems();
-            JSONObject o = arr.getJSONObject(index);
-            o.put("status", status);
-            prefs.edit().putString("later_items", arr.toString()).apply();
-            showTab("later");
+            Toast.makeText(this, "حُفظت في لاحقًا", Toast.LENGTH_SHORT).show();
         } catch (Exception ignored) {}
     }
 
@@ -488,82 +553,33 @@ public class MainActivity extends Activity {
         showTab("later");
     }
 
-    private View buildPlanScreen() {
-        ScrollView scroll = baseScroll();
-        LinearLayout root = baseRoot(scroll);
-        addHeader(root, "الخطة • ما الذي نحميه الآن؟");
-        LinearLayout c = card();
-        c.setPadding(dp(16), dp(14), dp(16), dp(14));
-        addCard(root, c, dp(16));
-        addBullet(c, "الطب هو الهدف الجامعي الأول، والمختبرات البديل.");
-        addBullet(c, "القرآن: ٤ صفحات يوميًا في المسجد.");
-        addBullet(c, "الإنجليزية: تطوير المفردات والاستماع والقبول.");
-        addBullet(c, "الدخل: مشروع الأكاديميات + تعلم البيع بالتطبيق.");
-        addBullet(c, "الصحة والتواصل: جرعات صغيرة مستمرة.");
-        LinearLayout rule = card();
-        rule.setPadding(dp(16), dp(14), dp(16), dp(14));
-        addCard(root, rule, dp(12));
-        rule.addView(text("قاعدة هذه المرحلة", 17, GREEN, true));
-        rule.addView(detail("الفكرة الجديدة تُحفظ في «لاحقًا» ولا تغير جدول اليوم."));
-        return scroll;
-    }
-
-    private View buildProgressScreen() {
-        ScrollView scroll = baseScroll();
-        LinearLayout root = baseRoot(scroll);
-        addHeader(root, "التقدم • أرقام اليوم");
-        addMetricCard(root, "أهم مهام اليوم", "أنجزت " + arabicNumber(countDoneTasks()) + " من ٣", NAVY);
-        addMetricCard(root, "المؤشرات اليومية", "أنجزت " + arabicNumber(countDoneIndicators()) + " من ٥", GREEN);
-        int reserve = prefs.getInt("reserve_0_" + todayKey, 0) + prefs.getInt("reserve_1_" + todayKey, 0) + prefs.getInt("reserve_2_" + todayKey, 0);
-        addMetricCard(root, "الوقت الاحتياطي المستخدم", arabicNumber(reserve) + " دقيقة", GOLD);
-        int emergency = prefs.getInt("emergency_" + todayKey, 0);
-        addMetricCard(root, "وقت الطوارئ اليوم", arabicNumber(emergency) + " دقيقة", emergency > 0 ? GOLD : MUTED);
-        return scroll;
-    }
-
-    private View buildMoreScreen() {
-        ScrollView scroll = baseScroll();
-        LinearLayout root = baseRoot(scroll);
-        addHeader(root, "المزيد");
-        addMetricCard(root, "الإصدار", "0.3.0", NAVY);
-        addMetricCard(root, "النقاط الرئيسية المنفذة", "١ إلى ١٠", GREEN);
-        LinearLayout c = card();
-        c.setPadding(dp(16), dp(14), dp(16), dp(14));
-        addCard(root, c, dp(12));
-        addBullet(c, "يعمل دون إنترنت.");
-        addBullet(c, "البيانات محفوظة محليًا.");
-        addBullet(c, "اليوم المرن: " + (isFlexibleToday() ? "اليوم" : "غير مستخدم اليوم"));
-        addBullet(c, "وضع الطارئ: " + arabicNumber(prefs.getInt("emergency_" + todayKey, 0)) + " دقيقة");
-        return scroll;
-    }
-
     private LinearLayout buildBottomNav() {
         LinearLayout nav = new LinearLayout(this);
         nav.setOrientation(LinearLayout.HORIZONTAL);
         nav.setGravity(Gravity.CENTER);
         nav.setBackgroundColor(Color.WHITE);
-        nav.setPadding(dp(4), dp(4), dp(4), dp(4));
+        nav.setPadding(dp(3), dp(4), dp(3), dp(4));
         nav.setElevation(dp(8));
         nav.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        addNavItem(nav, "اليوم", "today");
-        addNavItem(nav, "الخطة", "plan");
-        addNavItem(nav, "التقدم", "progress");
-        addNavItem(nav, "لاحقًا", "later");
-        addNavItem(nav, "المزيد", "more");
+        addNav(nav, "اليوم", "today");
+        addNav(nav, "المجالات", "domains");
+        addNav(nav, "الأوسمة", "badges");
+        addNav(nav, "التقدم", "progress");
+        addNav(nav, "لاحقًا", "later");
         return nav;
     }
 
-    private void addNavItem(LinearLayout nav, String label, String key) {
-        TextView item = text(label, 12, activeTab.equals(key) ? GREEN : MUTED, activeTab.equals(key));
-        item.setGravity(Gravity.CENTER);
-        if (activeTab.equals(key)) item.setBackground(rounded(SOFT_GREEN, 16));
+    private void addNav(LinearLayout nav, String label, String key) {
+        TextView v = text(label, 11, activeTab.equals(key) ? GREEN : MUTED, activeTab.equals(key));
+        v.setGravity(Gravity.CENTER);
+        if (activeTab.equals(key)) v.setBackground(rounded(Color.rgb(235, 247, 243), 15));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
-        lp.setMargins(dp(2), dp(4), dp(2), dp(4));
-        nav.addView(item, lp);
-        item.setOnClickListener(v -> showTab(key));
+        lp.setMargins(dp(1), dp(4), dp(1), dp(4));
+        nav.addView(v, lp);
+        v.setOnClickListener(x -> showTab(key));
     }
 
-    private void addHeader(LinearLayout root, String subtitleValue) {
+    private void addHeader(LinearLayout root, String subtitle) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
@@ -572,131 +588,75 @@ public class MainActivity extends Activity {
         block.setOrientation(LinearLayout.VERTICAL);
         row.addView(block, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         block.addView(text("مساري", 30, NAVY, true));
-        block.addView(text(subtitleValue, 14, MUTED, false));
-        TextView badge = text("0.3.0", 12, Color.WHITE, true);
-        badge.setGravity(Gravity.CENTER);
-        badge.setPadding(dp(10), dp(6), dp(10), dp(6));
-        badge.setBackground(rounded(NAVY, 30));
-        row.addView(badge);
+        block.addView(text(subtitle, 14, MUTED, false));
+        TextView version = pill("0.4.0", NAVY, Color.WHITE);
+        row.addView(version);
         root.addView(row);
-        TextView date = text(arabicDate(), 16, TEXT, true);
-        date.setPadding(0, dp(10), 0, 0);
+        TextView date = text(arabicDate(), 15, TEXT, true);
+        date.setPadding(0, dp(9), 0, 0);
         root.addView(date);
     }
 
-    private void addTaskRow(LinearLayout parent, int index, String defaultText) {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        row.setPadding(0, dp(9), 0, 0);
-        CheckBox check = new CheckBox(this);
-        check.setButtonTintList(android.content.res.ColorStateList.valueOf(GREEN));
-        check.setChecked(prefs.getBoolean("task_" + index + "_done_" + todayKey, false));
-        taskChecks[index] = check;
-        row.addView(check, new LinearLayout.LayoutParams(dp(44), dp(62)));
-        EditText input = new EditText(this);
-        input.setText(prefs.getString("task_" + index + "_text_" + todayKey, defaultText));
-        input.setTextSize(14);
-        input.setTextColor(TEXT);
-        input.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
-        input.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        input.setSingleLine(false);
-        input.setMaxLines(3);
-        input.setPadding(dp(12), dp(7), dp(12), dp(7));
-        input.setBackground(rounded(Color.rgb(247, 249, 252), 14, Color.rgb(226, 231, 239)));
-        taskInputs[index] = input;
-        row.addView(input, new LinearLayout.LayoutParams(0, dp(64), 1f));
-        check.setOnCheckedChangeListener((v, checked) -> {
-            prefs.edit().putBoolean("task_" + index + "_done_" + todayKey, checked).apply();
-            updatePriorityProgress();
-        });
-        parent.addView(row);
+    private ProgressBar progressBar(int value, int max, int color) {
+        ProgressBar p = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        p.setMax(max);
+        p.setProgress(Math.min(value, max));
+        p.setProgressTintList(ColorStateList.valueOf(color));
+        p.setProgressBackgroundTintList(ColorStateList.valueOf(Color.rgb(231, 235, 241)));
+        p.setMinimumHeight(dp(9));
+        return p;
     }
 
-    private void addTimelineRow(LinearLayout parent, String time, String label, String tag, boolean highlight) {
-        LinearLayout c = new LinearLayout(this);
-        c.setOrientation(LinearLayout.VERTICAL);
-        c.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        c.setPadding(dp(14), dp(11), dp(14), dp(11));
-        c.setBackground(rounded(highlight ? SOFT_GREEN : Color.WHITE, 16, highlight ? Color.rgb(179, 221, 209) : Color.rgb(227, 232, 240)));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.setMargins(0, dp(6), 0, 0);
-        parent.addView(c, lp);
-        TextView t = text(time, 13, highlight ? GREEN : NAVY, true);
-        t.setPadding(0, 0, 0, dp(4));
-        c.addView(t);
-        c.addView(text(label, 15, TEXT, true));
-        TextView tagView = text(tag, 11, highlight ? GREEN : MUTED, false);
-        tagView.setPadding(0, dp(3), 0, 0);
-        c.addView(tagView);
+    private int domainColor(String domain) {
+        Integer c = domainColors.get(domain);
+        return c == null ? NAVY : c;
     }
 
-    private void addMetricCard(LinearLayout root, String titleValue, String value, int color) {
-        LinearLayout c = card();
-        c.setPadding(dp(16), dp(14), dp(16), dp(14));
-        addCard(root, c, dp(12));
-        c.addView(text(titleValue, 13, MUTED, true));
-        TextView v = text(value, 21, color, true);
-        v.setPadding(0, dp(5), 0, 0);
-        c.addView(v);
+    private String formatTimeRange(int start, int end) {
+        return minuteToTime(start) + " – " + minuteToTime(end);
     }
 
-    private void addBullet(LinearLayout parent, String value) {
-        TextView t = text("•  " + value, 14, TEXT, false);
-        t.setPadding(0, dp(5), 0, dp(5));
-        parent.addView(t);
+    private String minuteToTime(int minute) {
+        int h24 = (minute / 60) % 24;
+        int m = minute % 60;
+        String suffix = h24 < 12 ? "ص" : "م";
+        int h = h24 % 12;
+        if (h == 0) h = 12;
+        return arabicNumber(h) + ":" + twoArabic(m) + " " + suffix;
     }
 
-    private void saveTasks(boolean showToast) {
-        if (taskInputs[0] == null) return;
-        SharedPreferences.Editor e = prefs.edit();
-        for (int i = 0; i < 3; i++) {
-            if (taskInputs[i] != null) e.putString("task_" + i + "_text_" + todayKey, taskInputs[i].getText().toString().trim());
-            if (taskChecks[i] != null) e.putBoolean("task_" + i + "_done_" + todayKey, taskChecks[i].isChecked());
-        }
-        e.apply();
-        if (showToast) Toast.makeText(this, "تم الحفظ", Toast.LENGTH_SHORT).show();
+    private String twoArabic(int n) {
+        String s = n < 10 ? "0" + n : String.valueOf(n);
+        return toArabicDigits(s);
     }
 
-    private int countDoneTasks() {
-        int n = 0;
-        for (int i = 0; i < 3; i++) if (prefs.getBoolean("task_" + i + "_done_" + todayKey, false)) n++;
-        return n;
+    private String dateKey(Calendar c) {
+        return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(c.getTime());
     }
 
-    private int countDoneIndicators() {
-        int n = 0;
-        for (int i = 0; i < 5; i++) if (prefs.getBoolean("indicator_" + i + "_" + todayKey, false)) n++;
-        return n;
+    private String arabicDate() {
+        return new SimpleDateFormat("EEEE، d MMMM yyyy", new Locale("ar")).format(new Date());
     }
 
-    private void updatePriorityProgress() {
-        if (priorityProgress != null) priorityProgress.setText("أنجزت " + arabicNumber(countCurrentChecks(taskChecks)) + " من ٣");
-    }
+    private String arabicNumber(int n) { return toArabicDigits(String.valueOf(n)); }
 
-    private void updateIndicatorProgress() {
-        if (indicatorProgress != null) indicatorProgress.setText("أنجزت " + arabicNumber(countCurrentChecks(indicatorChecks)) + " من ٥");
-    }
-
-    private int countCurrentChecks(CheckBox[] list) {
-        int n = 0;
-        for (CheckBox c : list) if (c != null && c.isChecked()) n++;
-        return n;
+    private String toArabicDigits(String s) {
+        return s.replace('0','٠').replace('1','١').replace('2','٢').replace('3','٣').replace('4','٤')
+                .replace('5','٥').replace('6','٦').replace('7','٧').replace('8','٨').replace('9','٩');
     }
 
     private ScrollView baseScroll() {
-        ScrollView scroll = new ScrollView(this);
-        scroll.setFillViewport(true);
-        scroll.setBackgroundColor(BG);
-        scroll.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        return scroll;
+        ScrollView s = new ScrollView(this);
+        s.setFillViewport(true);
+        s.setBackgroundColor(BG);
+        s.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        return s;
     }
 
     private LinearLayout baseRoot(ScrollView scroll) {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(18), dp(18), dp(18), dp(32));
+        root.setPadding(dp(17), dp(17), dp(17), dp(32));
         root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         scroll.addView(root, new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         return root;
@@ -706,7 +666,7 @@ public class MainActivity extends Activity {
         LinearLayout c = new LinearLayout(this);
         c.setOrientation(LinearLayout.VERTICAL);
         c.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        c.setBackground(rounded(Color.WHITE, 20, Color.rgb(228, 233, 241)));
+        c.setBackground(rounded(Color.WHITE, 18, BORDER));
         c.setElevation(dp(1));
         return c;
     }
@@ -728,29 +688,29 @@ public class MainActivity extends Activity {
         return t;
     }
 
-    private TextView pill(String value, int color) {
-        TextView t = text(value, 12, color, true);
-        t.setGravity(Gravity.CENTER);
-        t.setPadding(dp(9), dp(5), dp(9), dp(5));
-        t.setBackground(rounded(SOFT_GREEN, 24));
+    private TextView detailText(String value) {
+        TextView t = text(value, 12, MUTED, false);
+        t.setPadding(0, dp(5), 0, 0);
         return t;
     }
 
-    private Button smallButton(String label, int color) {
+    private TextView pill(String value, int color, int bg) {
+        TextView t = text(value, 12, color, true);
+        t.setGravity(Gravity.CENTER);
+        t.setPadding(dp(9), dp(5), dp(9), dp(5));
+        t.setBackground(rounded(bg, 22));
+        return t;
+    }
+
+    private Button button(String value, int color) {
         Button b = new Button(this);
-        b.setText(label);
-        b.setTextSize(12);
+        b.setText(value);
+        b.setTextSize(13);
         b.setTextColor(Color.WHITE);
         b.setAllCaps(false);
         b.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        b.setBackground(rounded(color, 13));
+        b.setBackground(rounded(color, 14));
         return b;
-    }
-
-    private LinearLayout.LayoutParams buttonWeight() {
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(46), 1f);
-        lp.setMargins(dp(3), 0, dp(3), 0);
-        return lp;
     }
 
     private GradientDrawable rounded(int color, int radiusDp) {
@@ -760,29 +720,111 @@ public class MainActivity extends Activity {
         return d;
     }
 
-    private GradientDrawable rounded(int color, int radiusDp, int strokeColor) {
+    private GradientDrawable rounded(int color, int radiusDp, int stroke) {
         GradientDrawable d = rounded(color, radiusDp);
-        d.setStroke(dp(1), strokeColor);
+        d.setStroke(dp(1), stroke);
         return d;
     }
 
-    private String arabicDate() {
-        return new SimpleDateFormat("EEEE، d MMMM yyyy", new Locale("ar")).format(Calendar.getInstance().getTime());
+    private int dp(int n) { return Math.round(n * getResources().getDisplayMetrics().density); }
+
+    static class Task {
+        final String id;
+        final int startMin;
+        final int endMin;
+        final String title;
+        final String details;
+        final String domain;
+        final int points;
+        Task(String id, int startMin, int endMin, String title, String details, String domain, int points) {
+            this.id = id; this.startMin = startMin; this.endMin = endMin; this.title = title;
+            this.details = details; this.domain = domain; this.points = points;
+        }
     }
 
-    private String arabicNumber(int n) {
-        return String.valueOf(n)
-                .replace('0', '٠').replace('1', '١').replace('2', '٢').replace('3', '٣').replace('4', '٤')
-                .replace('5', '٥').replace('6', '٦').replace('7', '٧').replace('8', '٨').replace('9', '٩');
-    }
+    class DayWheelView extends View {
+        private final List<Task> tasks;
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF oval = new RectF();
 
-    private int dp(int value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
-    }
+        DayWheelView(Context context, List<Task> tasks) {
+            super(context);
+            this.tasks = tasks;
+            setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+        }
 
-    @Override
-    protected void onPause() {
-        super.onPause();
-        saveTasks(false);
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float w = getWidth();
+            float h = getHeight();
+            float cx = w / 2f;
+            float cy = h / 2f;
+            float radius = Math.min(w, h) * 0.38f;
+            float stroke = dp(31);
+            oval.set(cx - radius, cy - radius, cx + radius, cy + radius);
+
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(stroke);
+            paint.setStrokeCap(Paint.Cap.BUTT);
+            paint.setColor(Color.rgb(229, 233, 240));
+            canvas.drawArc(oval, 0, 360, false, paint);
+
+            for (Task t : tasks) {
+                float start = -90f + (t.startMin / 1440f) * 360f;
+                float sweep = Math.max(1.5f, ((t.endMin - t.startMin) / 1440f) * 360f - 0.7f);
+                int color = domainColor(t.domain);
+                paint.setColor(isTaskDone(t) ? color : blendWithWhite(color, 0.54f));
+                canvas.drawArc(oval, start, sweep, false, paint);
+            }
+
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.WHITE);
+            canvas.drawCircle(cx, cy, radius - stroke * 0.62f, paint);
+
+            textPaint.setTextAlign(Paint.Align.CENTER);
+            textPaint.setTypeface(Typeface.DEFAULT_BOLD);
+            textPaint.setColor(NAVY);
+            textPaint.setTextSize(dp(18));
+            canvas.drawText(arabicNumber(getDayPoints(Calendar.getInstance())), cx, cy - dp(4), textPaint);
+            textPaint.setTextSize(dp(10));
+            textPaint.setColor(MUTED);
+            canvas.drawText("نقطة اليوم", cx, cy + dp(17), textPaint);
+
+            drawHour(canvas, cx, cy, radius + stroke * 0.85f, 0, "٠");
+            drawHour(canvas, cx, cy, radius + stroke * 0.85f, 6, "٦");
+            drawHour(canvas, cx, cy, radius + stroke * 0.85f, 12, "١٢");
+            drawHour(canvas, cx, cy, radius + stroke * 0.85f, 18, "١٨");
+
+            Calendar now = Calendar.getInstance();
+            int minute = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
+            double angle = Math.toRadians(-90 + (minute / 1440.0) * 360.0);
+            float x2 = cx + (radius + stroke * 0.62f) * (float)Math.cos(angle);
+            float y2 = cy + (radius + stroke * 0.62f) * (float)Math.sin(angle);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(dp(2));
+            paint.setColor(Color.rgb(35, 42, 53));
+            canvas.drawLine(cx, cy, x2, y2, paint);
+            paint.setStyle(Paint.Style.FILL);
+            canvas.drawCircle(cx, cy, dp(4), paint);
+        }
+
+        private void drawHour(Canvas canvas, float cx, float cy, float r, int hour, String label) {
+            double a = Math.toRadians(-90 + (hour / 24.0) * 360.0);
+            float x = cx + r * (float)Math.cos(a);
+            float y = cy + r * (float)Math.sin(a) + dp(4);
+            textPaint.setTextAlign(Paint.Align.CENTER);
+            textPaint.setTextSize(dp(10));
+            textPaint.setColor(MUTED);
+            canvas.drawText(label, x, y, textPaint);
+        }
+
+        private int blendWithWhite(int color, float whiteAmount) {
+            int r = (int)(Color.red(color) * (1 - whiteAmount) + 255 * whiteAmount);
+            int g = (int)(Color.green(color) * (1 - whiteAmount) + 255 * whiteAmount);
+            int b = (int)(Color.blue(color) * (1 - whiteAmount) + 255 * whiteAmount);
+            return Color.rgb(r, g, b);
+        }
     }
 }
