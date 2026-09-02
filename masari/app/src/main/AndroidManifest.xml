@@ -4,7 +4,6 @@
         android:allowBackup="true"
         android:icon="@drawable/ic_launcher"
         android:label="مساري"
-        android:rtlSupport="true"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <activity
