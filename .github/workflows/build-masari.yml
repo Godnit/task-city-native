@@ -1,0 +1,53 @@
+name: Build Masari APK
+
+on:
+  push:
+    branches: [masari-app]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Restore fixed signing key
+        run: |
+          base64 -d masari/signing/masari-release.keystore.b64 > masari/signing/masari-release.keystore
+          keytool -list -keystore masari/signing/masari-release.keystore -storepass android -alias masari >/dev/null
+
+      - name: Build signed release APK
+        working-directory: masari
+        run: gradle --no-daemon assembleRelease
+
+      - name: Verify APK
+        run: |
+          $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose masari/app/build/outputs/apk/release/app-release.apk
+          unzip -t masari/app/build/outputs/apk/release/app-release.apk
+
+      - name: Prepare named APK
+        run: cp masari/app/build/outputs/apk/release/app-release.apk Masari-v0.1.0.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Masari-v0.1.0
+          path: Masari-v0.1.0.apk
+          if-no-files-found: error
+          retention-days: 30
