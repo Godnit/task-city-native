@@ -94,10 +94,12 @@ public class RewardCenterActivity extends Activity {
     private void addWallet(LinearLayout root) {
         int stars = prefs.getInt("reward_stars", 0);
         int points = planPoints();
+
         LinearLayout c = card();
         c.setPadding(dp(16), dp(15), dp(16), dp(15));
         c.setBackground(round(Color.rgb(255,249,233), 18, Color.rgb(232,204,139)));
         add(root, c, 14);
+
         LinearLayout line = new LinearLayout(this);
         line.setOrientation(LinearLayout.HORIZONTAL);
         line.setGravity(Gravity.CENTER_VERTICAL);
@@ -116,169 +118,114 @@ public class RewardCenterActivity extends Activity {
         Calendar now = Calendar.getInstance();
         int points = dayPoints(now);
         int target = dayTarget(now);
-        int pct = percent(points, target);
-        boolean claimed = prefs.getBoolean("daily_bonus_claimed_" + todayKey, false);
-        LinearLayout c = card();
-        c.setPadding(dp(15), dp(13), dp(15), dp(13));
-        add(root, c, 10);
-        LinearLayout top = new LinearLayout(this);
-        top.setOrientation(LinearLayout.HORIZONTAL);
-        top.setGravity(Gravity.CENTER_VERTICAL);
-        top.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        top.addView(text("مكافأة اليوم", 17, NAVY, true), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        top.addView(pill(ar(pct) + "٪", pct >= 80 ? GREEN : RED, Color.rgb(248,250,253)));
-        c.addView(top);
-        c.addView(progress(points, target, pct >= 80 ? GREEN : RED));
-        if (claimed) {
-            c.addView(detail("✓ استلمت مكافأة هذا اليوم بالفعل."));
-            return;
-        }
-        if (pct < 80) {
-            c.addView(detail("عند ٨٠٪ تحصل على ★ واحدة، وعند ١٠٠٪ تحصل على ★★. أكمل المهام الأساسية أولًا."));
-            return;
-        }
-        int gain = pct >= 100 ? 2 : 1;
-        c.addView(detail("وصلت للحد المطلوب. استلم " + ar(gain) + " ★ الآن."));
-        Button b = button("استلام +" + ar(gain) + " ★", GOLD);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
-        lp.setMargins(0, dp(8), 0, 0);
-        c.addView(b, lp);
-        b.setOnClickListener(v -> {
-            prefs.edit().putBoolean("daily_bonus_claimed_" + todayKey, true)
-                    .putInt("reward_stars", prefs.getInt("reward_stars", 0) + gain).apply();
-            Toast.makeText(this, "تمت إضافة النجوم", Toast.LENGTH_SHORT).show();
-            render();
-        });
+        int pct = percent(points,target);
+        boolean claimed80 = prefs.getBoolean("reward_claim_80_" + todayKey,false);
+        boolean claimed100 = prefs.getBoolean("reward_claim_100_" + todayKey,false);
+
+        TextView h = text("مكافأة اليوم",21,NAVY,true);
+        h.setPadding(0,dp(22),0,dp(5)); root.addView(h);
+        LinearLayout c = card(); c.setPadding(dp(15),dp(13),dp(15),dp(13)); add(root,c,6);
+        LinearLayout l = new LinearLayout(this); l.setOrientation(LinearLayout.HORIZONTAL); l.setGravity(Gravity.CENTER_VERTICAL); l.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        l.addView(text("إنجاز اليوم",16,TEXT,true),new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f));
+        l.addView(pill(ar(pct)+"٪",gradeColor(pct),Color.rgb(248,250,253))); c.addView(l);
+        c.addView(progress(points,target,gradeColor(pct)));
+        c.addView(detail("عند ٨٠٪: ★ واحدة. عند ١٠٠٪: ★★ إضافيتان."));
+        if (pct >= 80 && !claimed80) addClaimButton(c,"استلام ★ لمستوى ٨٠٪",1,"reward_claim_80_"+todayKey);
+        else c.addView(detail(claimed80 ? "✓ استلمت مكافأة ٨٠٪" : "لم تصل إلى ٨٠٪ بعد."));
+        if (pct >= 100 && !claimed100) addClaimButton(c,"استلام ★★ لإكمال اليوم",2,"reward_claim_100_"+todayKey);
+        else if (claimed100) c.addView(detail("✓ استلمت مكافأة إكمال اليوم"));
+    }
+
+    private void addClaimButton(LinearLayout parent, String label, int stars, String claimKey) {
+        Button b = button(label,GOLD); LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(46)); lp.setMargins(0,dp(9),0,0); parent.addView(b,lp);
+        b.setOnClickListener(v -> { prefs.edit().putInt("reward_stars",prefs.getInt("reward_stars",0)+stars).putBoolean(claimKey,true).apply(); Toast.makeText(this,"أضيفت "+stars+" نجمة",Toast.LENGTH_SHORT).show(); render(); });
     }
 
     private void addStore(LinearLayout root) {
-        TextView h = text("متجر المكافآت", 21, NAVY, true);
-        h.setPadding(0, dp(20), 0, dp(5));
-        root.addView(h);
-        List<Reward> rewards = new ArrayList<>();
-        rewards.add(new Reward("٣٠ دقيقة ترفيه إضافي", 1));
-        rewards.add(new Reward("ساعة لعبة أو أنمي/مسلسل", 2));
-        rewards.add(new Reward("ساعة استكشاف علمي بحرية", 3));
-        rewards.add(new Reward("مساء مرن بلا مهام ثانوية", 4));
-        JSONArray custom = customRewards();
-        for (int i = 0; i < custom.length(); i++) {
-            JSONObject o = custom.optJSONObject(i);
-            if (o != null) rewards.add(new Reward(o.optString("title"), Math.max(1, o.optInt("cost", 1))));
-        }
-        for (Reward reward : rewards) addReward(root, reward);
-        Button add = button("＋ أضف مكافأة خاصة", NAVY);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(46));
-        lp.setMargins(0, dp(8), 0, 0);
-        root.addView(add, lp);
-        add.setOnClickListener(v -> showCustomRewardDialog());
+        TextView h=text("متجر المكافآت",21,NAVY,true);h.setPadding(0,dp(22),0,dp(5));root.addView(h);
+        addStoreItem(root,"٣٠ دقيقة ترفيه إضافية","فيديو/لعبة/أنمي فوق وقت الراحة المعتاد.",2,"fun30");
+        addStoreItem(root,"ساعة لعبة أو أنمي","استخدمها في وقت مناسب لا يزاحم الصلاة أو النوم.",4,"fun60");
+        addStoreItem(root,"ساعة استكشاف حر","طقس، إلكترونيات، جيولوجيا، علم نفس... موضوع تحبه.",3,"explore60");
+        addStoreItem(root,"مساء مرن","خفف المهمات الإضافية في مساء واحد واستمتع بالراحة.",7,"flex_evening");
+        Button custom=button("＋ أضف مكافأة من اختيارك",PURPLE);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(46));lp.setMargins(0,dp(8),0,0);root.addView(custom,lp);custom.setOnClickListener(v->showCustomRewardDialog());
+        JSONArray arr = customRewards();
+        for(int i=0;i<arr.length();i++){JSONObject o=arr.optJSONObject(i);if(o!=null)addStoreItem(root,o.optString("title"),o.optString("note"),o.optInt("cost",3),"custom"+i);}
     }
 
-    private void addReward(LinearLayout root, Reward r) {
-        int balance = prefs.getInt("reward_stars", 0);
-        LinearLayout c = card();
-        c.setPadding(dp(14), dp(12), dp(14), dp(12));
-        add(root, c, 7);
-        LinearLayout top = new LinearLayout(this);
-        top.setOrientation(LinearLayout.HORIZONTAL);
-        top.setGravity(Gravity.CENTER_VERTICAL);
-        top.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        top.addView(text(r.title, 15, TEXT, true), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        top.addView(pill(ar(r.cost) + " ★", GOLD, Color.rgb(255,249,233)));
-        c.addView(top);
-        Button use = button(balance >= r.cost ? "استخدم المكافأة" : "تحتاج نجومًا أكثر", balance >= r.cost ? GREEN : MUTED);
-        use.setEnabled(balance >= r.cost);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(42));
-        lp.setMargins(0, dp(8), 0, 0);
-        c.addView(use, lp);
-        use.setOnClickListener(v -> new AlertDialog.Builder(this)
-                .setTitle("استخدام المكافأة")
-                .setMessage("صرف " + r.cost + " ★ على «" + r.title + "»؟\nلن تنقص نقاط تقدمك.")
-                .setPositiveButton("استخدم", (d,w) -> redeem(r))
-                .setNegativeButton("إلغاء", null).show());
-    }
-
-    private void redeem(Reward r) {
-        int balance = prefs.getInt("reward_stars", 0);
-        if (balance < r.cost) return;
-        prefs.edit().putInt("reward_stars", balance - r.cost).apply();
-        try {
-            JSONArray a = redemptions();
-            JSONObject o = new JSONObject();
-            o.put("title", r.title); o.put("cost", r.cost); o.put("date", arabicDate());
-            a.put(o); prefs.edit().putString("reward_redemptions", a.toString()).apply();
-        } catch (Exception ignored) {}
-        Toast.makeText(this, "تم صرف المكافأة — استمتع بها", Toast.LENGTH_SHORT).show();
-        render();
+    private void addStoreItem(LinearLayout root,String title,String note,int cost,String id) {
+        LinearLayout c=card();c.setPadding(dp(14),dp(11),dp(14),dp(11));add(root,c,6);
+        LinearLayout line=new LinearLayout(this);line.setOrientation(LinearLayout.HORIZONTAL);line.setGravity(Gravity.CENTER_VERTICAL);line.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        LinearLayout info=new LinearLayout(this);info.setOrientation(LinearLayout.VERTICAL);info.addView(text(title,15,TEXT,true));info.addView(text(note,12,MUTED,false));line.addView(info,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f));
+        Button buy=button("★ "+ar(cost),GOLD);line.addView(buy,new LinearLayout.LayoutParams(dp(82),dp(42)));c.addView(line);
+        buy.setOnClickListener(v->{int stars=prefs.getInt("reward_stars",0);if(stars<cost){Toast.makeText(this,"تحتاج نجومًا أكثر",Toast.LENGTH_SHORT).show();return;}prefs.edit().putInt("reward_stars",stars-cost).putLong("reward_used_"+id+"_"+System.currentTimeMillis(),System.currentTimeMillis()).apply();new AlertDialog.Builder(this).setTitle("المكافأة جاهزة").setMessage(title+"\n\nاستخدمها في وقت مناسب ثم ارجع لخطة مساري.").setPositiveButton("تم",null).show();render();});
     }
 
     private void showCustomRewardDialog() {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(18), 0, dp(18), 0);
-        box.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        EditText name = new EditText(this);
-        name.setHint("مثال: خروج لمكان أحبه"); name.setGravity(Gravity.RIGHT); name.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        EditText cost = new EditText(this);
-        cost.setHint("عدد النجوم"); cost.setInputType(InputType.TYPE_CLASS_NUMBER); cost.setGravity(Gravity.RIGHT);
-        box.addView(name); box.addView(cost);
-        new AlertDialog.Builder(this).setTitle("مكافأة خاصة").setView(box)
-                .setPositiveButton("حفظ", (d,w) -> {
-                    String n = name.getText().toString().trim(); int c = 1;
-                    try { c = Math.max(1, Integer.parseInt(cost.getText().toString().trim())); } catch (Exception ignored) {}
-                    if (!n.isEmpty()) {
-                        try { JSONArray a = customRewards(); JSONObject o = new JSONObject(); o.put("title", n); o.put("cost", c); a.put(o); prefs.edit().putString("custom_rewards", a.toString()).apply(); } catch (Exception ignored) {}
-                    }
-                    render();
-                }).setNegativeButton("إلغاء", null).show();
+        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setPadding(dp(18),0,dp(18),0);box.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        EditText title=input("اسم المكافأة");EditText note=input("ملاحظة قصيرة");EditText cost=input("سعرها بالنجوم");cost.setInputType(InputType.TYPE_CLASS_NUMBER);box.addView(title);box.addView(note);box.addView(cost);
+        new AlertDialog.Builder(this).setTitle("مكافأة جديدة").setView(box).setPositiveButton("حفظ",(d,w)->{String t=title.getText().toString().trim();if(t.isEmpty())return;int c=3;try{c=Math.max(1,Integer.parseInt(cost.getText().toString().trim()));}catch(Exception ignored){}try{JSONArray arr=customRewards();JSONObject o=new JSONObject();o.put("title",t);o.put("note",note.getText().toString().trim());o.put("cost",c);arr.put(o);prefs.edit().putString("reward_custom_store",arr.toString()).apply();render();}catch(Exception ignored){}}).setNegativeButton("إلغاء",null).show();
     }
+
+    private JSONArray customRewards(){try{return new JSONArray(prefs.getString("reward_custom_store","[]"));}catch(Exception e){return new JSONArray();}}
 
     private void addAchievements(LinearLayout root) {
-        TextView h = text("إنجازات خاصة", 21, NAVY, true); h.setPadding(0, dp(22), 0, dp(5)); root.addView(h);
-        int total = planPoints();
-        int strong = countStrongDays();
-        int quran = countDoneContains("_quran");
-        int english = countDoneEndsWith("_english");
-        int workout = countDoneContains("_workout");
-        int work = countDoneEndsWith("_work");
-        achievement(root, "أول ٥٠٠ نقطة", "ابدأ سجلًا حقيقيًا للاستمرارية.", total, 500);
-        achievement(root, "٧ أيام قوية", "سبعة أيام وصلت فيها إلى ٨٠٪ أو أكثر.", strong, 7);
-        achievement(root, "١٠ جلسات قرآن", "عشر مهام قرآن منجزة.", quran, 10);
-        achievement(root, "١٠ جلسات إنجليزية", "عشر ساعات صباحية منجزة.", english, 10);
-        achievement(root, "٨ تمارين A/B", "ثماني جلسات قوة دون مطاردة الإنهاك.", workout, 8);
-        achievement(root, "٥ جلسات عمل", "خمس خطوات تنفيذية في السوق/المشروع.", work, 5);
+        TextView h=text("الإنجازات الخاصة",21,NAVY,true);h.setPadding(0,dp(22),0,dp(5));root.addView(h);
+        achievement(root,"أول ٥٠٠ نقطة","اجمع ٥٠٠ نقطة في الخطة.",planPoints(),500);
+        achievement(root,"٧ أيام قوية","حقق ٨٠٪ أو أكثر في ٧ أيام.",countStrongDays(),7);
+        achievement(root,"١٠ جلسات قرآن","أكمل ١٠ جلسات مراجعة قرآن.",countDoneContains("_quran"),10);
+        achievement(root,"١٠ جلسات إنجليزي","أكمل ١٠ جلسات إنجليزية.",countDoneEndsWith("_english"),10);
+        achievement(root,"٨ تمارين","أكمل ٨ جلسات تمرين A/B.",countDoneContains("workout"),8);
+        achievement(root,"٥ جلسات عمل","أكمل ٥ جلسات عمل حقيقية.",countDoneEndsWith("_work"),5);
     }
 
-    private void achievement(LinearLayout root, String title, String note, int value, int target) {
-        boolean open = value >= target;
-        LinearLayout c = card(); c.setPadding(dp(13), dp(11), dp(13), dp(11)); if (!open) c.setAlpha(.72f); add(root, c, 6);
-        LinearLayout line = new LinearLayout(this); line.setOrientation(LinearLayout.HORIZONTAL); line.setGravity(Gravity.CENTER_VERTICAL); line.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        line.addView(text(open ? "★" : "☆", 24, open ? GOLD : MUTED, true), new LinearLayout.LayoutParams(dp(38), ViewGroup.LayoutParams.WRAP_CONTENT));
-        LinearLayout info = new LinearLayout(this); info.setOrientation(LinearLayout.VERTICAL); info.addView(text(title, 15, open ? TEXT : MUTED, true)); info.addView(text(note, 12, MUTED, false));
-        line.addView(info, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        line.addView(pill(ar(Math.min(value,target)) + "/" + ar(target), open ? GREEN : MUTED, Color.rgb(248,250,253))); c.addView(line);
+    private void achievement(LinearLayout root,String title,String note,int value,int target) {
+        boolean open=value>=target;LinearLayout c=card();c.setPadding(dp(13),dp(10),dp(13),dp(10));if(!open)c.setAlpha(.63f);add(root,c,5);
+        LinearLayout line=new LinearLayout(this);line.setOrientation(LinearLayout.HORIZONTAL);line.setGravity(Gravity.CENTER_VERTICAL);line.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);line.addView(text(open?"★":"☆",24,open?GOLD:MUTED,true),new LinearLayout.LayoutParams(dp(38),ViewGroup.LayoutParams.WRAP_CONTENT));
+        LinearLayout info=new LinearLayout(this);info.setOrientation(LinearLayout.VERTICAL);info.addView(text(title,15,open?TEXT:MUTED,true));info.addView(text(note,12,MUTED,false));line.addView(info,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f));line.addView(pill(ar(Math.min(value,target))+"/"+ar(target),open?GREEN:MUTED,Color.rgb(248,250,253)));c.addView(line);
     }
 
     private void addWeekHistory(LinearLayout root) {
-        TextView h = text("آخر ٧ أيام", 21, NAVY, true); h.setPadding(0, dp(22), 0, dp(5)); root.addView(h);
-        Calendar d = Calendar.getInstance(); d.add(Calendar.DAY_OF_MONTH, -6);
+        TextView h = text("آخر ٧ أيام", 21, NAVY, true);
+        h.setPadding(0, dp(22), 0, dp(5));
+        root.addView(h);
+
+        Calendar d = Calendar.getInstance();
+        d.add(Calendar.DAY_OF_MONTH, -6);
         for (int i = 0; i < 7; i++) {
-            int value = dayPoints(d), target = dayTarget(d), pct = percent(value, target);
-            LinearLayout c = card(); c.setPadding(dp(13), dp(10), dp(13), dp(10)); add(root, c, 5);
-            LinearLayout line = new LinearLayout(this); line.setOrientation(LinearLayout.HORIZONTAL); line.setGravity(Gravity.CENTER_VERTICAL); line.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+            int value = dayPoints(d);
+            int target = dayTarget(d);
+            int pct = percent(value, target);
+
+            LinearLayout c = card();
+            c.setPadding(dp(13), dp(10), dp(13), dp(10));
+            add(root, c, 5);
+
+            LinearLayout line = new LinearLayout(this);
+            line.setOrientation(LinearLayout.HORIZONTAL);
+            line.setGravity(Gravity.CENTER_VERTICAL);
+            line.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
             String label = new SimpleDateFormat("EEEE d/M", new Locale("ar")).format(d.getTime());
             line.addView(text(label, 14, TEXT, true), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-            line.addView(pill(ar(pct) + "٪", gradeColor(pct), Color.rgb(248,250,253))); c.addView(line); c.addView(progress(value, target, gradeColor(pct)));
+            line.addView(pill(ar(pct) + "٪", gradeColor(pct), Color.rgb(248,250,253)));
+            c.addView(line);
+            c.addView(progress(value, target, gradeColor(pct)));
             d.add(Calendar.DAY_OF_MONTH, 1);
         }
     }
 
     private void addMonthlyMetrics(LinearLayout root) {
-        TextView h = text("مؤشرات هذا الشهر", 21, NAVY, true); h.setPadding(0, dp(22), 0, dp(5)); root.addView(h);
+        TextView h = text("مؤشرات هذا الشهر", 21, NAVY, true);
+        h.setPadding(0, dp(22), 0, dp(5));
+        root.addView(h);
+
         int days = Calendar.getInstance().getActualMaximum(Calendar.DAY_OF_MONTH);
-        int q1 = monthDone("quran1"), q2 = monthDone("quran2"), en = monthDone("english");
+        int q1 = monthDone("quran1");
+        int q2 = monthDone("quran2");
+        int en = monthDone("english");
         int workout = monthDone("workoutA") + monthDone("workoutB");
         int work = monthDone("work");
         int books = monthDone("leap1") + monthDone("leap2") + monthDone("leap3");
+
         metric(root, "القرآن — المراجعة الجديدة", q1, days, GREEN);
         metric(root, "القرآن — القديمة/البصرية", q2, days, GREEN);
         metric(root, "جلسات الإنجليزية", en, expectedEnglishThisMonth(), Color.rgb(46,94,170));
@@ -289,17 +236,26 @@ public class RewardCenterActivity extends Activity {
 
     private void metric(LinearLayout root, String label, int value, int target, int color) {
         target = Math.max(1,target);
-        LinearLayout c = card(); c.setPadding(dp(13), dp(10), dp(13), dp(10)); add(root, c, 6);
-        LinearLayout line = new LinearLayout(this); line.setOrientation(LinearLayout.HORIZONTAL); line.setGravity(Gravity.CENTER_VERTICAL); line.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        LinearLayout c = card();
+        c.setPadding(dp(13), dp(10), dp(13), dp(10));
+        add(root, c, 6);
+        LinearLayout line = new LinearLayout(this);
+        line.setOrientation(LinearLayout.HORIZONTAL);
+        line.setGravity(Gravity.CENTER_VERTICAL);
+        line.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         line.addView(text(label, 14, TEXT, true), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        line.addView(pill(ar(value) + "/" + ar(target), color, Color.rgb(248,250,253))); c.addView(line); c.addView(progress(value, target, color));
+        line.addView(pill(ar(value) + "/" + ar(target), color, Color.rgb(248,250,253)));
+        c.addView(line);
+        c.addView(progress(value, target, color));
     }
 
-    private int dayPoints(Calendar c) { return prefs.getInt("reward_day_points_" + dateKey(c), 0); }
+    private int dayPoints(Calendar c) {
+        return prefs.getInt("reward_day_points_" + dateKey(c), 0);
+    }
 
     private int dayTarget(Calendar c) {
         int day = c.get(Calendar.DAY_OF_WEEK);
-        int total = 75;
+        int total = 5 + 5 + 7 + 14 + 3 + 8 + 18 + 5 + 5 + 5;
         if (day == Calendar.SATURDAY || day == Calendar.TUESDAY) total += 20;
         if (day != Calendar.FRIDAY) total += 25;
         if (day != Calendar.FRIDAY) total += 25;
@@ -311,67 +267,129 @@ public class RewardCenterActivity extends Activity {
             case Calendar.WEDNESDAY: total += 12; break;
             case Calendar.THURSDAY: total += 12; break;
         }
+        total += customRequiredTarget(day);
         return Math.max(1,total);
     }
 
+    private int customRequiredTarget(int dow) {
+        int total = 0;
+        try {
+            JSONArray arr = new JSONArray(prefs.getString("custom_tasks", "[]"));
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.optJSONObject(i);
+                if (o == null || !o.optBoolean("active", true) || !o.optBoolean("required", false)) continue;
+                int day = o.optInt("day", 0);
+                if (day == 0 || day == dow) total += Math.max(1, o.optInt("points", 10));
+            }
+        } catch (Exception ignored) {}
+        return total;
+    }
+
     private int planPoints() {
-        Calendar start = Calendar.getInstance(); start.set(2026, Calendar.SEPTEMBER, 1);
-        Calendar end = Calendar.getInstance(); end.set(2027, Calendar.MAY, 31);
-        Calendar now = Calendar.getInstance(); Calendar last = now.before(end) ? now : end; int total = 0;
-        while (!start.after(last)) { total += dayPoints(start); start.add(Calendar.DAY_OF_MONTH, 1); }
+        Calendar start = Calendar.getInstance();
+        start.set(2026, Calendar.SEPTEMBER, 1);
+        Calendar end = Calendar.getInstance();
+        end.set(2027, Calendar.MAY, 31);
+        Calendar now = Calendar.getInstance();
+        Calendar last = now.before(end) ? now : end;
+        int total = 0;
+        while (!start.after(last)) {
+            total += dayPoints(start);
+            start.add(Calendar.DAY_OF_MONTH, 1);
+        }
         return total;
     }
 
     private int countStrongDays() {
-        Calendar d = Calendar.getInstance(); d.set(2026, Calendar.SEPTEMBER, 1); Calendar now = Calendar.getInstance(); int n = 0;
-        while (!d.after(now)) { if (percent(dayPoints(d), dayTarget(d)) >= 80) n++; d.add(Calendar.DAY_OF_MONTH, 1); }
+        Calendar d = Calendar.getInstance();
+        d.set(2026, Calendar.SEPTEMBER, 1);
+        Calendar now = Calendar.getInstance();
+        int n = 0;
+        while (!d.after(now)) {
+            if (percent(dayPoints(d), dayTarget(d)) >= 80) n++;
+            d.add(Calendar.DAY_OF_MONTH, 1);
+        }
         return n;
     }
 
     private int countDoneContains(String fragment) {
-        int n = 0; for (Map.Entry<String,?> e : prefs.getAll().entrySet()) if (e.getKey().startsWith("reward_done_") && e.getKey().contains(fragment) && Boolean.TRUE.equals(e.getValue())) n++; return n;
+        int n = 0;
+        for (Map.Entry<String,?> e : prefs.getAll().entrySet()) {
+            if (e.getKey().startsWith("reward_done_") && e.getKey().contains(fragment) && Boolean.TRUE.equals(e.getValue())) n++;
+        }
+        return n;
     }
 
     private int countDoneEndsWith(String suffix) {
-        int n = 0; for (Map.Entry<String,?> e : prefs.getAll().entrySet()) if (e.getKey().startsWith("reward_done_") && e.getKey().endsWith(suffix) && Boolean.TRUE.equals(e.getValue())) n++; return n;
+        int n = 0;
+        for (Map.Entry<String,?> e : prefs.getAll().entrySet()) {
+            if (e.getKey().startsWith("reward_done_") && e.getKey().endsWith(suffix) && Boolean.TRUE.equals(e.getValue())) n++;
+        }
+        return n;
     }
 
     private int monthDone(String id) {
-        Calendar d = Calendar.getInstance(); d.set(Calendar.DAY_OF_MONTH, 1); int month = d.get(Calendar.MONTH), n = 0;
-        while (d.get(Calendar.MONTH) == month) { if (prefs.getBoolean("reward_done_" + dateKey(d) + "_" + id, false)) n++; d.add(Calendar.DAY_OF_MONTH, 1); }
+        Calendar d = Calendar.getInstance();
+        d.set(Calendar.DAY_OF_MONTH, 1);
+        int month = d.get(Calendar.MONTH);
+        int n = 0;
+        while (d.get(Calendar.MONTH) == month) {
+            if (prefs.getBoolean("reward_done_" + dateKey(d) + "_" + id, false)) n++;
+            d.add(Calendar.DAY_OF_MONTH, 1);
+        }
         return n;
     }
 
     private int expectedEnglishThisMonth() {
-        Calendar d = Calendar.getInstance(); d.set(Calendar.DAY_OF_MONTH, 1); int month = d.get(Calendar.MONTH), n = 0;
-        while (d.get(Calendar.MONTH) == month) { if (d.get(Calendar.DAY_OF_WEEK) != Calendar.FRIDAY) n++; d.add(Calendar.DAY_OF_MONTH, 1); } return n;
+        Calendar d = Calendar.getInstance();
+        d.set(Calendar.DAY_OF_MONTH, 1);
+        int month = d.get(Calendar.MONTH);
+        int n = 0;
+        while (d.get(Calendar.MONTH) == month) {
+            if (d.get(Calendar.DAY_OF_WEEK) != Calendar.FRIDAY) n++;
+            d.add(Calendar.DAY_OF_MONTH, 1);
+        }
+        return n;
     }
 
     private int expectedWorkoutThisMonth() {
-        Calendar d = Calendar.getInstance(); d.set(Calendar.DAY_OF_MONTH, 1); int month = d.get(Calendar.MONTH), n = 0;
-        while (d.get(Calendar.MONTH) == month) { int dow = d.get(Calendar.DAY_OF_WEEK); if (dow == Calendar.SATURDAY || dow == Calendar.TUESDAY) n++; d.add(Calendar.DAY_OF_MONTH, 1); } return n;
+        Calendar d = Calendar.getInstance();
+        d.set(Calendar.DAY_OF_MONTH, 1);
+        int month = d.get(Calendar.MONTH);
+        int n = 0;
+        while (d.get(Calendar.MONTH) == month) {
+            int dow = d.get(Calendar.DAY_OF_WEEK);
+            if (dow == Calendar.SATURDAY || dow == Calendar.TUESDAY) n++;
+            d.add(Calendar.DAY_OF_MONTH, 1);
+        }
+        return n;
     }
 
-    private int expectedWorkThisMonth() { return expectedEnglishThisMonth(); }
+    private int expectedWorkThisMonth() {
+        Calendar d = Calendar.getInstance();
+        d.set(Calendar.DAY_OF_MONTH, 1);
+        int month = d.get(Calendar.MONTH);
+        int n = 0;
+        while (d.get(Calendar.MONTH) == month) {
+            if (d.get(Calendar.DAY_OF_WEEK) != Calendar.FRIDAY) n++;
+            d.add(Calendar.DAY_OF_MONTH, 1);
+        }
+        return n;
+    }
 
-    private JSONArray customRewards() { try { return new JSONArray(prefs.getString("custom_rewards", "[]")); } catch (Exception e) { return new JSONArray(); } }
-    private JSONArray redemptions() { try { return new JSONArray(prefs.getString("reward_redemptions", "[]")); } catch (Exception e) { return new JSONArray(); } }
-    private int percent(int value, int target) { return target <= 0 ? 0 : Math.min(999, Math.round(value * 100f / target)); }
-    private int gradeColor(int pct) { if (pct >= 80) return GREEN; if (pct >= 50) return GOLD; return RED; }
-    private String dateKey(Calendar c) { return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(c.getTime()); }
-    private String arabicDate() { return new SimpleDateFormat("EEEE، d MMMM yyyy", new Locale("ar")).format(new Date()); }
-    private String ar(int n) { return String.valueOf(n).replace('0','٠').replace('1','١').replace('2','٢').replace('3','٣').replace('4','٤').replace('5','٥').replace('6','٦').replace('7','٧').replace('8','٨').replace('9','٩'); }
-
-    private void add(LinearLayout root, View v, int top) { LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT); lp.setMargins(0, dp(top), 0, 0); root.addView(v, lp); }
-    private LinearLayout card() { LinearLayout c = new LinearLayout(this); c.setOrientation(LinearLayout.VERTICAL); c.setLayoutDirection(View.LAYOUT_DIRECTION_RTL); c.setBackground(round(Color.WHITE,18,BORDER)); c.setElevation(dp(1)); return c; }
-    private TextView text(String value, int size, int color, boolean bold) { TextView t = new TextView(this); t.setText(value); t.setTextSize(size); t.setTextColor(color); t.setGravity(Gravity.RIGHT); t.setLayoutDirection(View.LAYOUT_DIRECTION_RTL); if (bold) t.setTypeface(Typeface.DEFAULT, Typeface.BOLD); return t; }
-    private TextView detail(String value) { TextView t = text(value,12,MUTED,false); t.setPadding(0,dp(5),0,0); return t; }
-    private TextView pill(String value, int color, int bg) { TextView t = text(value,12,color,true); t.setGravity(Gravity.CENTER); t.setPadding(dp(9),dp(5),dp(9),dp(5)); t.setBackground(round(bg,22)); return t; }
-    private Button button(String value, int color) { Button b = new Button(this); b.setText(value); b.setTextSize(13); b.setTextColor(Color.WHITE); b.setAllCaps(false); b.setTypeface(Typeface.DEFAULT, Typeface.BOLD); b.setBackground(round(color,14)); return b; }
-    private ProgressBar progress(int value, int max, int color) { ProgressBar p = new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal); p.setMax(Math.max(1,max)); p.setProgress(Math.min(value,Math.max(1,max))); p.setProgressTintList(ColorStateList.valueOf(color)); p.setProgressBackgroundTintList(ColorStateList.valueOf(Color.rgb(231,235,241))); p.setMinimumHeight(dp(9)); return p; }
-    private GradientDrawable round(int color, int radius) { GradientDrawable d = new GradientDrawable(); d.setColor(color); d.setCornerRadius(dp(radius)); return d; }
-    private GradientDrawable round(int color, int radius, int stroke) { GradientDrawable d = round(color,radius); d.setStroke(dp(1),stroke); return d; }
-    private int dp(int n) { return Math.round(n * getResources().getDisplayMetrics().density); }
-
-    static class Reward { final String title; final int cost; Reward(String title,int cost) { this.title=title; this.cost=cost; } }
+    private int percent(int v,int t){return Math.min(100,Math.round(v*100f/Math.max(1,t)));}
+    private int gradeColor(int pct){return pct>=80?GREEN:(pct>=50?GOLD:RED);}
+    private String dateKey(Calendar c){return new SimpleDateFormat("yyyy-MM-dd",Locale.US).format(c.getTime());}
+    private String ar(int n){return String.valueOf(n).replace('0','٠').replace('1','١').replace('2','٢').replace('3','٣').replace('4','٤').replace('5','٥').replace('6','٦').replace('7','٧').replace('8','٨').replace('9','٩');}
+    private TextView text(String s,int sp,int color,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextSize(sp);t.setTextColor(color);t.setGravity(Gravity.RIGHT);t.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return t;}
+    private TextView detail(String s){TextView t=text(s,12,MUTED,false);t.setPadding(0,dp(5),0,0);return t;}
+    private TextView pill(String s,int color,int bg){TextView t=text(s,12,color,true);t.setGravity(Gravity.CENTER);t.setPadding(dp(9),dp(5),dp(9),dp(5));t.setBackground(round(bg,20));return t;}
+    private Button button(String s,int color){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextColor(Color.WHITE);b.setTextSize(13);b.setTypeface(Typeface.DEFAULT,Typeface.BOLD);b.setBackground(round(color,13));return b;}
+    private EditText input(String hint){EditText e=new EditText(this);e.setHint(hint);e.setGravity(Gravity.RIGHT);e.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);e.setPadding(dp(8),dp(6),dp(8),dp(6));return e;}
+    private LinearLayout card(){LinearLayout c=new LinearLayout(this);c.setOrientation(LinearLayout.VERTICAL);c.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);c.setBackground(round(Color.WHITE,18,BORDER));c.setElevation(dp(1));return c;}
+    private void add(LinearLayout r,View v,int top){LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);lp.setMargins(0,dp(top),0,0);r.addView(v,lp);}
+    private ProgressBar progress(int value,int target,int color){ProgressBar p=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);p.setMax(Math.max(1,target));p.setProgress(Math.min(value,Math.max(1,target)));p.setProgressTintList(ColorStateList.valueOf(color));p.setProgressBackgroundTintList(ColorStateList.valueOf(Color.rgb(232,236,242)));return p;}
+    private GradientDrawable round(int color,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));return d;}
+    private GradientDrawable round(int color,int radius,int stroke){GradientDrawable d=round(color,radius);d.setStroke(dp(1),stroke);return d;}
+    private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
 }
