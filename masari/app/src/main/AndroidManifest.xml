@@ -7,7 +7,11 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <activity
-            android:name=".MasariRewardsActivity"
+            android:name=".RewardCenterActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
+            android:name=".MasariRewardsActivityV2"
             android:exported="true"
             android:screenOrientation="portrait">
             <intent-filter>
