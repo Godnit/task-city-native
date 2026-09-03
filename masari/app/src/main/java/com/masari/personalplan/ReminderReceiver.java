@@ -14,6 +14,7 @@ public class ReminderReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
+        if (!context.getSharedPreferences("masari_data", Context.MODE_PRIVATE).getBoolean("smart_reminders_enabled", true)) return;
         String title = intent.getStringExtra("title");
         String body = intent.getStringExtra("body");
         int id = intent.getIntExtra("id", (int) System.currentTimeMillis());
