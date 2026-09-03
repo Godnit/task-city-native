@@ -11,7 +11,11 @@
             android:exported="false"
             android:screenOrientation="portrait" />
         <activity
-            android:name=".MasariRewardsActivityV2"
+            android:name=".PlannerCenterActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
+            android:name=".MasariRewardsActivityV3"
             android:exported="true"
             android:screenOrientation="portrait">
             <intent-filter>
