@@ -337,7 +337,31 @@ public class MasariRewardsActivity extends Activity {
         t.add(new Task("leap3", 1230, 1275, "LeapAhead — الكتاب ٣ (مكافأة)", "إذا أكملت كتابين فقد حققت الحد الأدنى. الكتاب الثالث هدف إضافي فقط؛ لا تسهر بسببه ولا تزاحم النوم والقرآن.", "المعرفة والقراءة", 7, false));
         t.add(new Task("close", 1320, 1340, "إغلاق اليوم", "حدد ٣ مهام للغد، انقل الأفكار الجديدة إلى «لاحقًا»، ولا تبدأ بحثًا أو مشروعًا جديدًا الآن.", "الانضباط", 5, true));
         t.add(new Task("sleep", 1340, 1350, "الاستعداد للنوم", "أبعد الهاتف واستعد للنوم. الهدف: أن تقترب من ١٠:٣٠ م بدل السهر لإنهاء محتوى مؤقت.", "الصحة", 5, true));
+        addCustomTasks(t, date);
         return t;
+    }
+
+    private void addCustomTasks(List<Task> tasks, Calendar date) {
+        try {
+            JSONArray arr = new JSONArray(prefs.getString("custom_tasks", "[]"));
+            int dow = date.get(Calendar.DAY_OF_WEEK);
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.optJSONObject(i);
+                if (o == null || !o.optBoolean("active", true)) continue;
+                int repeatDay = o.optInt("day", 0);
+                if (repeatDay != 0 && repeatDay != dow) continue;
+                String id = o.optString("id", "custom_" + i);
+                String title = o.optString("title", "مهمة مخصصة");
+                String details = o.optString("details", "مهمة أضفتها بنفسك.");
+                String domain = o.optString("domain", "الانضباط");
+                if (!domainColors.containsKey(domain)) domain = "الانضباط";
+                int points = Math.max(1, Math.min(100, o.optInt("points", 10)));
+                int start = Math.max(0, Math.min(1439, o.optInt("start", 960)));
+                int end = Math.max(start + 5, Math.min(1440, o.optInt("end", start + 30)));
+                boolean required = o.optBoolean("required", false);
+                tasks.add(new Task(id, start, end, title, details, domain, points, required));
+            }
+        } catch (Exception ignored) {}
     }
 
     private void addAfternoonTask(List<Task> t, int day, int week) {
@@ -689,16 +713,74 @@ public class MasariRewardsActivity extends Activity {
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        LinearLayout block = new LinearLayout(this);
-        block.setOrientation(LinearLayout.VERTICAL);
-        row.addView(block, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        block.addView(text("مساري", 30, NAVY, true));
-        block.addView(text(subtitle, 14, MUTED, false));
-        row.addView(pill("0.5.0", NAVY, Color.WHITE));
+        LinearLayout titles = new LinearLayout(this);
+        titles.setOrientation(LinearLayout.VERTICAL);
+        titles.addView(text("مساري", 30, NAVY, true));
+        titles.addView(text(subtitle, 13, MUTED, false));
+        row.addView(titles, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        TextView ver = pill("0.7.0", NAVY, Color.rgb(238, 242, 248));
+        row.addView(ver);
         root.addView(row);
         TextView date = text(arabicDate(), 15, TEXT, true);
         date.setPadding(0, dp(9), 0, 0);
         root.addView(date);
+    }
+
+    private ScrollView baseScroll() {
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setBackgroundColor(BG);
+        scroll.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        return scroll;
+    }
+
+    private LinearLayout baseRoot(ScrollView scroll) {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(17), dp(17), dp(17), dp(30));
+        root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        scroll.addView(root, new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        return root;
+    }
+
+    private LinearLayout card() {
+        LinearLayout c = new LinearLayout(this);
+        c.setOrientation(LinearLayout.VERTICAL);
+        c.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        c.setBackground(rounded(Color.WHITE, 18, BORDER));
+        c.setElevation(dp(1));
+        return c;
+    }
+
+    private void addCard(LinearLayout root, View c, int top) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(0, dp(top), 0, 0);
+        root.addView(c, lp);
+    }
+
+    private TextView text(String value, int sp, int color, boolean bold) {
+        TextView t = new TextView(this);
+        t.setText(value);
+        t.setTextSize(sp);
+        t.setTextColor(color);
+        t.setGravity(Gravity.RIGHT);
+        t.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        if (bold) t.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        return t;
+    }
+
+    private TextView detailText(String value) {
+        TextView t = text(value, 12, MUTED, false);
+        t.setPadding(0, dp(5), 0, 0);
+        return t;
+    }
+
+    private TextView pill(String value, int textColor, int bg) {
+        TextView t = text(value, 12, textColor, true);
+        t.setGravity(Gravity.CENTER);
+        t.setPadding(dp(9), dp(5), dp(9), dp(5));
+        t.setBackground(rounded(bg, 20));
+        return t;
     }
 
     private ProgressBar progressBar(int value, int max, int color) {
@@ -706,55 +788,75 @@ public class MasariRewardsActivity extends Activity {
         p.setMax(Math.max(1, max));
         p.setProgress(Math.min(value, Math.max(1, max)));
         p.setProgressTintList(ColorStateList.valueOf(color));
-        p.setProgressBackgroundTintList(ColorStateList.valueOf(Color.rgb(231, 235, 241)));
-        p.setMinimumHeight(dp(9));
+        p.setProgressBackgroundTintList(ColorStateList.valueOf(Color.rgb(232, 236, 242)));
         return p;
     }
 
-    private int domainColor(String domain) { Integer c = domainColors.get(domain); return c == null ? NAVY : c; }
-    private String formatTimeRange(int start, int end) { return minuteToTime(start) + " – " + minuteToTime(end); }
+    private int domainColor(String domain) {
+        Integer color = domainColors.get(domain);
+        return color == null ? NAVY : color;
+    }
 
-    private String minuteToTime(int minute) {
+    private String formatTimeRange(int start, int end) { return formatTime(start) + " - " + formatTime(end); }
+
+    private String formatTime(int minute) {
         int h24 = (minute / 60) % 24;
-        int m = minute % 60;
+        int min = minute % 60;
         String suffix = h24 < 12 ? "ص" : "م";
         int h = h24 % 12;
         if (h == 0) h = 12;
-        return arabicNumber(h) + ":" + twoArabic(m) + " " + suffix;
+        return arabicNumber(h) + ":" + (min < 10 ? "٠" : "") + arabicNumber(min) + " " + suffix;
     }
 
-    private String twoArabic(int n) { return toArabicDigits(n < 10 ? "0" + n : String.valueOf(n)); }
+    private String arabicDate() {
+        return new SimpleDateFormat("EEEE، d MMMM yyyy", new Locale("ar")).format(new Date());
+    }
+
     private String dateKey(Calendar c) { return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(c.getTime()); }
-    private String arabicDate() { return new SimpleDateFormat("EEEE، d MMMM yyyy", new Locale("ar")).format(new Date()); }
-    private String arabicNumber(int n) { return toArabicDigits(String.valueOf(n)); }
-    private String toArabicDigits(String s) { return s.replace('0','٠').replace('1','١').replace('2','٢').replace('3','٣').replace('4','٤').replace('5','٥').replace('6','٦').replace('7','٧').replace('8','٨').replace('9','٩'); }
 
-    private ScrollView baseScroll() { ScrollView s = new ScrollView(this); s.setFillViewport(true); s.setBackgroundColor(BG); s.setLayoutDirection(View.LAYOUT_DIRECTION_RTL); return s; }
-
-    private LinearLayout baseRoot(ScrollView scroll) {
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(17), dp(17), dp(17), dp(32));
-        root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        scroll.addView(root, new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        return root;
+    private String arabicNumber(int n) {
+        return String.valueOf(n).replace('0','٠').replace('1','١').replace('2','٢').replace('3','٣').replace('4','٤')
+                .replace('5','٥').replace('6','٦').replace('7','٧').replace('8','٨').replace('9','٩');
     }
 
-    private LinearLayout card() { LinearLayout c = new LinearLayout(this); c.setOrientation(LinearLayout.VERTICAL); c.setLayoutDirection(View.LAYOUT_DIRECTION_RTL); c.setBackground(rounded(Color.WHITE, 18, BORDER)); c.setElevation(dp(1)); return c; }
-    private void addCard(LinearLayout root, View card, int topMargin) { LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT); lp.setMargins(0, topMargin, 0, 0); root.addView(card, lp); }
+    private Button button(String value, int color) {
+        Button b = new Button(this);
+        b.setText(value);
+        b.setAllCaps(false);
+        b.setTextColor(Color.WHITE);
+        b.setTextSize(13);
+        b.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        b.setBackground(rounded(color, 14));
+        return b;
+    }
 
-    private TextView text(String value, int sp, int color, boolean bold) { TextView t = new TextView(this); t.setText(value); t.setTextSize(sp); t.setTextColor(color); t.setGravity(Gravity.RIGHT); t.setLayoutDirection(View.LAYOUT_DIRECTION_RTL); if (bold) t.setTypeface(Typeface.DEFAULT, Typeface.BOLD); return t; }
-    private TextView detailText(String value) { TextView t = text(value, 12, MUTED, false); t.setPadding(0, dp(5), 0, 0); return t; }
-    private TextView pill(String value, int color, int bg) { TextView t = text(value, 12, color, true); t.setGravity(Gravity.CENTER); t.setPadding(dp(9), dp(5), dp(9), dp(5)); t.setBackground(rounded(bg, 22)); return t; }
-    private Button button(String value, int color) { Button b = new Button(this); b.setText(value); b.setTextSize(13); b.setTextColor(Color.WHITE); b.setAllCaps(false); b.setTypeface(Typeface.DEFAULT, Typeface.BOLD); b.setBackground(rounded(color, 14)); return b; }
-    private GradientDrawable rounded(int color, int radiusDp) { GradientDrawable d = new GradientDrawable(); d.setColor(color); d.setCornerRadius(dp(radiusDp)); return d; }
-    private GradientDrawable rounded(int color, int radiusDp, int stroke) { GradientDrawable d = rounded(color, radiusDp); d.setStroke(dp(1), stroke); return d; }
+    private GradientDrawable rounded(int color, int radiusDp) {
+        GradientDrawable d = new GradientDrawable();
+        d.setColor(color);
+        d.setCornerRadius(dp(radiusDp));
+        return d;
+    }
+
+    private GradientDrawable rounded(int color, int radiusDp, int stroke) {
+        GradientDrawable d = rounded(color, radiusDp);
+        d.setStroke(dp(1), stroke);
+        return d;
+    }
+
     private int dp(int n) { return Math.round(n * getResources().getDisplayMetrics().density); }
 
     static class Task {
-        final String id; final int startMin; final int endMin; final String title; final String details; final String domain; final int points; final boolean required;
+        final String id;
+        final int startMin;
+        final int endMin;
+        final String title;
+        final String details;
+        final String domain;
+        final int points;
+        final boolean required;
         Task(String id, int startMin, int endMin, String title, String details, String domain, int points, boolean required) {
-            this.id = id; this.startMin = startMin; this.endMin = endMin; this.title = title; this.details = details; this.domain = domain; this.points = points; this.required = required;
+            this.id = id; this.startMin = startMin; this.endMin = endMin; this.title = title;
+            this.details = details; this.domain = domain; this.points = points; this.required = required;
         }
     }
 
@@ -763,15 +865,30 @@ public class MasariRewardsActivity extends Activity {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final RectF oval = new RectF();
-        DayWheelView(Context context, List<Task> tasks) { super(context); this.tasks = tasks; setLayerType(View.LAYER_TYPE_SOFTWARE, null); }
 
-        @Override protected void onDraw(Canvas canvas) {
+        DayWheelView(Context context, List<Task> tasks) {
+            super(context);
+            this.tasks = tasks;
+            setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
-            float w = getWidth(), h = getHeight(), cx = w / 2f, cy = h / 2f;
-            float radius = Math.min(w, h) * 0.38f, stroke = dp(31);
+            float w = getWidth();
+            float h = getHeight();
+            float cx = w / 2f;
+            float cy = h / 2f;
+            float radius = Math.min(w, h) * 0.38f;
+            float stroke = dp(31);
             oval.set(cx - radius, cy - radius, cx + radius, cy + radius);
-            paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(stroke); paint.setStrokeCap(Paint.Cap.BUTT); paint.setColor(Color.rgb(229, 233, 240));
+
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(stroke);
+            paint.setStrokeCap(Paint.Cap.BUTT);
+            paint.setColor(Color.rgb(229, 233, 240));
             canvas.drawArc(oval, 0, 360, false, paint);
+
             for (Task t : tasks) {
                 float start = -90f + (t.startMin / 1440f) * 360f;
                 float sweep = Math.max(1.5f, ((t.endMin - t.startMin) / 1440f) * 360f - 0.7f);
@@ -779,22 +896,46 @@ public class MasariRewardsActivity extends Activity {
                 paint.setColor(isTaskDone(t) ? color : blendWithWhite(color, 0.54f));
                 canvas.drawArc(oval, start, sweep, false, paint);
             }
-            paint.setStyle(Paint.Style.FILL); paint.setColor(Color.WHITE); canvas.drawCircle(cx, cy, radius - stroke * 0.62f, paint);
-            textPaint.setTextAlign(Paint.Align.CENTER); textPaint.setTypeface(Typeface.DEFAULT_BOLD); textPaint.setColor(NAVY); textPaint.setTextSize(dp(18));
+
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.WHITE);
+            canvas.drawCircle(cx, cy, radius - stroke * 0.62f, paint);
+
+            textPaint.setTextAlign(Paint.Align.CENTER);
+            textPaint.setTypeface(Typeface.DEFAULT_BOLD);
+            textPaint.setColor(NAVY);
+            textPaint.setTextSize(dp(18));
             canvas.drawText(arabicNumber(getDayPoints(Calendar.getInstance())), cx, cy - dp(4), textPaint);
-            textPaint.setTextSize(dp(10)); textPaint.setColor(MUTED); canvas.drawText("نقطة اليوم", cx, cy + dp(17), textPaint);
-            drawHour(canvas, cx, cy, radius + stroke * 0.85f, 0, "٠"); drawHour(canvas, cx, cy, radius + stroke * 0.85f, 6, "٦"); drawHour(canvas, cx, cy, radius + stroke * 0.85f, 12, "١٢"); drawHour(canvas, cx, cy, radius + stroke * 0.85f, 18, "١٨");
-            Calendar now = Calendar.getInstance(); int minute = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
+            textPaint.setTextSize(dp(10));
+            textPaint.setColor(MUTED);
+            canvas.drawText("نقطة اليوم", cx, cy + dp(17), textPaint);
+
+            drawHour(canvas, cx, cy, radius + stroke * 0.85f, 0, "٠");
+            drawHour(canvas, cx, cy, radius + stroke * 0.85f, 6, "٦");
+            drawHour(canvas, cx, cy, radius + stroke * 0.85f, 12, "١٢");
+            drawHour(canvas, cx, cy, radius + stroke * 0.85f, 18, "١٨");
+
+            Calendar now = Calendar.getInstance();
+            int minute = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
             double angle = Math.toRadians(-90 + (minute / 1440.0) * 360.0);
-            float x2 = cx + (radius + stroke * 0.62f) * (float)Math.cos(angle), y2 = cy + (radius + stroke * 0.62f) * (float)Math.sin(angle);
-            paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(dp(2)); paint.setColor(Color.rgb(35, 42, 53)); canvas.drawLine(cx, cy, x2, y2, paint);
-            paint.setStyle(Paint.Style.FILL); canvas.drawCircle(cx, cy, dp(4), paint);
+            float x2 = cx + (radius + stroke * 0.62f) * (float)Math.cos(angle);
+            float y2 = cy + (radius + stroke * 0.62f) * (float)Math.sin(angle);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(dp(2));
+            paint.setColor(Color.rgb(35, 42, 53));
+            canvas.drawLine(cx, cy, x2, y2, paint);
+            paint.setStyle(Paint.Style.FILL);
+            canvas.drawCircle(cx, cy, dp(4), paint);
         }
 
         private void drawHour(Canvas canvas, float cx, float cy, float r, int hour, String label) {
             double a = Math.toRadians(-90 + (hour / 24.0) * 360.0);
-            float x = cx + r * (float)Math.cos(a), y = cy + r * (float)Math.sin(a) + dp(4);
-            textPaint.setTextAlign(Paint.Align.CENTER); textPaint.setTextSize(dp(10)); textPaint.setColor(MUTED); canvas.drawText(label, x, y, textPaint);
+            float x = cx + r * (float)Math.cos(a);
+            float y = cy + r * (float)Math.sin(a) + dp(4);
+            textPaint.setTextAlign(Paint.Align.CENTER);
+            textPaint.setTextSize(dp(10));
+            textPaint.setColor(MUTED);
+            canvas.drawText(label, x, y, textPaint);
         }
 
         private int blendWithWhite(int color, float whiteAmount) {
