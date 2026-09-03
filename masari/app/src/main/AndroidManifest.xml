@@ -1,11 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application
         android:allowBackup="true"
         android:icon="@drawable/ic_launcher"
         android:label="مساري"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
+        <receiver
+            android:name=".ReminderReceiver"
+            android:exported="false" />
         <activity
             android:name=".RewardCenterActivity"
             android:exported="false"
@@ -15,7 +19,11 @@
             android:exported="false"
             android:screenOrientation="portrait" />
         <activity
-            android:name=".MasariRewardsActivityV3"
+            android:name=".WeeklyPlannerActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
+            android:name=".MasariRewardsActivityV4"
             android:exported="true"
             android:screenOrientation="portrait">
             <intent-filter>
