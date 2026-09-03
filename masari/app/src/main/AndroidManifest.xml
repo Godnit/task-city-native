@@ -10,20 +10,12 @@
         <receiver
             android:name=".ReminderReceiver"
             android:exported="false" />
+        <activity android:name=".RewardCenterActivity" android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".PlannerCenterActivity" android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".WeeklyPlannerActivity" android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".MasariRewardsActivityV4" android:exported="false" android:screenOrientation="portrait" />
         <activity
-            android:name=".RewardCenterActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
-        <activity
-            android:name=".PlannerCenterActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
-        <activity
-            android:name=".WeeklyPlannerActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
-        <activity
-            android:name=".MasariRewardsActivityV4"
+            android:name=".ProfessionalDashboardActivity"
             android:exported="true"
             android:screenOrientation="portrait">
             <intent-filter>
