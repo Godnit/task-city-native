@@ -33,7 +33,7 @@ jobs:
       - name: Prepare source fixes
         run: |
           sed -i 's/private int soft(int c)/private static int soft(int c)/' masari/app/src/main/java/com/masari/personalplan/MasariV12Activity.java
-          sed -i 's/addDomainProgress(dom,d)/addDomainProgress(domains,d)/' masari/app/src/main/java/com/masari/personalplan/MasariV17Activity.java
+          sed -i '0,/addDomainProgress(dom,d)/s//addDomainProgress(domains,d)/' masari/app/src/main/java/com/masari/personalplan/MasariV17Activity.java
 
       - name: Build signed release APK
         working-directory: masari
