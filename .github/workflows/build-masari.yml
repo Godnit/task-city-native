@@ -32,19 +32,6 @@ jobs:
           base64 -d masari/signing/masari-release.keystore.b64 > masari/signing/masari-release.keystore
           keytool -list -keystore masari/signing/masari-release.keystore -storepass android -alias masari >/dev/null
 
-      - name: Prepare professional dashboard source
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('masari/app/src/main/java/com/masari/personalplan/ProfessionalDashboardActivity.java')
-          s = p.read_text(encoding='utf-8')
-          marker = '    private ScrollView scroll()'
-          helper = '    private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}\n'
-          if helper.strip() not in s:
-              s = s.replace(marker, helper + marker)
-          p.write_text(s, encoding='utf-8')
-          PY
-
       - name: Build signed release APK
         working-directory: masari
         run: gradle --no-daemon assembleRelease
@@ -55,12 +42,12 @@ jobs:
           unzip -t masari/app/build/outputs/apk/release/app-release.apk
 
       - name: Prepare named APK
-        run: cp masari/app/build/outputs/apk/release/app-release.apk Masari-v0.9.0.apk
+        run: cp masari/app/build/outputs/apk/release/app-release.apk Masari-v0.10.0.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Masari-v0.9.0
-          path: Masari-v0.9.0.apk
+          name: Masari-v0.10.0
+          path: Masari-v0.10.0.apk
           if-no-files-found: error
           retention-days: 30
