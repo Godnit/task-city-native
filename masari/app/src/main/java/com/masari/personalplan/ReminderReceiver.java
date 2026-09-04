@@ -26,7 +26,7 @@ public class ReminderReceiver extends BroadcastReceiver {
             ch.setLightColor(Color.rgb(24,142,78));
             nm.createNotificationChannel(ch);
         }
-        Intent open = new Intent(context, MasariProActivity.class);
+        Intent open = new Intent(context, MasariV10Activity.class);
         open.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pi = PendingIntent.getActivity(context, id, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         android.app.Notification.Builder b = Build.VERSION.SDK_INT >= 26
