@@ -27,14 +27,13 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Restore fixed signing key
-        run: |
-          base64 -d masari/signing/masari-release.keystore.b64 > masari/signing/masari-release.keystore
-          keytool -list -keystore masari/signing/masari-release.keystore -storepass android -alias masari >/dev/null
+      - name: Restore signing key
+        run: base64 -d masari/signing/masari-release.keystore.b64 > masari/signing/masari-release.keystore
 
-      - name: Prepare source compatibility
+      - name: Prepare source fixes
         run: |
           sed -i 's/private int soft(int c)/private static int soft(int c)/' masari/app/src/main/java/com/masari/personalplan/MasariV12Activity.java
+          sed -i 's/addDomainProgress(dom,d)/addDomainProgress(domains,d)/' masari/app/src/main/java/com/masari/personalplan/MasariV17Activity.java
 
       - name: Build signed release APK
         working-directory: masari
@@ -46,12 +45,12 @@ jobs:
           unzip -t masari/app/build/outputs/apk/release/app-release.apk
 
       - name: Prepare named APK
-        run: cp masari/app/build/outputs/apk/release/app-release.apk Masari-v0.16.0.apk
+        run: cp masari/app/build/outputs/apk/release/app-release.apk Masari-v0.17.0.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Masari-v0.16.0
-          path: Masari-v0.16.0.apk
+          name: Masari-v0.17.0
+          path: Masari-v0.17.0.apk
           if-no-files-found: error
           retention-days: 30
