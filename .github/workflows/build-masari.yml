@@ -33,7 +33,16 @@ jobs:
       - name: Prepare source fixes
         run: |
           sed -i 's/private int soft(int c)/private static int soft(int c)/' masari/app/src/main/java/com/masari/personalplan/MasariV12Activity.java
-          sed -i '0,/addDomainProgress(dom,d)/s//addDomainProgress(domains,d)/' masari/app/src/main/java/com/masari/personalplan/MasariV17Activity.java
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('masari/app/src/main/java/com/masari/personalplan/MasariV17Activity.java')
+          s=p.read_text()
+          old='for(String d:reviewDomains)addDomainProgress(dom,d);'
+          new='for(String d:reviewDomains)addDomainProgress(domains,d);'
+          if old not in s:
+              raise SystemExit('weekly review source pattern not found')
+          p.write_text(s.replace(old,new,1))
+          PY
 
       - name: Build signed release APK
         working-directory: masari
