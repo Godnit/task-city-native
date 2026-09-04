@@ -15,8 +15,9 @@
         <activity android:name=".MasariV10Activity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".MasariV11Activity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".MasariV12Activity" android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".MasariV13Activity" android:exported="false" android:screenOrientation="portrait" />
         <activity
-            android:name=".MasariV13Activity"
+            android:name=".MasariV14Activity"
             android:exported="true"
             android:screenOrientation="portrait">
             <intent-filter>
