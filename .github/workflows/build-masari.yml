@@ -32,6 +32,10 @@ jobs:
           base64 -d masari/signing/masari-release.keystore.b64 > masari/signing/masari-release.keystore
           keytool -list -keystore masari/signing/masari-release.keystore -storepass android -alias masari >/dev/null
 
+      - name: Prepare v0.12 source
+        run: |
+          sed -i 's/private int soft(int c)/private static int soft(int c)/' masari/app/src/main/java/com/masari/personalplan/MasariV12Activity.java
+
       - name: Build signed release APK
         working-directory: masari
         run: gradle --no-daemon assembleRelease
@@ -42,12 +46,12 @@ jobs:
           unzip -t masari/app/build/outputs/apk/release/app-release.apk
 
       - name: Prepare named APK
-        run: cp masari/app/build/outputs/apk/release/app-release.apk Masari-v0.10.0.apk
+        run: cp masari/app/build/outputs/apk/release/app-release.apk Masari-v0.12.0.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Masari-v0.10.0
-          path: Masari-v0.10.0.apk
+          name: Masari-v0.12.0
+          path: Masari-v0.12.0.apk
           if-no-files-found: error
           retention-days: 30
