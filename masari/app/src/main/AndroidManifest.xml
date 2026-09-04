@@ -12,9 +12,8 @@
         <activity android:name=".PlannerCenterActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".WeeklyPlannerActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".MasariRewardsActivityV4" android:exported="false" android:screenOrientation="portrait" />
-        <activity android:name=".ProfessionalDashboardActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity
-            android:name=".MasariProActivity"
+            android:name=".MasariV10Activity"
             android:exported="true"
             android:screenOrientation="portrait">
             <intent-filter>
