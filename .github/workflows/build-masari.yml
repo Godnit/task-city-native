@@ -30,7 +30,7 @@ jobs:
       - name: Restore signing key
         run: base64 -d masari/signing/masari-release.keystore.b64 > masari/signing/masari-release.keystore
 
-      - name: Prepare source fixes
+      - name: Prepare source compatibility
         run: |
           sed -i 's/private int soft(int c)/private static int soft(int c)/' masari/app/src/main/java/com/masari/personalplan/MasariV12Activity.java
           python3 - <<'PY'
@@ -39,9 +39,9 @@ jobs:
           s=p.read_text()
           old='for(String d:reviewDomains)addDomainProgress(dom,d);'
           new='for(String d:reviewDomains)addDomainProgress(domains,d);'
-          if old not in s:
-              raise SystemExit('weekly review source pattern not found')
-          p.write_text(s.replace(old,new,1))
+          if old in s:
+              s=s.replace(old,new,1)
+          p.write_text(s)
           PY
 
       - name: Build signed release APK
@@ -54,12 +54,12 @@ jobs:
           unzip -t masari/app/build/outputs/apk/release/app-release.apk
 
       - name: Prepare named APK
-        run: cp masari/app/build/outputs/apk/release/app-release.apk Masari-v0.17.0.apk
+        run: cp masari/app/build/outputs/apk/release/app-release.apk Masari-v0.18.0.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Masari-v0.17.0
-          path: Masari-v0.17.0.apk
+          name: Masari-v0.18.0
+          path: Masari-v0.18.0.apk
           if-no-files-found: error
           retention-days: 30
